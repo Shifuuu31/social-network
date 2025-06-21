@@ -1,7 +1,7 @@
 -- Migration: Create messages table
 -- Private and group chat messages with optional receiver/group references
 
-CREATE TABLE messages (
+CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sender_id INTEGER NOT NULL,
     receiver_id INTEGER,

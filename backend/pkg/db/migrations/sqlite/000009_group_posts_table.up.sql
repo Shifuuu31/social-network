@@ -1,7 +1,7 @@
 -- Migration: Create group_posts table
 -- Posts inside groups, visible to members only
 
-CREATE TABLE group_posts (
+CREATE TABLE IF NOT EXISTS group_posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,

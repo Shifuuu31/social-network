@@ -1,7 +1,7 @@
 -- Migration: Create groups table
 -- User-created groups with title and description
 
-CREATE TABLE groups (
+CREATE TABLE IF NOT EXISTS groups (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     creator_id INTEGER NOT NULL,
     title TEXT NOT NULL,

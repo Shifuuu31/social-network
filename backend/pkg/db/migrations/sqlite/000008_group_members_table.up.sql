@@ -1,7 +1,7 @@
 -- Migration: Create group_members table
 -- Tracks membership status (invited/requested/member/declined) in groups
 
-CREATE TABLE group_members (
+CREATE TABLE IF NOT EXISTS group_members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,

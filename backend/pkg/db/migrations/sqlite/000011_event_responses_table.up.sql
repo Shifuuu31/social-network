@@ -1,7 +1,7 @@
 -- Migration: Create event_responses table
 -- RSVP responses (going/not going) from users to events
 
-CREATE TABLE event_responses (
+CREATE TABLE IF NOT EXISTS event_responses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,

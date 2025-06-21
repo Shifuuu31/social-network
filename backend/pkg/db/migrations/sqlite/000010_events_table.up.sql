@@ -1,7 +1,7 @@
 -- Migration: Create events table
 -- Events created inside groups with schedule and details
 
-CREATE TABLE events (
+CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER NOT NULL,
     title TEXT NOT NULL,

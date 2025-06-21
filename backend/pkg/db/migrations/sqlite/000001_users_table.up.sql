@@ -1,7 +1,7 @@
 -- Migration: Create users table
 -- Stores registered users’ account information and profile data
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,

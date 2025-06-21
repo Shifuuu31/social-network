@@ -1,7 +1,7 @@
 -- Migration: Create comments table
 -- Comments on posts with optional images
 
-CREATE TABLE comments (
+CREATE TABLE IF NOT EXISTS comments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,

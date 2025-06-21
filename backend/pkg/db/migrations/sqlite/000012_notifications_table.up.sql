@@ -1,7 +1,7 @@
 -- Migration: Create notifications table
 -- Notifications for user alerts (follow requests, group invites, etc.)
 
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     type TEXT NOT NULL,

@@ -1,7 +1,7 @@
 -- Migration: Create posts table
 -- User posts with text, optional images, and privacy settings
 
-CREATE TABLE posts (
+CREATE TABLE IF NOT EXISTS posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     content TEXT,
