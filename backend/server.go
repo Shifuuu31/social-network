@@ -16,6 +16,10 @@ func main() {
 	}
 	defer db.Close()
 
+	_ = db
+
+	
+
 	// Now you can use `db` for your queries
 	// Start your server, handlers, etc.
 }

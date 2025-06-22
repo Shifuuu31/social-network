@@ -8,9 +8,9 @@ CREATE TABLE IF NOT EXISTS users (
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     date_of_birth DATE NOT NULL,
-    avatar_url TEXT,
-    nickname TEXT,
-    about_me TEXT,
+    avatar_url TEXT NOT NULL,
+    nickname TEXT NOT NULL,
+    about_me TEXT NOT NULL,
     is_public BOOLEAN NOT NULL DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
