@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     last_name TEXT NOT NULL,
     date_of_birth DATE NOT NULL,
     avatar_url TEXT NOT NULL,
-    nickname TEXT NOT NULL,
+    nickname TEXT UNIQUE NOT NULL,
     about_me TEXT NOT NULL,
     is_public BOOLEAN NOT NULL DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

@@ -10,7 +10,7 @@ import (
 )
 
 type DataLayer struct {
-	// Users *models.UserModel
+	Users *models.UserModel
 	Sessions *models.SessionModel
 	Logger   *models.LoggerModel
 	// link to other models db connection
@@ -127,9 +127,9 @@ func (dl *DataLayer) GlobalMiddleware(handler http.Handler, requireAuth bool) ht
 	}
 	return dl.RecoverMiddleware(
 		dl.TimeoutMiddleware(timeout)(
-			dl.CORSMiddleware(
+			// dl.CORSMiddleware(
 				handler,
-			),
+			// ),
 		),
 	)
 }

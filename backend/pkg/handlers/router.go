@@ -19,7 +19,7 @@ func (rt *Root)Router() (uh *http.ServeMux) {
 	mainMux := http.NewServeMux()
 
 	// Mount sub-muxes under prefixes
-	mainMux.Handle("/user/", http.StripPrefix("/user", userMux))
+	mainMux.Handle("/auth/", http.StripPrefix("/auth", userMux))
 	// mainMux.Handle("/user/", http.StripPrefix("/user", userHandler.Mux))
 
 	return mainMux
