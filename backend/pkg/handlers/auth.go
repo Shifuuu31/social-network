@@ -11,14 +11,14 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func (rt *Root) NewUserHandler() (userMux *http.ServeMux) {
-	userMux = http.NewServeMux()
+func (rt *Root) NewAuthHandler() (authMux *http.ServeMux) {
+	authMux = http.NewServeMux()
 
-	userMux.HandleFunc("POST /signup", rt.SignUp)
-	userMux.HandleFunc("POST /signin", rt.SignIn)
-	userMux.HandleFunc("DELETE /signout", rt.SignOut)
+	authMux.HandleFunc("POST /signup", rt.SignUp)
+	authMux.HandleFunc("POST /signin", rt.SignIn)
+	authMux.HandleFunc("DELETE /signout", rt.SignOut)
 
-	return userMux
+	return authMux
 }
 
 func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {

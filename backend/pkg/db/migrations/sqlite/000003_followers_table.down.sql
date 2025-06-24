@@ -1,2 +1,3 @@
 -- Rollback: Drop followers table
-DROP TABLE followers;
+DROP TABLE follow_request;
+

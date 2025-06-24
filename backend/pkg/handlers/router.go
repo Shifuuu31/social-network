@@ -12,15 +12,15 @@ type Root struct {
 	DL *middleware.DataLayer
 }
 
-func (rt *Root)Router() (uh *http.ServeMux) {
-	userMux := rt.NewUserHandler()
-	// userHandler := handlers.NewUserHandler()
+func (rt *Root) Router() (uh *http.ServeMux) {
+	authMux := rt.NewAuthHandler()
+	userHandler := rt.NewUserHandler()
 
 	mainMux := http.NewServeMux()
 
 	// Mount sub-muxes under prefixes
-	mainMux.Handle("/auth/", http.StripPrefix("/auth", userMux))
-	// mainMux.Handle("/user/", http.StripPrefix("/user", userHandler.Mux))
+	mainMux.Handle("/auth/", http.StripPrefix("/auth", authMux))
+	mainMux.Handle("/user/", http.StripPrefix("/user", userHandler))
 
 	return mainMux
 }

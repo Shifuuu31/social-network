@@ -31,6 +31,12 @@ func main() {
 			Sessions: &models.SessionModel{
 				DB: db,
 			},
+			Posts: &models.PostModel{
+				DB: db,
+			},
+			Follows: &models.FollowRequestModel{
+				DB: db,
+			},
 			Logger: &models.LoggerModel{
 				DB: db,
 			},

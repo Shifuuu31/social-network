@@ -11,6 +11,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type contextKey string
+
+const UserIDKey = contextKey("userID")
+
 type User struct {
 	ID           int       `json:"id"`
 	Email        string    `json:"email"`
@@ -24,7 +28,6 @@ type User struct {
 	IsPublic     bool      `json:"is_public"`
 	PasswordHash []byte    `json:"-"`
 	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // Validate checks all required fields and ensures correct formats
@@ -105,7 +108,7 @@ func (um *UserModel) ValidateCredentials(user *User) error {
 		query = `SELECT id, password_hash FROM users WHERE nickname = ? LIMIT 1`
 		arg = user.Nickname
 	}
-	
+
 	if err := um.DB.QueryRow(query, arg).Scan(&user.ID, &user.PasswordHash); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("User not found: %w", err)
@@ -125,7 +128,7 @@ func (um *UserModel) InsertUser(user *User) error {
 	query := `
 		INSERT INTO users (
 			email, password_hash, first_name, last_name, date_of_birth,
-			avatar_url, nickname, about_me, is_public, created_at, updated_at
+			avatar_url, nickname, about_me, is_public, created_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 	`
 	res, err := um.DB.Exec(query,
@@ -156,7 +159,7 @@ func (um *UserModel) UpdateUser(user *User) error {
 	query := `
 		UPDATE users
 		SET first_name = ?, last_name = ?, date_of_birth = ?, avatar_url = ?, nickname = ?,
-			about_me = ?, is_public = ?, updated_at = CURRENT_TIMESTAMP
+			about_me = ?, is_public = ? = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
 
@@ -188,16 +191,15 @@ func (um *UserModel) DeleteUser(id int) error {
 }
 
 // GetUserByID retrieves a user by ID.
-func (um *UserModel) GetUserByID(id int) (*User, error) {
+func (um *UserModel) GetUserByID(user *User) error {
 	query := `
 		SELECT id, email, password_hash, first_name, last_name, date_of_birth,
-		       avatar_url, nickname, about_me, is_public, created_at, updated_at
+		       avatar_url, nickname, about_me, is_public, created_at
 		FROM users
 		WHERE id = ?
 	`
 
-	var user User
-	err := um.DB.QueryRow(query, id).Scan(
+	err := um.DB.QueryRow(query, user.ID).Scan(
 		&user.ID,
 		&user.Email,
 		&user.PasswordHash,
@@ -209,13 +211,12 @@ func (um *UserModel) GetUserByID(id int) (*User, error) {
 		&user.AboutMe,
 		&user.IsPublic,
 		&user.CreatedAt,
-		&user.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("no user with this id: %w", err) // Not found
+			return fmt.Errorf("no user with this id: %w", err) // Not found
 		}
-		return nil, fmt.Errorf("get user by id: %w", err)
+		return fmt.Errorf("get user by id: %w", err)
 	}
-	return &user, nil
+	return nil
 }

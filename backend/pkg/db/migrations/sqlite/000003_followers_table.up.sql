@@ -1,13 +1,13 @@
 -- Migration: Create followers table
 -- Tracks follow requests and follow relationships between users with status
 
-CREATE TABLE IF NOT EXISTS followers (
+CREATE TABLE IF NOT EXISTS follow_request (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    follower_id INTEGER NOT NULL,
-    following_id INTEGER NOT NULL,
+    from_user_id INTEGER NOT NULL,
+    to_user_id INTEGER NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('pending', 'accepted', 'declined')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(follower_id, following_id),
-    FOREIGN KEY(follower_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY(following_id) REFERENCES users(id) ON DELETE CASCADE
+    UNIQUE(from_user_id, to_user_id),
+    FOREIGN KEY(from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(to_user_id) REFERENCES users(id) ON DELETE CASCADE
 );

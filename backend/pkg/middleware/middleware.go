@@ -10,8 +10,10 @@ import (
 )
 
 type DataLayer struct {
-	Users *models.UserModel
+	Users    *models.UserModel
 	Sessions *models.SessionModel
+	Posts *models.PostModel
+	Follows  *models.FollowRequestModel
 	Logger   *models.LoggerModel
 	// link to other models db connection
 }
@@ -45,17 +47,17 @@ func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		// TODO: and get user id by session token
-		userID := session.UserID
+		requesterID := session.UserID
 		dl.Logger.Log(models.LogEntry{
 			Level:   "INFO",
 			Message: "Authorized access granted",
 			Metadata: map[string]interface{}{
-				"userID": userID,
+				"requesterID": requesterID,
 				"token":  cookie.Value,
 				"path":   r.URL.Path,
 			},
 		})
-		ctx := context.WithValue(r.Context(), tools.UserIDKey, userID)
+		ctx := context.WithValue(r.Context(), models.UserIDKey, requesterID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -128,7 +130,7 @@ func (dl *DataLayer) GlobalMiddleware(handler http.Handler, requireAuth bool) ht
 	return dl.RecoverMiddleware(
 		dl.TimeoutMiddleware(timeout)(
 			// dl.CORSMiddleware(
-				handler,
+			handler,
 			// ),
 		),
 	)

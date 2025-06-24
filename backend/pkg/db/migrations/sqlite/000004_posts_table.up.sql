@@ -4,8 +4,8 @@
 CREATE TABLE IF NOT EXISTS posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
-    content TEXT,
-    image_url TEXT,
+    content TEXT NOT NULL,
+    image_url TEXT NOT NULL,
     privacy TEXT NOT NULL CHECK(privacy IN ('public', 'followers', 'selected')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
