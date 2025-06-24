@@ -128,8 +128,8 @@ func (um *UserModel) InsertUser(user *User) error {
 	query := `
 		INSERT INTO users (
 			email, password_hash, first_name, last_name, date_of_birth,
-			avatar_url, nickname, about_me, is_public, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			avatar_url, nickname, about_me, is_public
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
 	`
 	res, err := um.DB.Exec(query,
 		&user.Email,

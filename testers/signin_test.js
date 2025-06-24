@@ -1,8 +1,10 @@
 const baseUrl = "http://localhost:8080/auth/signin";
 
-const email = `signin1750728753762@test.com`;
-const password = "GoodPassword123";
+// const email = `signin1750728753762@test.com`;
+// const password = "GoodPassword123";
 
+const email = `signout1750730580607@test.com`;
+const password = "Logout123";
 (async () => {
   console.log("\n--- SIGNIN TESTS ---");
 

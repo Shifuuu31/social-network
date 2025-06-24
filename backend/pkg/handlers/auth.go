@@ -84,7 +84,7 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 				"err":   err.Error(),
 			},
 		})
-		tools.RespondError(w, err.Error(), http.StatusBadRequest)
+		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

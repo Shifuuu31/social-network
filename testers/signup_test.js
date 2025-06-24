@@ -2,8 +2,12 @@
 const baseUrl = "http://localhost:8080/auth/signup";
 
 (async () => {
-  const email = `test${Date.now()}@example.com`;
-  const password = "ValidPass123";
+  const   nickname = `test${Date.now()}`
+  // const email = `${nickname}@example.com`;
+
+  // const password = "ValidPass123";
+  const email = `signout1750730580607@test.com`;
+const password = "Logout12@3";
 
   console.log("\n--- SIGNUP TESTS ---");
 
@@ -16,12 +20,12 @@ const baseUrl = "http://localhost:8080/auth/signup";
       password,
       first_name: "Test",
       last_name: "User",
-      nickname: "tester",
+      nickname,
       date_of_birth: new Date("2000-01-01").toISOString()
 
     })
   });
-  console.log("✅ Signup valid:", success.status === 201);
+  console.log("✅ Signup valid:", success.status === 201, success.status);
 
   // ❌ Missing email
   const missingEmail = await fetch(baseUrl, {
