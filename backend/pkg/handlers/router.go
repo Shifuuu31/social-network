@@ -15,8 +15,10 @@ type Root struct {
 func (rt *Root) Router() (uh *http.ServeMux) {
 	authMux := rt.NewAuthHandler()
 	userHandler := rt.NewUserHandler()
-
+	
 	mainMux := http.NewServeMux()
+	 rt.SetupPostRoutes(mainMux)
+
 
 	// Mount sub-muxes under prefixes
 	mainMux.Handle("/auth/", http.StripPrefix("/auth", authMux))
