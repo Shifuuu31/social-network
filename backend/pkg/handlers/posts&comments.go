@@ -25,7 +25,7 @@ func (rt *Root) SetupPostRoutes(mux *http.ServeMux) {
 	postMux := http.NewServeMux()
 	postMux.HandleFunc("POST /feed", rt.GetFeedPosts)
 	postMux.HandleFunc("POST /new", rt.NewPost)
-	postMux.HandleFunc("GET /followers", rt.GetFollowers)
+	postMux.HandleFunc("GET /followers", rt.GetFollowers) // it already in profile&follow.go
 	// log.Println("Mounting post multiplexer at /post/")
 	mux.Handle("/post/", http.StripPrefix("/post", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received request: %s %s", r.Method, r.URL.Path)
@@ -100,10 +100,6 @@ func (app *Root) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 	var post models.Post
 	var hasFile bool
-	if r.Method != http.MethodPost {
-		tools.EncodeJSON(w, 403, nil)
-		return
-	}
 	contentType := r.Header.Get("Content-Type")
 
 	// Handle different content types
@@ -142,10 +138,8 @@ func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate post using existing tools function
-	if status := models.ValidatePost(&post); status != 200 {
-		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "Invalid post data",
-		})
+	if err := post.Validate(); err != nil {
+		tools.RespondError(w, "Invalid post data", http.StatusBadRequest)
 		return
 	}
 

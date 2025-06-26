@@ -22,46 +22,53 @@ type Post struct {
 	ChosenUsersIds []int  `json:"chosen_users_ids"`
 }
 
-type PostFilter struct {
-	Id    int    `json:"id"`
-	Type  string `json:"type"`
-	Start int    `json:"start"`
-	NPost int    `json:"n_post"`
-}
+func (post *Post) Validate() error {
+	if post.OwnerId <= 0 {
+		return errors.New("owner_id must be a positive integer")
+	}
 
-func (pfl *PostFilter) Validate() error {
-	var errs []string
+	if post.GroupId < 0 {
+		return errors.New("group_id cannot be negative")
+	}
 
-	// Validate Type if provided
-	if pfl.Type != "" {
-		validTypes := map[string]bool{
-			"feed":   true,
-			"user":   true,
-			"group":  true,
-			"public": true,
+	post.Content = strings.TrimSpace(post.Content)
+	if post.Content == "" {
+		return errors.New("content cannot be empty")
+	}
+	if len(post.Content) > 1000 {
+		return errors.New("content exceeds 1000 character limit")
+	}
+
+	// Validate privacy value
+	validPrivacyLevels := map[string]bool{
+		"public":         true,
+		"almost_private": true,
+		"private":        true,
+	}
+	if !validPrivacyLevels[post.Privacy] {
+		return errors.New("invalid privacy value; must be 'public', 'almost_private', or 'private'")
+	}
+
+	// Validate ChosenUsersIds
+	if post.Privacy == "private" {
+		if len(post.ChosenUsersIds) == 0 {
+			return errors.New("chosen_users_ids required for private posts")
 		}
-		if !validTypes[pfl.Type] {
-			errs = append(errs, "type must be one of: feed, user, group, public")
+		// Check for duplicates and valid IDs
+		seen := make(map[int]bool)
+		for _, id := range post.ChosenUsersIds {
+			if id <= 0 {
+				return errors.New("all chosen_users_ids must be positive integers")
+			}
+			if seen[id] {
+				return errors.New("duplicate user ID found in chosen_users_ids")
+			}
+			seen[id] = true
 		}
-	}
-
-	if pfl.Start < 0 {
-		errs = append(errs, "start cannot be negative")
-	}
-
-	if pfl.NPost <= 0 {
-		pfl.NPost = 10
-	}
-	if pfl.NPost > 100 {
-		errs = append(errs, "n_post cannot exceed 100")
-	}
-
-	if pfl.Id < 0 {
-		errs = append(errs, "id cannot be negative")
-	}
-
-	if len(errs) > 0 {
-		return errors.New(strings.Join(errs, "; "))
+	} else {
+		if len(post.ChosenUsersIds) > 0 {
+			return errors.New("chosen_users_ids should only be set for private posts")
+		}
 	}
 
 	return nil
@@ -70,11 +77,50 @@ func (pfl *PostFilter) Validate() error {
 type PostModel struct {
 	DB *sql.DB
 }
+type PostFilter struct {
+	Id    int    `json:"id"`
+	Type  string `json:"type"`
+	Start int    `json:"start"`
+	NPost int    `json:"n_post"`
+}
+
+func (pfl *PostFilter) Validate() error {
+	pfl.Type = strings.TrimSpace(pfl.Type)
+
+	if pfl.NPost <= 0 {
+		pfl.NPost = 10
+	}
+
+	if pfl.Id < 0 {
+		return errors.New("id cannot be negative")
+	}
+
+	if pfl.Start < 0 {
+		return errors.New("start cannot be negative")
+	}
+
+	if pfl.Type != "" {
+		validTypes := map[string]bool{
+			"feed":   true,
+			"user":   true,
+			"group":  true,
+			"public": true,
+		}
+		if !validTypes[pfl.Type] {
+			return errors.New("type must be one of: feed, user, group, public")
+		}
+	}
+
+	if pfl.NPost > 100 {
+		return errors.New("n_post cannot exceed 100")
+	}
+
+	return nil
+}
 
 func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 	var query string
 	var rows *sql.Rows
-	fmt.Println("PostFilter:", filter)
 
 	switch filter.Type {
 	case "group":
@@ -140,6 +186,7 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer rows.Close()
 
 	for rows.Next() {
@@ -167,56 +214,6 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 	}
 
 	return posts, nil
-}
-
-func ValidatePost(post *Post) int {
-	// Validate OwnerId
-	if post.OwnerId <= 0 {
-		return 400
-	}
-
-	if post.GroupId < 0 {
-		return 400
-	}
-
-	// Validate Content
-	post.Content = strings.TrimSpace(post.Content)
-	if post.Content == "" || len(post.Content) > 1000 {
-		return 400
-	}
-
-	// Validate Privacy
-	validPrivacyLevels := map[string]bool{
-		"public":         true,
-		"almost_private": true,
-		"private":        true,
-	}
-	if !validPrivacyLevels[post.Privacy] {
-		return 400
-	}
-
-	// Validate ChosenUsersIds for private posts
-	if post.Privacy == "private" {
-		if len(post.ChosenUsersIds) == 0 {
-			fmt.Println("ChosenUsersIds is empty for private post")
-			return 400
-		}
-		// Check for duplicate user IDs and validate positive integers
-		userIdMap := make(map[int]bool)
-		for _, id := range post.ChosenUsersIds {
-			if id <= 0 {
-				return 400
-			}
-			if userIdMap[id] {
-				return 400 // Duplicate user ID
-			}
-			userIdMap[id] = true
-		}
-	} else if len(post.ChosenUsersIds) > 0 {
-		return 400 // chosen_users_ids should only be specified for private posts
-	}
-
-	return 200 // OK
 }
 
 func ParsePostFromForm(r *http.Request, post *Post) int {
