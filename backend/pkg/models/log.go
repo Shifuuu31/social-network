@@ -10,7 +10,7 @@ import (
 type LogEntry struct {
 	Level    string // "INFO", "ERROR", etc.
 	Message  string
-	Metadata map[string]interface{}
+	Metadata map[string]any
 }
 
 type LoggerModel struct {
@@ -38,7 +38,7 @@ func (lm *LoggerModel) Log(entry LogEntry) error {
 // logEntry := LogEntry{
 // 	Level:   "ERROR",
 // 	Message: "Failed to create user",
-// 	Metadata: map[string]interface{}{
+// 	Metadata: map[string]any{
 // 		"user_id": 42,
 // 		"ip":      r.RemoteAddr,
 // 		"path":    r.URL.Path,

@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"slices"
 	"time"
 
 	"social-network/pkg/models"
@@ -12,21 +13,39 @@ import (
 type DataLayer struct {
 	Users    *models.UserModel
 	Sessions *models.SessionModel
-	Posts *models.PostModel
+	Posts    *models.PostModel
 	Follows  *models.FollowRequestModel
 	Logger   *models.LoggerModel
 	// link to other models db connection
 }
 
+// Define paths to skip (exact match only)
+var skipPaths = []string{
+	"/auth/signup",
+	"/auth/signin",
+}
+
+// Optional: define prefixes to skip (e.g., for /static/*)
+var skipPrefixes = []string{
+	"/public/",
+}
+
 // RequireAuth checks if a user is authenticated by session
 func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if request path is in skipPaths
+		// Check if request path matches any skipPrefixes
+		if slices.Contains(skipPaths, r.URL.Path) && tools.SliceHasPrefix(skipPrefixes, r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		cookie, err := r.Cookie("session_token")
 		if err != nil || cookie.Value == "" {
 			dl.Logger.Log(models.LogEntry{
 				Level:   "WARN",
 				Message: "Missing or empty session cookie",
-				Metadata: map[string]interface{}{
+				Metadata: map[string]any{
 					"method": r.Method,
 					"path":   r.URL.Path,
 				},
@@ -41,7 +60,7 @@ func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 			dl.Logger.Log(models.LogEntry{
 				Level:    "WARN",
 				Message:  "Missing osr Invalid session cookie",
-				Metadata: map[string]interface{}{},
+				Metadata: map[string]any{},
 			})
 			tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -51,10 +70,10 @@ func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 		dl.Logger.Log(models.LogEntry{
 			Level:   "INFO",
 			Message: "Authorized access granted",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"requesterID": requesterID,
-				"token":  cookie.Value,
-				"path":   r.URL.Path,
+				"token":       cookie.Value,
+				"path":        r.URL.Path,
 			},
 		})
 		ctx := context.WithValue(r.Context(), models.UserIDKey, requesterID)
@@ -74,7 +93,7 @@ func (dl *DataLayer) CORSMiddleware(next http.Handler) http.Handler {
 			dl.Logger.Log(models.LogEntry{
 				Level:   "INFO",
 				Message: "CORS preflight handled",
-				Metadata: map[string]interface{}{
+				Metadata: map[string]any{
 					"method": r.Method,
 					"path":   r.URL.Path,
 				},
@@ -95,7 +114,7 @@ func (dl *DataLayer) RecoverMiddleware(next http.Handler) http.Handler {
 				dl.Logger.Log(models.LogEntry{
 					Level:   "ERROR",
 					Message: "Panic recovered",
-					Metadata: map[string]interface{}{
+					Metadata: map[string]any{
 						"error": err,
 						"path":  r.URL.Path,
 					},
@@ -113,7 +132,7 @@ func (dl *DataLayer) TimeoutMiddleware(duration time.Duration) func(http.Handler
 		dl.Logger.Log(models.LogEntry{
 			Level:   "INFO",
 			Message: "Applied timeout middleware",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"timeout": duration.String(),
 			},
 		})
@@ -122,16 +141,15 @@ func (dl *DataLayer) TimeoutMiddleware(duration time.Duration) func(http.Handler
 }
 
 // ChainMiddlewares wraps all middleware in correct order
-func (dl *DataLayer) GlobalMiddleware(handler http.Handler, requireAuth bool) http.Handler {
+func (dl *DataLayer) GlobalMiddleware(handler http.Handler) http.Handler {
 	timeout := 10 * time.Second
-	if requireAuth {
-		handler = dl.AccessMiddleware(handler)
-	}
-	return dl.RecoverMiddleware(
+
+	return dl.AccessMiddleware(dl.RecoverMiddleware(
 		dl.TimeoutMiddleware(timeout)(
 			// dl.CORSMiddleware(
 			handler,
 			// ),
 		),
+	),
 	)
 }

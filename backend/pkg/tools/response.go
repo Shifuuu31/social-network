@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-func DecodeJSON(r *http.Request, v interface{}) error {
+func DecodeJSON(r *http.Request, v any) error {
 	if r.Body == nil {
 		return errors.New("request body is empty")
 	}
@@ -31,7 +31,7 @@ func DecodeJSON(r *http.Request, v interface{}) error {
 	return nil
 }
 
-func EncodeJSON(w http.ResponseWriter, status int, v interface{}) (err error) {
+func EncodeJSON(w http.ResponseWriter, status int, v any) (err error) {
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetIndent("", "  ")

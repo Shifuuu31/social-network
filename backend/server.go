@@ -21,7 +21,6 @@ func main() {
 	}
 	defer db.Close()
 
-	_ = db
 
 	AppRoot := handlers.Root{
 		DL: &middleware.DataLayer{
