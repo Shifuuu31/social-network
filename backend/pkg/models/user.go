@@ -49,7 +49,7 @@ func (u *User) Validate() error {
 	if u.FirstName == "" {
 		return errors.New("first name is required")
 	}
-	
+
 	u.LastName = strings.TrimSpace(u.LastName)
 	if u.LastName == "" {
 		return errors.New("last name is required")
@@ -61,7 +61,7 @@ func (u *User) Validate() error {
 	if u.DateOfBirth.IsZero() || u.DateOfBirth.After(minDOB) {
 		return errors.New("user must be at least 13 years old")
 	}
-	
+
 	// TODO — add if https is prsent (allow empty, but if present, validate format)
 	u.AvatarURL = strings.TrimSpace(u.AvatarURL)
 	// if u.AvatarURL != "" {
