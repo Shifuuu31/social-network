@@ -32,14 +32,7 @@ type User struct {
 
 // Validate checks all required fields and ensures correct formats
 func (u *User) Validate() error {
-	// Trim spaces
 	u.Email = strings.TrimSpace(u.Email)
-	u.FirstName = strings.TrimSpace(u.FirstName)
-	u.LastName = strings.TrimSpace(u.LastName)
-	u.Nickname = strings.TrimSpace(u.Nickname)
-	u.AvatarURL = strings.TrimSpace(u.AvatarURL)
-	u.AboutMe = strings.TrimSpace(u.AboutMe)
-
 	// Email validation
 	emailExp := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 	if u.Email == "" || !emailExp.MatchString(u.Email) {
@@ -52,9 +45,12 @@ func (u *User) Validate() error {
 	}
 
 	// Name validations
+	u.FirstName = strings.TrimSpace(u.FirstName)
 	if u.FirstName == "" {
 		return errors.New("first name is required")
 	}
+	
+	u.LastName = strings.TrimSpace(u.LastName)
 	if u.LastName == "" {
 		return errors.New("last name is required")
 	}
@@ -65,8 +61,9 @@ func (u *User) Validate() error {
 	if u.DateOfBirth.IsZero() || u.DateOfBirth.After(minDOB) {
 		return errors.New("user must be at least 13 years old")
 	}
-
+	
 	// TODO — add if https is prsent (allow empty, but if present, validate format)
+	u.AvatarURL = strings.TrimSpace(u.AvatarURL)
 	// if u.AvatarURL != "" {
 	// 	urlRegex := regexp.MustCompile(`^https?://[^\s]+$`)
 	// 	if !urlRegex.MatchString(u.AvatarURL) {
@@ -74,14 +71,16 @@ func (u *User) Validate() error {
 	// 	}
 	// }
 
+	// Alphanumeric and underscore, 3–30 chars
+	u.Nickname = strings.TrimSpace(u.Nickname)
 	if u.Nickname != "" {
-		// Alphanumeric and underscore, 3–30 chars
 		nickRegex := regexp.MustCompile(`^[a-zA-Z0-9_]{3,30}$`)
 		if !nickRegex.MatchString(u.Nickname) {
 			return errors.New("nickname must be alphanumeric/underscore and 3–30 chars")
 		}
 	}
 
+	u.AboutMe = strings.TrimSpace(u.AboutMe)
 	if len(u.AboutMe) > 500 {
 		return errors.New("about me section is too long (max 500 characters)")
 	}

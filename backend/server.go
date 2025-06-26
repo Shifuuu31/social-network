@@ -36,6 +36,9 @@ func main() {
 			Follows: &models.FollowRequestModel{
 				DB: db,
 			},
+			Groups: &models.GroupModel{
+				DB: db,
+			},
 			Logger: &models.LoggerModel{
 				DB: db,
 			},

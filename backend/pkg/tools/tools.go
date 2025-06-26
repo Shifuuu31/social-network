@@ -1,6 +1,8 @@
 package tools
 
-import "strings"
+import (
+	"strings"
+)
 
 func SliceHasPrefix(prifixes []string, path string) bool {
 	for _, prefix := range prifixes {

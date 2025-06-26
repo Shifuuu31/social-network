@@ -14,13 +14,15 @@ type Root struct {
 
 func (rt *Root) Router() (uh *http.ServeMux) {
 	authMux := rt.NewAuthHandler()
-	userHandler := rt.NewUserHandler()
+	usersHandler := rt.NewUsersHandler()
+	groupsHandler := rt.NewGroupsHandler()
 
 	mainMux := http.NewServeMux()
 
 	// Mount sub-muxes under prefixes
 	mainMux.Handle("/auth/", http.StripPrefix("/auth", authMux))
-	mainMux.Handle("/user/", http.StripPrefix("/user", userHandler))
+	mainMux.Handle("/users/", http.StripPrefix("/users", usersHandler))
+	mainMux.Handle("/groups/", http.StripPrefix("/groups", groupsHandler))
 
 	return mainMux
 }

@@ -15,6 +15,7 @@ type DataLayer struct {
 	Sessions *models.SessionModel
 	Posts    *models.PostModel
 	Follows  *models.FollowRequestModel
+	Groups   *models.GroupModel
 	Logger   *models.LoggerModel
 	// link to other models db connection
 }
@@ -28,6 +29,23 @@ var skipPaths = []string{
 // Optional: define prefixes to skip (e.g., for /static/*)
 var skipPrefixes = []string{
 	"/public/",
+}
+
+func (dl *DataLayer) GetRequesterID(w http.ResponseWriter, r *http.Request) (requesterID int) {
+	requesterID, ok := r.Context().Value(models.UserIDKey).(int)
+	if !ok {
+		tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
+		dl.Logger.Log(models.LogEntry{
+			Level:   "WARN",
+			Message: "Unauthorized",
+			Metadata: map[string]any{
+				"ip":   r.RemoteAddr,
+				"path": r.URL.Path,
+			},
+		})
+		return 0
+	}
+	return requesterID
 }
 
 // RequireAuth checks if a user is authenticated by session
@@ -54,7 +72,7 @@ func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// TODO: validate token and get user ID
+		// validate token and get user ID
 		session, err := dl.Sessions.GetSessionByToken(cookie.Value)
 		if err != nil {
 			dl.Logger.Log(models.LogEntry{
@@ -65,7 +83,7 @@ func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 			tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		// TODO: and get user id by session token
+		// and get user id by session token
 		requesterID := session.UserID
 		dl.Logger.Log(models.LogEntry{
 			Level:   "INFO",
