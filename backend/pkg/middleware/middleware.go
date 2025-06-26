@@ -13,9 +13,28 @@ type DataLayer struct {
 	Users    *models.UserModel
 	Sessions *models.SessionModel
 	Posts *models.PostModel
+	Comments *models.CommentModel
 	Follows  *models.FollowRequestModel
 	Logger   *models.LoggerModel
 	// link to other models db connection
+}
+
+
+func (dl *DataLayer) GetRequesterID(w http.ResponseWriter, r *http.Request) (requesterID int) {
+    requesterID, ok := r.Context().Value(models.UserIDKey).(int)
+    if !ok {
+        tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
+        dl.Logger.Log(models.LogEntry{
+            Level:   "WARN",
+            Message: "Unauthorized profile view attempt",
+            Metadata: map[string]any{
+                "ip":   r.RemoteAddr,
+                "path": r.URL.Path,
+            },
+        })
+        return 0
+    }
+    return requesterID
 }
 
 // RequireAuth checks if a user is authenticated by session
@@ -26,7 +45,7 @@ func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 			dl.Logger.Log(models.LogEntry{
 				Level:   "WARN",
 				Message: "Missing or empty session cookie",
-				Metadata: map[string]interface{}{
+				Metadata: map[string]any{
 					"method": r.Method,
 					"path":   r.URL.Path,
 				},

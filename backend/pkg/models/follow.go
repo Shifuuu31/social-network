@@ -19,6 +19,8 @@ type FollowRequestModel struct {
 	DB *sql.DB
 }
 
+
+
 // CanFollow checks if follower can send a follow request or follow directly.
 // Return false if already following or a pending request exists.
 func (flm *FollowRequestModel) CanFollow(followRequest *FollowRequest) (bool, error) {

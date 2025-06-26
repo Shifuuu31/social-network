@@ -34,6 +34,9 @@ func main() {
 			Posts: &models.PostModel{
 				DB: db,
 			},
+			Comments: &models.CommentModel{
+				DB: db,
+			},
 			Follows: &models.FollowRequestModel{
 				DB: db,
 			},
