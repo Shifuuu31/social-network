@@ -26,7 +26,7 @@ func (rt *Root) SetupPostRoutes(mux *http.ServeMux) {
 	postMux.HandleFunc("POST /feed", rt.GetFeedPosts)
 	postMux.HandleFunc("POST /new", rt.NewPost)
 	postMux.HandleFunc("GET /followers", rt.GetFollowers)
-	log.Println("Mounting post multiplexer at /post/")
+	// log.Println("Mounting post multiplexer at /post/")
 	mux.Handle("/post/", http.StripPrefix("/post", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received request: %s %s", r.Method, r.URL.Path)
 		postMux.ServeHTTP(w, r)
@@ -74,7 +74,7 @@ func (app *Root) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate filter using tools function
-	if err := models.ValidatePostFilter(filter); err != nil {
+	if err := filter.Validate(); err != nil {
 		fmt.Println("GetFeedPosts filter validation error:", err, "filter:", filter)
 		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
 			"error": "Invalid filter parameters",
@@ -207,7 +207,6 @@ func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 		INSERT INTO posts (user_id, group_id, content, image, privacy, created_at)
 		VALUES (?, ?, ?, ?, ?, ?)`,
 		post.OwnerId, post.GroupId, post.Content, imagePath, post.Privacy, time.Now())
-
 	if err != nil {
 		log.Printf("Error inserting post: %v", err)
 		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{
@@ -429,7 +428,6 @@ func (app *Root) NewComment(w http.ResponseWriter, r *http.Request) {
 		INSERT INTO comments (user_id, post_id, content, image, created_at)
 		VALUES (?, ?, ?, ?, ?)`,
 		comment.OwnerId, comment.Post_id, comment.Content, imagePath, time.Now())
-
 	if err != nil {
 		log.Printf("Error inserting post: %v", err)
 		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{

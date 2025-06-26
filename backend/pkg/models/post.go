@@ -21,15 +21,54 @@ type Post struct {
 	CreatedAt      string `json:"created_at"`
 	ChosenUsersIds []int  `json:"chosen_users_ids"`
 }
-type PostModel struct {
-	DB *sql.DB
-}
 
 type PostFilter struct {
 	Id    int    `json:"id"`
 	Type  string `json:"type"`
 	Start int    `json:"start"`
 	NPost int    `json:"n_post"`
+}
+
+func (pfl *PostFilter) Validate() error {
+	var errs []string
+
+	// Validate Type if provided
+	if pfl.Type != "" {
+		validTypes := map[string]bool{
+			"feed":   true,
+			"user":   true,
+			"group":  true,
+			"public": true,
+		}
+		if !validTypes[pfl.Type] {
+			errs = append(errs, "type must be one of: feed, user, group, public")
+		}
+	}
+
+	if pfl.Start < 0 {
+		errs = append(errs, "start cannot be negative")
+	}
+
+	if pfl.NPost <= 0 {
+		pfl.NPost = 10
+	}
+	if pfl.NPost > 100 {
+		errs = append(errs, "n_post cannot exceed 100")
+	}
+
+	if pfl.Id < 0 {
+		errs = append(errs, "id cannot be negative")
+	}
+
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "; "))
+	}
+
+	return nil
+}
+
+type PostModel struct {
+	DB *sql.DB
 }
 
 func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
@@ -220,42 +259,4 @@ func ParsePostFromForm(r *http.Request, post *Post) int {
 	}
 
 	return 200 // OK
-}
-
-func ValidatePostFilter(filter *PostFilter) error {
-	var errs []string
-
-	// Validate Type if provided
-	if filter.Type != "" {
-		validTypes := map[string]bool{
-			"feed":   true,
-			"user":   true,
-			"group":  true,
-			"public": true,
-		}
-		if !validTypes[filter.Type] {
-			errs = append(errs, "type must be one of: feed, user, group, public")
-		}
-	}
-
-	if filter.Start < 0 {
-		errs = append(errs, "start cannot be negative")
-	}
-
-	if filter.NPost <= 0 {
-		filter.NPost = 10
-	}
-	if filter.NPost > 100 {
-		errs = append(errs, "n_post cannot exceed 100")
-	}
-
-	if filter.Id < 0 {
-		errs = append(errs, "id cannot be negative")
-	}
-
-	if len(errs) > 0 {
-		return errors.New(strings.Join(errs, "; "))
-	}
-
-	return nil
 }

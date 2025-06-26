@@ -17,7 +17,7 @@ func (rt *Root) Router() (uh *http.ServeMux) {
 	userHandler := rt.NewUserHandler()
 	
 	mainMux := http.NewServeMux()
-	 rt.SetupPostRoutes(mainMux)
+	rt.SetupPostRoutes(mainMux)
 
 
 	// Mount sub-muxes under prefixes
