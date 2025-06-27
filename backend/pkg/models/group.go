@@ -150,6 +150,22 @@ func (gm *GroupModel) DeleteGroup(group *Group) error {
 	return nil
 }
 
+// IsUserCreator checks if the user is the creator of the given group.
+func (gm *GroupModel) IsUserCreator(groupID, userID int) error {
+	query := `
+		SELECT COUNT(*)
+		FROM groups
+		WHERE id = ? AND creator_id = ?
+	`
+	var count int
+	err := gm.DB.QueryRow(query, groupID, userID).Scan(&count)
+	if err != nil || !(count > 0) {
+		return fmt.Errorf("check user is creator: %w", err)
+	}
+
+	return nil
+}
+
 type GroupsPayload struct {
 	UserID     string `json:"user_id"`
 	Start      int    `json:"star"`

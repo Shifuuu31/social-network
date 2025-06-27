@@ -18,18 +18,20 @@ type GroupMemberModel struct {
 	DB *sql.DB
 }
 
-// InsertMember inserts a new group member.
-func (gmm *GroupMemberModel) InsertMember(member *GroupMember) error {
+// UpsertMember insert member or update mehis status.
+func (gmm *GroupMemberModel) UpsertMember(member *GroupMember) error {
 	query := `
 		INSERT INTO group_members (group_id, user_id, status)
 		VALUES (?, ?, ?)
+		ON CONFLICT(group_id, user_id) DO UPDATE SET status=excluded.status
 	`
 	_, err := gmm.DB.Exec(query, member.GroupID, member.UserID, member.Status)
 	if err != nil {
-		return fmt.Errorf("insert group member: %w", err)
+		return fmt.Errorf("upsert group member: %w", err)
 	}
 	return nil
 }
+
 
 // DeleteMember removes a member from a group.
 func (gmm *GroupMemberModel) DeleteMember(member *GroupMember) error {
@@ -48,23 +50,6 @@ func (gmm *GroupMemberModel) DeleteMember(member *GroupMember) error {
 	return nil
 }
 
-// UpdateMemberStatus updates the status of a group member.
-func (gmm *GroupMemberModel) UpdateMemberStatus(member *GroupMember) error {
-	query := `
-		UPDATE group_members
-		SET status = ?
-		WHERE group_id = ? AND user_id = ?
-	`
-	res, err := gmm.DB.Exec(query, member.Status, member.GroupID, member.UserID)
-	if err != nil {
-		return fmt.Errorf("update member status: %w", err)
-	}
-	rowsAffected, _ := res.RowsAffected()
-	if rowsAffected == 0 {
-		return sql.ErrNoRows
-	}
-	return nil
-}
 
 // GetMember retrieves a specific group member.
 func (gmm *GroupMemberModel) GetMember(member *GroupMember) error {
@@ -102,7 +87,7 @@ func (gmm *GroupMemberModel) GetGroupMembers(groupID int) ([]*GroupMember, error
 }
 
 // IsUserInGroup checks if a user is in a specific group.
-func (gmm *GroupMemberModel) IsUserInGroup(groupID, userID int) (bool, error) {
+func (gmm *GroupMemberModel) IsUserInGroup(groupID, userID int) error {
 	query := `
 		SELECT COUNT(*)
 		FROM group_members
@@ -110,8 +95,11 @@ func (gmm *GroupMemberModel) IsUserInGroup(groupID, userID int) (bool, error) {
 	`
 	var count int
 	err := gmm.DB.QueryRow(query, groupID, userID).Scan(&count)
-	if err != nil {
-		return false, fmt.Errorf("check user in group: %w", err)
+	if err != nil ||  count > 0 {
+		return fmt.Errorf("check user in group: %w", err)
 	}
-	return count > 0, nil
+	return nil
 }
+
+
+
