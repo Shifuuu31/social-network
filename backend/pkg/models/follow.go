@@ -15,6 +15,8 @@ type FollowRequest struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+func (fl *FollowRequest) Validate() error
+
 type FollowRequestModel struct {
 	DB *sql.DB
 }

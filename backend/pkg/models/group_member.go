@@ -14,6 +14,8 @@ type GroupMember struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+func (gm *GroupMember) Validate() error
+
 type GroupMemberModel struct {
 	DB *sql.DB
 }
@@ -32,7 +34,6 @@ func (gmm *GroupMemberModel) UpsertMember(member *GroupMember) error {
 	return nil
 }
 
-
 // DeleteMember removes a member from a group.
 func (gmm *GroupMemberModel) DeleteMember(member *GroupMember) error {
 	query := `
@@ -49,7 +50,6 @@ func (gmm *GroupMemberModel) DeleteMember(member *GroupMember) error {
 	}
 	return nil
 }
-
 
 // GetMember retrieves a specific group member.
 func (gmm *GroupMemberModel) GetMember(member *GroupMember) error {
@@ -95,11 +95,8 @@ func (gmm *GroupMemberModel) IsUserInGroup(groupID, userID int) error {
 	`
 	var count int
 	err := gmm.DB.QueryRow(query, groupID, userID).Scan(&count)
-	if err != nil ||  count > 0 {
+	if err != nil || count <= 0 {
 		return fmt.Errorf("check user in group: %w", err)
 	}
 	return nil
 }
-
-
-

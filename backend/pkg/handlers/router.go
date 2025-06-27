@@ -6,7 +6,7 @@ import (
 	"social-network/pkg/middleware"
 )
 
-// TODO add routes...
+
 
 type Root struct {
 	DL *middleware.DataLayer
@@ -20,9 +20,9 @@ func (rt *Root) Router() (uh *http.ServeMux) {
 	mainMux := http.NewServeMux()
 
 	// Mount sub-muxes under prefixes
-	mainMux.Handle("/auth/", http.StripPrefix("/auth", authMux))
-	mainMux.Handle("/users/", http.StripPrefix("/users", usersHandler))
-	mainMux.Handle("/groups/", http.StripPrefix("/groups", groupsHandler))
+	mainMux.Handle("/api/auth/", http.StripPrefix("/api/auth", authMux))
+	mainMux.Handle("/api/users/", http.StripPrefix("/api/users", usersHandler))
+	mainMux.Handle("/api/groups/", http.StripPrefix("/api/groups", groupsHandler))
 
 	return mainMux
 }

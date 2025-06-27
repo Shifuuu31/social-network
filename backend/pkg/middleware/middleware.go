@@ -17,6 +17,8 @@ type DataLayer struct {
 	Follows  *models.FollowRequestModel
 	Groups   *models.GroupModel
 	Members   *models.GroupMemberModel
+	Events   *models.EventModel
+	Votes   *models.EventVoteModel
 	Logger   *models.LoggerModel
 	// link to other models db connection
 }

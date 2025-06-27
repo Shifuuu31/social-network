@@ -159,7 +159,7 @@ func (gm *GroupModel) IsUserCreator(groupID, userID int) error {
 	`
 	var count int
 	err := gm.DB.QueryRow(query, groupID, userID).Scan(&count)
-	if err != nil || !(count > 0) {
+	if err != nil || count <= 0 {
 		return fmt.Errorf("check user is creator: %w", err)
 	}
 
@@ -170,69 +170,61 @@ type GroupsPayload struct {
 	UserID     string `json:"user_id"`
 	Start      int    `json:"star"`
 	NumOfItems int    `json:"n_items"`
+	Type       string `json:"type"`
 }
 
-func (gm *GroupModel) GetUserGroups(Groups *GroupsPayload) ([]*Group, error) {
-	if Groups.Start == -1 {
-		// Get the last group id for this user
-		err := gm.DB.QueryRow(`SELECT MAX(id) FROM groups WHERE creator_id = ?`, Groups.UserID).Scan(&Groups.Start)
-		if err != nil {
-			return nil, fmt.Errorf("get max group id: %w", err)
+func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
+	var (
+		query string
+		args  []any
+	)
+
+	switch Groups.Type {
+	case "user":
+		if Groups.Start == -1 {
+			err := gm.DB.QueryRow(`SELECT MAX(id) FROM groups WHERE creator_id = ?`, Groups.UserID).Scan(&Groups.Start)
+			if err != nil {
+				return nil, fmt.Errorf("get max group id: %w", err)
+			}
 		}
+		query = `
+			SELECT g.id, g.creator_id, g.title, g.description, g.created_at,
+			       COUNT(m.id) AS member_count
+			FROM groups g
+			LEFT JOIN group_members m ON g.id = m.group_id AND m.status = 'member'
+			WHERE g.creator_id = ? AND g.id <= ?
+			GROUP BY g.id
+			ORDER BY g.id DESC
+			LIMIT ?
+		`
+		args = []any{Groups.UserID, Groups.Start, Groups.NumOfItems}
+
+	case "all":
+		if Groups.Start == -1 {
+			err := gm.DB.QueryRow(`SELECT MAX(id) FROM groups`).Scan(&Groups.Start)
+			if err != nil {
+				return nil, fmt.Errorf("get max group id: %w", err)
+			}
+		}
+		query = `
+			SELECT g.id, g.creator_id, g.title, g.description, g.created_at,
+			       COUNT(m.id) AS member_count
+			FROM groups g
+			LEFT JOIN group_members m ON g.id = m.group_id AND m.status = 'member'
+			WHERE g.id <= ?
+			GROUP BY g.id
+			ORDER BY g.id DESC
+			LIMIT ?
+		`
+		args = []any{Groups.Start, Groups.NumOfItems}
+
+	default:
+		return nil, fmt.Errorf("invalid group type: %s", Groups.Type)
 	}
 
-	query := `
-		SELECT g.id, g.creator_id, g.title, g.description, g.created_at,
-		       COUNT(m.id) AS member_count
-		FROM groups g
-		LEFT JOIN group_members m ON g.id = m.group_id AND m.status = 'member'
-		WHERE g.creator_id = ? AND g.id <= ?
-		GROUP BY g.id
-		ORDER BY g.id DESC
-		LIMIT ?
-	`
-
-	rows, err := gm.DB.Query(query, Groups.UserID, Groups.Start, Groups.NumOfItems)
+	rows, err := gm.DB.Query(query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("get user groups: %w", err)
-	}
-	defer rows.Close()
-
-	var groups []*Group
-	for rows.Next() {
-		var g Group
-		var memberCount int
-		if err := rows.Scan(&g.ID, &g.CreatorID, &g.Title, &g.Description, &g.CreatedAt, &memberCount); err != nil {
-			return nil, fmt.Errorf("scan group: %w", err)
-		}
-		groups = append(groups, &g)
-	}
-
-	return groups, nil
-}
-
-func (gm *GroupModel) GetAllGroups(Groups *GroupsPayload) ([]*Group, error) {
-	if Groups.Start == -1 {
-		err := gm.DB.QueryRow(`SELECT MAX(id) FROM groups`).Scan(&Groups.Start)
-		if err != nil {
-			return nil, fmt.Errorf("get max group id: %w", err)
-		}
-	}
-
-	query := `
-		SELECT g.id, g.creator_id, g.title, g.description, g.created_at,
-		       COUNT(m.id) AS member_count
-		FROM groups g
-		LEFT JOIN group_members m ON g.id = m.group_id AND m.status = 'member'
-		WHERE g.id <= ?
-		GROUP BY g.id
-		ORDER BY g.id DESC
-		LIMIT ?
-	`
-
-	rows, err := gm.DB.Query(query, Groups.Start, Groups.NumOfItems)
-	if err != nil {
-		return nil, fmt.Errorf("get all groups: %w", err)
+		return nil, fmt.Errorf("get groups (%s): %w", Groups.Type, err)
 	}
 	defer rows.Close()
 

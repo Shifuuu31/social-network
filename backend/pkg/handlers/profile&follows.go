@@ -41,6 +41,9 @@ func (rt *Root) ProfileAccess(w http.ResponseWriter, r *http.Request, targetUser
 		return false
 	}
 
+		targetUser.PasswordHash = nil
+
+
 	if targetUser.IsPublic {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "INFO",
@@ -130,7 +133,6 @@ func (rt *Root) ProfileInfo(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 
-		user.PasswordHash = nil
 		user.DateOfBirth = time.Unix(0, 0)
 		user.AboutMe = ""
 	}
