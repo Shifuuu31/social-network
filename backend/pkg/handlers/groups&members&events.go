@@ -54,7 +54,7 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// insert user into db
-	if err := rt.DL.Groups.InsertGroup(group); err != nil {
+	if err := rt.DL.Groups.Insert(group); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to insert group into DB",
@@ -135,7 +135,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 
 	// Insert into group_members as "pending_invite"
 	// member.Status = "invited"
-	if err := rt.DL.Members.UpsertMember(member); err != nil {
+	if err := rt.DL.Members.Upsert(member); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to insert member into DB",
@@ -193,7 +193,7 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 
 	// Insert into group_members as "pending_request"
 	// member.Status = "requested"
-	if err := rt.DL.Members.UpsertMember(member); err != nil {
+	if err := rt.DL.Members.Upsert(member); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to insert member into DB",
@@ -274,7 +274,7 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update status to "joined" or delete row
-	if err := rt.DL.Members.UpsertMember(member); err != nil {
+	if err := rt.DL.Members.Upsert(member); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to insert member into DB",
@@ -376,7 +376,7 @@ func (rt *Root) NewEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// insert user into db
-	if err := rt.DL.Events.InsertEvent(event); err != nil {
+	if err := rt.DL.Events.Insert(event); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to insert event into DB",

@@ -41,7 +41,7 @@ type EventModel struct {
 }
 
 // InsertEvent inserts a new event.
-func (em *EventModel) InsertEvent(event *Event) error {
+func (em *EventModel) Insert(event *Event) error {
 	query := `
 		INSERT INTO events (group_id, title, description, event_time)
 		VALUES (?, ?, ?, ?)
@@ -67,11 +67,11 @@ func (em *EventModel) GetEventByID(event *Event) error {
 		WHERE e.id = ?
 		GROUP BY e.id
 	`
-	err := em.DB.QueryRow(query, event.ID).Scan(
+
+	if err := em.DB.QueryRow(query, event.ID).Scan(
 		&event.ID, &event.GroupId, &event.Title, &event.Description,
 		&event.EventTime, &event.CreatedAt, &event.VotesCount,
-	)
-	if err != nil {
+	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("event not found")
 		}
@@ -120,8 +120,7 @@ type EventsPayload struct {
 // GetEventsByGroup returns paginated events for a group.
 func (em *EventModel) GetEventsByGroup(payload *EventsPayload) ([]*Event, error) {
 	if payload.Start == -1 {
-		err := em.DB.QueryRow(`SELECT MAX(id) FROM events WHERE group_id = ?`, payload.GroupID).Scan(&payload.Start)
-		if err != nil {
+		if err := em.DB.QueryRow(`SELECT MAX(id) FROM events WHERE group_id = ?`, payload.GroupID).Scan(&payload.Start); err != nil {
 			return nil, fmt.Errorf("get max event id: %w", err)
 		}
 	}
@@ -156,8 +155,7 @@ func (em *EventModel) GetEventsByGroup(payload *EventsPayload) ([]*Event, error)
 // IsEventInGroup checks if event belongs to a group.
 func (em *EventModel) IsEventInGroup(eventID, groupID int) error {
 	var count int
-	err := em.DB.QueryRow(`SELECT COUNT(*) FROM events WHERE id = ? AND group_id = ?`, eventID, groupID).Scan(&count)
-	if err != nil || count <= 0 {
+	if err := em.DB.QueryRow(`SELECT COUNT(*) FROM events WHERE id = ? AND group_id = ?`, eventID, groupID).Scan(&count); err != nil || count <= 0 {
 		return fmt.Errorf("check event in group: %w", err)
 	}
 	return nil
@@ -172,8 +170,8 @@ func (em *EventModel) IsUserEventCreator(eventID, userID int) error {
 		WHERE e.id = ? AND g.creator_id = ?
 	`
 	var count int
-	err := em.DB.QueryRow(query, eventID, userID).Scan(&count)
-	if err != nil || count <= 0 {
+
+	if err := em.DB.QueryRow(query, eventID, userID).Scan(&count); err != nil || count <= 0 {
 		return fmt.Errorf("check event creator: %w", err)
 	}
 	return nil

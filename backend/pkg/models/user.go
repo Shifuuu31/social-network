@@ -122,8 +122,8 @@ func (um *UserModel) ValidateCredentials(user *User) error {
 	return nil
 }
 
-// InsertUser inserts a new user into the database.
-func (um *UserModel) InsertUser(user *User) error {
+// Insert inserts a new user into the database.
+func (um *UserModel) Insert(user *User) error {
 	query := `
 		INSERT INTO users (
 			email, password_hash, first_name, last_name, date_of_birth,
@@ -154,7 +154,7 @@ func (um *UserModel) InsertUser(user *User) error {
 }
 
 // UpdateUser updates an existing user's profile data.
-func (um *UserModel) UpdateUser(user *User) error {
+func (um *UserModel) Update(user *User) error {
 	query := `
 		UPDATE users
 		SET first_name = ?, last_name = ?, date_of_birth = ?, avatar_url = ?, nickname = ?,
@@ -162,7 +162,8 @@ func (um *UserModel) UpdateUser(user *User) error {
 		WHERE id = ?
 	`
 
-	_, err := um.DB.Exec(query,
+	
+	if _, err := um.DB.Exec(query,
 		user.FirstName,
 		user.LastName,
 		user.DateOfBirth,
@@ -171,19 +172,17 @@ func (um *UserModel) UpdateUser(user *User) error {
 		user.AboutMe,
 		user.IsPublic,
 		user.ID,
-	)
-	if err != nil {
+	);err != nil {
 		return fmt.Errorf("update user: %w", err)
 	}
 	return nil
 }
 
 // DeleteUser deletes a user by ID.
-func (um *UserModel) DeleteUser(id int) error {
+func (um *UserModel) Delete(id int) error {
 	query := `DELETE FROM users WHERE id = ?`
 
-	_, err := um.DB.Exec(query, id)
-	if err != nil {
+	if _, err := um.DB.Exec(query, id); err != nil {
 		return fmt.Errorf("delete user: %w", err)
 	}
 	return nil
@@ -198,7 +197,8 @@ func (um *UserModel) GetUserByID(user *User) error {
 		WHERE id = ?
 	`
 
-	err := um.DB.QueryRow(query, user.ID).Scan(
+	
+	if err := um.DB.QueryRow(query, user.ID).Scan(
 		&user.ID,
 		&user.Email,
 		&user.PasswordHash,
@@ -210,8 +210,7 @@ func (um *UserModel) GetUserByID(user *User) error {
 		&user.AboutMe,
 		&user.IsPublic,
 		&user.CreatedAt,
-	)
-	if err != nil {
+	);err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("no user with this id: %w", err) // Not found
 		}

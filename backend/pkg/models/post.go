@@ -21,8 +21,8 @@ type PostModel struct {
 	DB *sql.DB
 }
 
+// TODO to be implemented
 func (pm *PostModel) GetAllUserPosts(userId int) (posts []Post, err error) {
 
-	// TODO to be implemented
 	return posts, nil
 }

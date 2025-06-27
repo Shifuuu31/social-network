@@ -15,7 +15,11 @@ type FollowRequest struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
-func (fl *FollowRequest) Validate() error
+// TODO
+
+func (fl *FollowRequest) Validate() error {
+	return nil
+}
 
 type FollowRequestModel struct {
 	DB *sql.DB
@@ -29,15 +33,15 @@ func (flm *FollowRequestModel) CanFollow(followRequest *FollowRequest) (bool, er
 		SELECT COUNT(*) FROM follow_requests
 		WHERE from_user_id = ? AND to_user_id = ? AND status IN ('pending', 'accepted')
 	`
-	err := flm.DB.QueryRow(query, followRequest.FromUserID, followRequest.ToUserID).Scan(&count)
-	if err != nil {
+	
+	if err := flm.DB.QueryRow(query, followRequest.FromUserID, followRequest.ToUserID).Scan(&count);err != nil {
 		return false, err
 	}
 	return count == 0, nil
 }
 
 // SendFollowRequest inserts a new follow request with status = 'pending'.
-func (flm *FollowRequestModel) InsertFollowRequest(followRequest *FollowRequest) error {
+func (flm *FollowRequestModel) Insert(followRequest *FollowRequest) error {
 	// Prevent duplicate or conflicting requests
 	canFollow, err := flm.CanFollow(followRequest)
 	if err != nil {
@@ -55,7 +59,7 @@ func (flm *FollowRequestModel) InsertFollowRequest(followRequest *FollowRequest)
 	return err
 }
 
-func (flm *FollowRequestModel) UpdateFollowRequest(followRequest *FollowRequest) error {
+func (flm *FollowRequestModel) UpdateStatus(followRequest *FollowRequest) error {
 	query := `
 		UPDATE follow_requests
 		SET status = ?
@@ -73,7 +77,7 @@ func (flm *FollowRequestModel) UpdateFollowRequest(followRequest *FollowRequest)
 }
 
 // UnfollowUser deletes an accepted follow relationship.
-func (flm *FollowRequestModel) UnfollowUser(followRequest *FollowRequest) error {
+func (flm *FollowRequestModel) Delete(followRequest *FollowRequest) error {
 	query := `
 		DELETE FROM follow_requests
 		WHERE from_user_id = ? AND to_user_id = ? AND status = 'accepted'
@@ -134,8 +138,8 @@ func (flm *FollowRequestModel) GetFollowStatus(followRequest *FollowRequest) err
 		SELECT status FROM follow_requests
 		WHERE (from_user_id = ? AND to_user_id = ?) OR id = ? 
 	`
-	err := flm.DB.QueryRow(query, followRequest.FromUserID, followRequest.ToUserID, followRequest.ID).Scan(&followRequest.Status)
-	if err != nil {
+	
+	if err := flm.DB.QueryRow(query, followRequest.FromUserID, followRequest.ToUserID, followRequest.ID).Scan(&followRequest.Status);err != nil {
 		if err == sql.ErrNoRows {
 			followRequest.Status = "none"
 			return nil

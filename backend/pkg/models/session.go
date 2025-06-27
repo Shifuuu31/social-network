@@ -27,25 +27,24 @@ func (sm *SessionModel) SetSession(w http.ResponseWriter, userId int) error {
 		Token:     uuid.New().String(),
 		ExpiresAt: time.Now().Add(24 * time.Hour),
 	}
-	if err := sm.UpsertSession(newSession); err != nil {
+	if err := sm.Upsert(newSession); err != nil {
 		return err
 	}
 
 	cookie := http.Cookie{
-		Name:     "session_id",
-		Value:    newSession.Token,
-		Path:     "/",
+		Name:  "session_id",
+		Value: newSession.Token,
+		Path:  "/",
 		// HttpOnly: true,
 		// SameSite: http.SameSiteLaxMode,
-		Expires:  newSession.ExpiresAt,
+		Expires: newSession.ExpiresAt,
 	}
 	http.SetCookie(w, &cookie)
 	return nil
 }
 
-
 // InsertSession adds a new session to the database.
-func (sm *SessionModel) UpsertSession(session *Session) error {
+func (sm *SessionModel) Upsert(session *Session) error {
 	query := `
 		INSERT INTO sessions (user_id, session_token, expires_at)
 		VALUES (?, ?, ?)
@@ -67,37 +66,36 @@ func (sm *SessionModel) UpsertSession(session *Session) error {
 }
 
 // GetSessionByToken finds a session by its token.
-func (sm *SessionModel) GetSessionByToken(token string) (*Session, error) {
+func (sm *SessionModel) GetSessionByToken(token string) (session *Session, err error) {
 	query := `
 		SELECT id, user_id, session_token, expires_at, created_at
 		FROM sessions
 		WHERE session_token = ?
 	`
 
-	var session Session
-	err := sm.DB.QueryRow(query, token).Scan(
+	
+	if err = sm.DB.QueryRow(query, token).Scan(
 		&session.ID,
 		&session.UserID,
 		&session.Token,
 		&session.ExpiresAt,
 		&session.CreatedAt,
-	)
-	if err != nil {
+	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // Not found
 		}
 		return nil, fmt.Errorf("get session by token: %w", err)
 	}
 
-	return &session, nil
+	return session, nil
 }
 
 // DeleteSessionByToken removes a session by its token.
 func (sm *SessionModel) DeleteSessionByToken(token string) error {
 	query := `DELETE FROM sessions WHERE session_token = ?`
 
-	_, err := sm.DB.Exec(query, token)
-	if err != nil {
+	
+	if _, err := sm.DB.Exec(query, token);err != nil {
 		return fmt.Errorf("delete session: %w", err)
 	}
 	return nil
@@ -107,8 +105,8 @@ func (sm *SessionModel) DeleteSessionByToken(token string) error {
 func (sm *SessionModel) DeleteExpiredSessions() error {
 	query := `DELETE FROM sessions WHERE expires_at < CURRENT_TIMESTAMP`
 
-	_, err := sm.DB.Exec(query)
-	if err != nil {
+	
+	if _, err := sm.DB.Exec(query);err != nil {
 		return fmt.Errorf("delete expired sessions: %w", err)
 	}
 	return nil

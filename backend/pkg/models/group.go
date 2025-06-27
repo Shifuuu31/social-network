@@ -46,7 +46,7 @@ type GroupModel struct {
 }
 
 // InsertGroup inserts a new group into the database.
-func (gm *GroupModel) InsertGroup(group *Group) error {
+func (gm *GroupModel) Insert(group *Group) error {
 	query := `
 		INSERT INTO groups (
 			creator_id, title, description
@@ -67,6 +67,21 @@ func (gm *GroupModel) InsertGroup(group *Group) error {
 		group.ID = int(lastID)
 	}
 
+	return nil
+}
+
+func (gm *GroupModel) Delete(group *Group) error {
+	res, err := gm.DB.Exec(`DELETE FROM groups WHERE id = ? AND creator_id = ?`, group.ID, group.CreatorID)
+	if err != nil {
+		return fmt.Errorf("delete group: %w", err)
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking delete result: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("no group deleted: not found or unauthorized")
+	}
 	return nil
 }
 
@@ -123,29 +138,14 @@ func (gm *GroupModel) GetGroupByID(group *Group) error {
 		WHERE g.id = ? AND g.creator_id = ?
 		GROUP BY g.id
 	`
-	err := gm.DB.QueryRow(query, group.ID, group.CreatorID).Scan(
+
+	if err := gm.DB.QueryRow(query, group.ID, group.CreatorID).Scan(
 		&group.ID, &group.CreatorID, &group.Title, &group.Description, &group.CreatedAt, &group.MemberCount,
-	)
-	if err != nil {
+	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("group not found or unauthorized")
 		}
 		return fmt.Errorf("get group by id: %w", err)
-	}
-	return nil
-}
-
-func (gm *GroupModel) DeleteGroup(group *Group) error {
-	res, err := gm.DB.Exec(`DELETE FROM groups WHERE id = ? AND creator_id = ?`, group.ID, group.CreatorID)
-	if err != nil {
-		return fmt.Errorf("delete group: %w", err)
-	}
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("checking delete result: %w", err)
-	}
-	if rowsAffected == 0 {
-		return fmt.Errorf("no group deleted: not found or unauthorized")
 	}
 	return nil
 }
@@ -158,8 +158,8 @@ func (gm *GroupModel) IsUserCreator(groupID, userID int) error {
 		WHERE id = ? AND creator_id = ?
 	`
 	var count int
-	err := gm.DB.QueryRow(query, groupID, userID).Scan(&count)
-	if err != nil || count <= 0 {
+
+	if err := gm.DB.QueryRow(query, groupID, userID).Scan(&count); err != nil || count <= 0 {
 		return fmt.Errorf("check user is creator: %w", err)
 	}
 
@@ -182,8 +182,7 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 	switch Groups.Type {
 	case "user":
 		if Groups.Start == -1 {
-			err := gm.DB.QueryRow(`SELECT MAX(id) FROM groups WHERE creator_id = ?`, Groups.UserID).Scan(&Groups.Start)
-			if err != nil {
+			if err := gm.DB.QueryRow(`SELECT MAX(id) FROM groups WHERE creator_id = ?`, Groups.UserID).Scan(&Groups.Start); err != nil {
 				return nil, fmt.Errorf("get max group id: %w", err)
 			}
 		}
@@ -201,8 +200,7 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 
 	case "all":
 		if Groups.Start == -1 {
-			err := gm.DB.QueryRow(`SELECT MAX(id) FROM groups`).Scan(&Groups.Start)
-			if err != nil {
+			if err := gm.DB.QueryRow(`SELECT MAX(id) FROM groups`).Scan(&Groups.Start); err != nil {
 				return nil, fmt.Errorf("get max group id: %w", err)
 			}
 		}

@@ -18,8 +18,8 @@ type EventVote struct {
 
 func (ev *EventVote) Validate() error {
 	ev.Vote = strings.ToLower(strings.TrimSpace(ev.Vote))
-	if ev.Vote != "yes" && ev.Vote != "no" {
-		return errors.New("vote must be 'yes' or 'no'")
+	if ev.Vote != "going" && ev.Vote != "not_going" {
+		return errors.New("vote must be 'going' or 'not_going'")
 	}
 	if ev.EventID <= 0 {
 		return errors.New("invalid event ID")
@@ -42,8 +42,8 @@ func (evm *EventVoteModel) UpsertVote(vote *EventVote) error {
 		ON CONFLICT(event_id, user_id)
 		DO UPDATE SET vote = excluded.vote
 	`
-	_, err := evm.DB.Exec(query, vote.EventID, vote.UserID, vote.Vote)
-	if err != nil {
+
+	if _, err := evm.DB.Exec(query, vote.EventID, vote.UserID, vote.Vote); err != nil {
 		return fmt.Errorf("upsert vote: %w", err)
 	}
 	return nil
@@ -51,8 +51,7 @@ func (evm *EventVoteModel) UpsertVote(vote *EventVote) error {
 
 // DeleteVote removes a user's vote on an event.
 func (evm *EventVoteModel) DeleteVote(vote *EventVote) error {
-	_, err := evm.DB.Exec(`DELETE FROM event_votes WHERE event_id = ? AND user_id = ?`, vote.EventID, vote.UserID)
-	if err != nil {
+	if _, err := evm.DB.Exec(`DELETE FROM event_votes WHERE event_id = ? AND user_id = ?`, vote.EventID, vote.UserID); err != nil {
 		return fmt.Errorf("delete vote: %w", err)
 	}
 	return nil
@@ -67,7 +66,6 @@ func (evm *EventVoteModel) HasUserVoted(vote *EventVote) error {
 	`
 	return evm.DB.QueryRow(query, vote.EventID, vote.UserID).Scan(&vote.Vote)
 }
-
 
 // CountVotesByType returns the count of a specific vote type for an event.
 func (evm *EventVoteModel) CountVotesByType(vote *EventVote) error {
@@ -84,8 +82,7 @@ type VotesPayload struct {
 // GetVotesByEvent returns a paginated list of votes for a given event.
 func (evm *EventVoteModel) GetVotesByEvent(payload *VotesPayload) ([]*EventVote, error) {
 	if payload.Start == -1 {
-		err := evm.DB.QueryRow(`SELECT MAX(id) FROM event_votes WHERE event_id = ?`, payload.EventID).Scan(&payload.Start)
-		if err != nil {
+		if err := evm.DB.QueryRow(`SELECT MAX(id) FROM event_votes WHERE event_id = ?`, payload.EventID).Scan(&payload.Start); err != nil {
 			return nil, fmt.Errorf("get max vote id: %w", err)
 		}
 	}

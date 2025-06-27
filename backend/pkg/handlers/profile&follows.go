@@ -41,8 +41,7 @@ func (rt *Root) ProfileAccess(w http.ResponseWriter, r *http.Request, targetUser
 		return false
 	}
 
-		targetUser.PasswordHash = nil
-
+	targetUser.PasswordHash = nil
 
 	if targetUser.IsPublic {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -368,7 +367,7 @@ func (rt *Root) UpdateProfileVisibility(w http.ResponseWriter, r *http.Request) 
 
 	user.IsPublic = !user.IsPublic
 
-	if err := rt.DL.Users.UpdateUser(user); err != nil {
+	if err := rt.DL.Users.Update(user); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to update user visibility",
@@ -435,7 +434,7 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 
 	switch payload.Action {
 	case "follow":
-		if err := rt.DL.Follows.InsertFollowRequest(followRequest); err != nil {
+		if err := rt.DL.Follows.Insert(followRequest); err != nil {
 			rt.DL.Logger.Log(models.LogEntry{
 				Level:   "ERROR",
 				Message: "Failed to insert follow request",
@@ -461,7 +460,7 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 	case "unfollow":
-		if err := rt.DL.Follows.UnfollowUser(followRequest); err != nil {
+		if err := rt.DL.Follows.Delete(followRequest); err != nil {
 			rt.DL.Logger.Log(models.LogEntry{
 				Level:   "ERROR",
 				Message: "Failed to unfollow user",
@@ -560,7 +559,7 @@ func (rt *Root) AcceptDeclineFollowRequest(w http.ResponseWriter, r *http.Reques
 		Status:     payload.Action,
 	}
 
-	if err := rt.DL.Follows.UpdateFollowRequest(followRequest); err != nil {
+	if err := rt.DL.Follows.UpdateStatus(followRequest); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to update follow request status",

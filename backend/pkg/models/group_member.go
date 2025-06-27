@@ -13,29 +13,31 @@ type GroupMember struct {
 	Status    string    `json:"status"` // "invited", "requested", "member", "declined"
 	CreatedAt time.Time `json:"created_at"`
 }
-
-func (gm *GroupMember) Validate() error
+// TODO
+func (gm *GroupMember) Validate() error {
+	return nil
+}
 
 type GroupMemberModel struct {
 	DB *sql.DB
 }
 
 // UpsertMember insert member or update mehis status.
-func (gmm *GroupMemberModel) UpsertMember(member *GroupMember) error {
+func (gmm *GroupMemberModel) Upsert(member *GroupMember) error {
 	query := `
 		INSERT INTO group_members (group_id, user_id, status)
 		VALUES (?, ?, ?)
 		ON CONFLICT(group_id, user_id) DO UPDATE SET status=excluded.status
 	`
-	_, err := gmm.DB.Exec(query, member.GroupID, member.UserID, member.Status)
-	if err != nil {
+	
+	if _, err := gmm.DB.Exec(query, member.GroupID, member.UserID, member.Status);err != nil {
 		return fmt.Errorf("upsert group member: %w", err)
 	}
 	return nil
 }
 
 // DeleteMember removes a member from a group.
-func (gmm *GroupMemberModel) DeleteMember(member *GroupMember) error {
+func (gmm *GroupMemberModel) Delete(member *GroupMember) error {
 	query := `
 		DELETE FROM group_members
 		WHERE group_id = ? AND user_id = ?
@@ -94,8 +96,8 @@ func (gmm *GroupMemberModel) IsUserInGroup(groupID, userID int) error {
 		WHERE group_id = ? AND user_id = ?
 	`
 	var count int
-	err := gmm.DB.QueryRow(query, groupID, userID).Scan(&count)
-	if err != nil || count <= 0 {
+	
+	if err := gmm.DB.QueryRow(query, groupID, userID).Scan(&count);err != nil || count <= 0 {
 		return fmt.Errorf("check user in group: %w", err)
 	}
 	return nil

@@ -73,7 +73,7 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 	user.PasswordHash = hash
 
 	// insert user into db
-	if err := rt.DL.Users.InsertUser(user); err != nil {
+	if err := rt.DL.Users.Insert(user); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to insert user into DB",
