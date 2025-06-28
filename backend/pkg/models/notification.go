@@ -9,7 +9,7 @@ type Notification struct {
 	ID        int    `json:"id"`
 	UserID    int    `json:"user_id"`
 	Type      string `json:"type"`
-	Message   string `json:"message"` // corrected typo from "meassage"
+	Message   string `json:"message"` 
 	Seen      bool   `json:"seen"`
 	CreatedAt int    `json:"created_at"`
 }
@@ -44,6 +44,9 @@ func (nm *NotificationModel) Delete(notificationID int) error {
 	}
 	return nil
 }
+
+// TODO
+// func (nm *NotificationModel) isLastSeen(userID int) error {}
 
 // MarkAllAsSeen marks all user notifications as seen
 func (nm *NotificationModel) MarkAllAsSeen(userID int) error {

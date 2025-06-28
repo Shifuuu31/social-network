@@ -17,7 +17,7 @@ func DecodeJSON(r *http.Request, v any) error {
 	const maxSize = 1048576 // 1MB
 	limited := io.LimitReader(r.Body, maxSize)
 
-	decoder := json.NewDecoder(limited)
+	decoder := json.NewDecoder(limited) 
 	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(v); err != nil {

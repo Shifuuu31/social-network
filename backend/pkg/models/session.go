@@ -66,7 +66,7 @@ func (sm *SessionModel) Upsert(session *Session) error {
 }
 
 // GetSessionByToken finds a session by its token.
-func (sm *SessionModel) GetSessionByToken(token string) (session *Session, err error) {
+func (sm *SessionModel) GetSessionByToken(token string) (session Session, err error) {
 	query := `
 		SELECT id, user_id, session_token, expires_at, created_at
 		FROM sessions
@@ -82,9 +82,9 @@ func (sm *SessionModel) GetSessionByToken(token string) (session *Session, err e
 		&session.CreatedAt,
 	); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil // Not found
+			return Session{}, nil // Not found
 		}
-		return nil, fmt.Errorf("get session by token: %w", err)
+		return Session{}, fmt.Errorf("get session by token: %w", err)
 	}
 
 	return session, nil
