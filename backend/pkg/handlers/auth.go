@@ -22,24 +22,9 @@ func (rt *Root) NewAuthHandler() (authMux *http.ServeMux) {
 }
 
 func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
-	var user *models.User
-
-	if err := tools.DecodeJSON(r, &user); err != nil {
-		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "ERROR",
-			Message: "Failed to decode signup JSON",
-			Metadata: map[string]any{
-				"ip":   r.RemoteAddr,
-				"path": r.URL.Path,
-				"err":  err.Error(),
-			},
-		})
-		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	// verify user input
-	if err := user.Validate(); err != nil {
+	user, err := models.Validate(r)
+	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "INFO",
 			Message: "Invalid signup input",
@@ -73,7 +58,7 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 	user.PasswordHash = hash
 
 	// insert user into db
-	if err := rt.DL.Users.Insert(user); err != nil {
+	if err := rt.DL.Users.Insert(&user); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to insert user into DB",

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -22,7 +23,7 @@ type User struct {
 	FirstName    string    `json:"first_name"`
 	LastName     string    `json:"last_name"`
 	DateOfBirth  time.Time `json:"date_of_birth"`
-	AvatarURL    string    `json:"avatar_url"`
+	AvatarPath   string    `json:"avatar_path"`
 	Nickname     string    `json:"nickname"`
 	AboutMe      string    `json:"about_me"`
 	IsPublic     bool      `json:"is_public"`
@@ -31,61 +32,73 @@ type User struct {
 }
 
 // Validate checks all required fields and ensures correct formats
-func (u *User) Validate() error {
-	u.Email = strings.TrimSpace(u.Email)
-	// Email validation
-	emailExp := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
-	if u.Email == "" || !emailExp.MatchString(u.Email) {
-		return errors.New("invalid email format")
+func Validate(r *http.Request) (User, error) {
+	// Parse form data (works for both application/x-www-form-urlencoded and multipart/form-data)
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		return User{}, fmt.Errorf("failed to parse form: %w", err)
 	}
 
-	// Password validation
-	if len(u.Password) < 8 || len(u.Password) > 64 {
-		return errors.New("password must be between 8/64 characters")
+	user := User{
+		Email:      strings.TrimSpace(r.FormValue("email")),
+		Password:   r.FormValue("password"),
+		FirstName:  strings.TrimSpace(r.FormValue("first_name")),
+		LastName:   strings.TrimSpace(r.FormValue("last_name")),
+		AvatarPath: strings.TrimSpace(r.FormValue("avatar_path")),
+		Nickname:   strings.TrimSpace(r.FormValue("nickname")),
+		AboutMe:    strings.TrimSpace(r.FormValue("about_me")),
 	}
 
-	// Name validations
-	u.FirstName = strings.TrimSpace(u.FirstName)
-	if u.FirstName == "" {
-		return errors.New("first name is required")
+	fmt.Println(user)
+	emailExp := regexp.MustCompile(`^[a-zA-Z0-9._%%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+	if user.Email == "" || !emailExp.MatchString(user.Email) {
+		return User{}, errors.New("invalid email format")
 	}
 
-	u.LastName = strings.TrimSpace(u.LastName)
-	if u.LastName == "" {
-		return errors.New("last name is required")
+	if len(user.Password) < 8 || len(user.Password) > 64 {
+		return User{}, errors.New("password must be between 8 and 64 characters")
 	}
 
-	// Date of Birth should be valid and user should be at least 13
-	now := time.Now()
-	minDOB := now.AddDate(-13, 0, 0)
-	if u.DateOfBirth.IsZero() || u.DateOfBirth.After(minDOB) {
-		return errors.New("user must be at least 13 years old")
+	if user.FirstName == "" {
+		return User{}, errors.New("first name is required")
 	}
 
-	// TODO — add if https is prsent (allow empty, but if present, validate format)
-	u.AvatarURL = strings.TrimSpace(u.AvatarURL)
-	// if u.AvatarURL != "" {
+	if user.LastName == "" {
+		return User{}, errors.New("last name is required")
+	}
+
+	dobStr := r.FormValue("date_of_birth")
+	if dobStr == "" {
+		return User{}, errors.New("date of birth is required")
+	}
+	dob, err := time.Parse("2006-01-02", dobStr) // e.g., "1990-04-23"
+	if err != nil {
+		return User{}, errors.New("invalid date of birth format (expected YYYY-MM-DD)")
+	}
+	minDOB := time.Now().AddDate(-13, 0, 0)
+	if dob.After(minDOB) {
+		return User{}, errors.New("user must be at least 13 years old")
+	}
+	user.DateOfBirth = dob
+
+	// Optional: validate URL format
+	// if user.AvatarPath != "" {
 	// 	urlRegex := regexp.MustCompile(`^https?://[^\s]+$`)
-	// 	if !urlRegex.MatchString(u.AvatarURL) {
-	// 		return errors.New("invalid avatar URL")
+	// 	if !urlRegex.MatchString(user.AvatarPath) {
+	// 		return User{},errors.New("invalid avatar URL")
 	// 	}
 	// }
 
-	// Alphanumeric and underscore, 3–30 chars
-	u.Nickname = strings.TrimSpace(u.Nickname)
-	if u.Nickname != "" {
+	if user.Nickname != "" {
 		nickRegex := regexp.MustCompile(`^[a-zA-Z0-9_]{3,30}$`)
-		if !nickRegex.MatchString(u.Nickname) {
-			return errors.New("nickname must be alphanumeric/underscore and 3–30 chars")
+		if !nickRegex.MatchString(user.Nickname) {
+			return User{}, errors.New("nickname must be alphanumeric/underscore and 3–30 characters")
 		}
 	}
-
-	u.AboutMe = strings.TrimSpace(u.AboutMe)
-	if len(u.AboutMe) > 500 {
-		return errors.New("about me section is too long (max 500 characters)")
+	if len(user.AboutMe) > 500 {
+		return User{}, errors.New("about me section is too long (max 500 characters)")
 	}
 
-	return nil
+	return user, nil
 }
 
 type UserModel struct {
@@ -127,7 +140,7 @@ func (um *UserModel) Insert(user *User) error {
 	query := `
 		INSERT INTO users (
 			email, password_hash, first_name, last_name, date_of_birth,
-			avatar_url, nickname, about_me, is_public
+			avatar_path, nickname, about_me, is_public
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
 	`
 	res, err := um.DB.Exec(query,
@@ -136,7 +149,7 @@ func (um *UserModel) Insert(user *User) error {
 		&user.FirstName,
 		&user.LastName,
 		&user.DateOfBirth,
-		&user.AvatarURL,
+		&user.AvatarPath,
 		&user.Nickname,
 		&user.AboutMe,
 		&user.IsPublic,
@@ -157,22 +170,21 @@ func (um *UserModel) Insert(user *User) error {
 func (um *UserModel) Update(user *User) error {
 	query := `
 		UPDATE users
-		SET first_name = ?, last_name = ?, date_of_birth = ?, avatar_url = ?, nickname = ?,
+		SET first_name = ?, last_name = ?, date_of_birth = ?, avatar_path = ?, nickname = ?,
 			about_me = ?, is_public = ? = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
 
-	
 	if _, err := um.DB.Exec(query,
 		user.FirstName,
 		user.LastName,
 		user.DateOfBirth,
-		user.AvatarURL,
+		user.AvatarPath,
 		user.Nickname,
 		user.AboutMe,
 		user.IsPublic,
 		user.ID,
-	);err != nil {
+	); err != nil {
 		return fmt.Errorf("update user: %w", err)
 	}
 	return nil
@@ -192,12 +204,11 @@ func (um *UserModel) Delete(id int) error {
 func (um *UserModel) GetUserByID(user *User) error {
 	query := `
 		SELECT id, email, password_hash, first_name, last_name, date_of_birth,
-		       avatar_url, nickname, about_me, is_public, created_at
+		       avatar_path, nickname, about_me, is_public, created_at
 		FROM users
 		WHERE id = ?
 	`
 
-	
 	if err := um.DB.QueryRow(query, user.ID).Scan(
 		&user.ID,
 		&user.Email,
@@ -205,12 +216,12 @@ func (um *UserModel) GetUserByID(user *User) error {
 		&user.FirstName,
 		&user.LastName,
 		&user.DateOfBirth,
-		&user.AvatarURL,
+		&user.AvatarPath,
 		&user.Nickname,
 		&user.AboutMe,
 		&user.IsPublic,
 		&user.CreatedAt,
-	);err != nil {
+	); err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("no user with this id: %w", err) // Not found
 		}

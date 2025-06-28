@@ -1,79 +1,65 @@
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"mime/multipart"
+	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
-	"time"
 )
 
 const UploadDir = "./pkg/db/data/uploads"
 
-// Allowed MIME types and their corresponding extensions
-var allowedImageMIMEs = map[string]string{
-	"image/png":  "png",
-	"image/jpeg": "jpg",
-	"image/jpg":  "jpg",
-	"image/gif":  "gif",
-	"image/webp": "webp",
-}
-
-func EnsureUploadDir() error {
-	// hadi 3abita usi nichan makdirall 7it recursive
-	return os.MkdirAll(UploadDir, os.ModePerm)
-}
-
-// GetImageExtension returns the file extension for a given MIME type
-func GetImageExtension(mimeType string) (string, error) {
-	ext, ok := allowedImageMIMEs[mimeType]
-	if !ok {
-		return "", fmt.Errorf("unsupported image MIME type: %s", mimeType)
-	}
-	return ext, nil
-}
-
-// ValidateImageFile checks the file header for valid size and content type
-func ValidateImageFile(header *multipart.FileHeader) error {
-	// Optional: limit size (e.g., 5MB)
-	const maxFileSize = 5 << 20 // 5MB
-	if header.Size > maxFileSize {
-		return fmt.Errorf("file too large: %d bytes (max %d)", header.Size, maxFileSize)
-	}
-
-	// Optional: validate by file extension (more robust: detect MIME using file content)
-	ext := strings.ToLower(filepath.Ext(header.Filename))
-	if ext == "" || (ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".gif" && ext != ".webp") {
-		return fmt.Errorf("invalid file extension: %s", ext)
-	}
-
-	return nil
-}
-
-// SaveUploadedImage saves the uploaded file to the uploads folder
-func SaveUploadedImage(file multipart.File, header *multipart.FileHeader) (string, error) {
-	if err := EnsureUploadDir(); err != nil {
-		return "", fmt.Errorf("creating upload dir: %w", err)
-	}
-
-	// Use timestamped unique filename
-	ext := filepath.Ext(header.Filename)
-	filename := fmt.Sprintf("post_%d%s", time.Now().UnixNano(), ext)
-	fullPath := filepath.Join(UploadDir, filename)
-
-	outFile, err := os.Create(fullPath)
+func ImageUpload(r *http.Request) (string, error) {
+	file, handler, err := r.FormFile("image")
 	if err != nil {
-		return "", fmt.Errorf("creating file: %w", err)
+		return "", err
+	}
+	defer file.Close()
+
+	ext := strings.ToLower(filepath.Ext(handler.Filename))
+	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".gif" {
+		return "", errors.New("file extension not valid")
+	}
+	if handler.Size > 5<<20 { // 5 MB limit
+		return "", errors.New("size too big")
+	}
+
+	buffer := make([]byte, 512)
+	if _, err := file.Read(buffer); err != nil {
+		return "", errors.New("couldn't read the file")
+	}
+	// Reset file pointer ofr future reads
+	file.Seek(0, 0)
+
+	allowedTypes := []string{"image/jpeg", "image/jpg", "image/png", "image/gif"} // TODO add all types
+
+	mimeType := http.DetectContentType(buffer)
+	if !slices.Contains(allowedTypes, mimeType) {
+		return "", errors.New("file format is not valid")
+	}
+	err = os.MkdirAll(UploadDir, os.ModePerm)
+	if err != nil {
+		return "", errors.New("failed to create data dir")
+	}
+
+	path := filepath.Join(UploadDir, handler.Filename)
+	// Save the file
+	outFile, err := os.Create(path)
+	if err != nil {
+		return "", errors.New("failed to create file")
 	}
 	defer outFile.Close()
 
-	if _, err := io.Copy(outFile, file); err != nil {
-		return "", fmt.Errorf("saving file: %w", err)
+	_, err = io.Copy(outFile, file)
+	if err != nil {
+		return "", errors.New("failed to save file")
 	}
 
-	return filename, nil
+	return path, nil
 }
 
 // DeleteImage removes the image file from disk

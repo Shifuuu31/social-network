@@ -13,10 +13,10 @@ func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 	groupsMux.HandleFunc("POST /group/new", rt.NewGroup)
 	groupsMux.HandleFunc("POST /group/invite", rt.InviteToJoinGroup)
 	groupsMux.HandleFunc("POST /group/request", rt.RequestToJoinGroup)
-	groupsMux.HandleFunc("POST /group/accept-decline", rt.InviteToJoinGroup)
-	groupsMux.HandleFunc("POST	/group/browse", rt.BrowseGroups)
-	groupsMux.HandleFunc("POST	/group/event", rt.NewEvent)
-	groupsMux.HandleFunc("POST	/group/event/vote", rt.EventVote)
+	groupsMux.HandleFunc("POST /group/accept-decline", rt.AcceptDeclineGroup)
+	groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups)
+	groupsMux.HandleFunc("POST /group/event", rt.NewEvent)
+	groupsMux.HandleFunc("POST /group/event/vote", rt.EventVote)
 
 	return groupsMux
 }
@@ -114,7 +114,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	// Check if requester is creator
 	requesterID := rt.DL.GetRequesterID(w, r)
 
-	err1 := rt.DL.Members.IsUserInGroup(member.GroupID, requesterID)
+	err1 := rt.DL.Members.IsUserGroupMember(member.GroupID, requesterID)
 	err2 := rt.DL.Groups.IsUserCreator(member.GroupID, requesterID)
 
 	if err1 != nil && err2 != nil {

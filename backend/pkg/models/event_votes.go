@@ -12,7 +12,7 @@ type EventVote struct {
 	ID        int       `json:"id"`
 	EventID   int       `json:"event_id"`
 	UserID    int       `json:"user_id"`
-	Vote      string    `json:"vote"` // example values: "yes", "no"
+	Vote      string    `json:"vote"` // example values: "going", "not_going"
 	CreatedAt time.Time `json:"created_at"`
 }
 

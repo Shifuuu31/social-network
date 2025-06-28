@@ -33,8 +33,8 @@ func (flm *FollowRequestModel) CanFollow(followRequest *FollowRequest) (bool, er
 		SELECT COUNT(*) FROM follow_requests
 		WHERE from_user_id = ? AND to_user_id = ? AND status IN ('pending', 'accepted')
 	`
-	
-	if err := flm.DB.QueryRow(query, followRequest.FromUserID, followRequest.ToUserID).Scan(&count);err != nil {
+
+	if err := flm.DB.QueryRow(query, followRequest.FromUserID, followRequest.ToUserID).Scan(&count); err != nil {
 		return false, err
 	}
 	return count == 0, nil
@@ -100,14 +100,14 @@ func (flm *FollowRequestModel) GetFollows(userID int, followType string) (users 
 	switch followType {
 	case "followers":
 		query = `
-			SELECT u.id, u.email, u.first_name, u.last_name, u.nickname, u.avatar_url
+			SELECT u.id, u.email, u.first_name, u.last_name, u.nickname, u.avatar_path
 			FROM users u
 			JOIN follow_requests fr ON fr.from_user_id = u.id
 			WHERE fr.to_user_id = ? AND fr.status = 'accepted'
 		`
 	case "following":
 		query = `
-			SELECT u.id, u.email, u.first_name, u.last_name, u.nickname, u.avatar_url
+			SELECT u.id, u.email, u.first_name, u.last_name, u.nickname, u.avatar_path
 			FROM users u
 			JOIN follow_requests fr ON fr.to_user_id = u.id
 			WHERE fr.from_user_id = ? AND fr.status = 'accepted'
@@ -124,7 +124,7 @@ func (flm *FollowRequestModel) GetFollows(userID int, followType string) (users 
 
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Email, &u.FirstName, &u.LastName, &u.Nickname, &u.AvatarURL); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &u.FirstName, &u.LastName, &u.Nickname, &u.AvatarPath); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
@@ -138,8 +138,8 @@ func (flm *FollowRequestModel) GetFollowStatus(followRequest *FollowRequest) err
 		SELECT status FROM follow_requests
 		WHERE (from_user_id = ? AND to_user_id = ?) OR id = ? 
 	`
-	
-	if err := flm.DB.QueryRow(query, followRequest.FromUserID, followRequest.ToUserID, followRequest.ID).Scan(&followRequest.Status);err != nil {
+
+	if err := flm.DB.QueryRow(query, followRequest.FromUserID, followRequest.ToUserID, followRequest.ID).Scan(&followRequest.Status); err != nil {
 		if err == sql.ErrNoRows {
 			followRequest.Status = "none"
 			return nil

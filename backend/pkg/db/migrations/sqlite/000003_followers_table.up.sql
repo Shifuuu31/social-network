@@ -1,7 +1,7 @@
 -- Migration: Create followers table
 -- Tracks follow requests and follow relationships between users with status
 
-CREATE TABLE IF NOT EXISTS follow_request (
+CREATE TABLE IF NOT EXISTS follow_requests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     from_user_id INTEGER NOT NULL,
     to_user_id INTEGER NOT NULL,

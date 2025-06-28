@@ -11,7 +11,7 @@ type Post struct {
 	UserID    int       `json:"user_id"`
 	GroupID    int       `json:"group_id"`
 	Content   string    `json:"content"`
-	ImageURL  string    `json:"image_url"`
+	ImageURL  string    `json:"image_path"`
 	Privacy   string    `json:"privacy"` // "public", "followers", "selected" or "group"
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

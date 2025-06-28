@@ -89,7 +89,7 @@ func (gmm *GroupMemberModel) GetGroupMembers(groupID int) ([]*GroupMember, error
 }
 
 // IsUserInGroup checks if a user is in a specific group.
-func (gmm *GroupMemberModel) IsUserInGroup(groupID, userID int) error {
+func (gmm *GroupMemberModel) IsUserGroupMember(groupID, userID int) error {
 	query := `
 		SELECT COUNT(*)
 		FROM group_members
