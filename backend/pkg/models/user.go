@@ -21,6 +21,7 @@ type User struct {
 	Password     string    `json:"password"`
 	FirstName    string    `json:"first_name"`
 	LastName     string    `json:"last_name"`
+	Gender       string    `json:"gender"`
 	DateOfBirth  time.Time `json:"date_of_birth"`
 	AvatarURL    string    `json:"avatar_url"`
 	Nickname     string    `json:"nickname"`
@@ -162,7 +163,6 @@ func (um *UserModel) Update(user *User) error {
 		WHERE id = ?
 	`
 
-	
 	if _, err := um.DB.Exec(query,
 		user.FirstName,
 		user.LastName,
@@ -172,7 +172,7 @@ func (um *UserModel) Update(user *User) error {
 		user.AboutMe,
 		user.IsPublic,
 		user.ID,
-	);err != nil {
+	); err != nil {
 		return fmt.Errorf("update user: %w", err)
 	}
 	return nil
@@ -197,7 +197,6 @@ func (um *UserModel) GetUserByID(user *User) error {
 		WHERE id = ?
 	`
 
-	
 	if err := um.DB.QueryRow(query, user.ID).Scan(
 		&user.ID,
 		&user.Email,
@@ -210,7 +209,7 @@ func (um *UserModel) GetUserByID(user *User) error {
 		&user.AboutMe,
 		&user.IsPublic,
 		&user.CreatedAt,
-	);err != nil {
+	); err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("no user with this id: %w", err) // Not found
 		}

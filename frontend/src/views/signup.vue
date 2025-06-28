@@ -33,28 +33,22 @@
         </div>
 
         <div class="field">
-          <label>Username</label>
-          <input name="username" v-model.trim="form.username" type="text" />
-          <span class="error" data-for="username">{{ errors.username }}</span>
-        </div>
-
-        <div class="field">
           <label>Password</label>
           <input name="password" v-model="form.password" type="password" />
           <span class="error" data-for="password">{{ errors.password }}</span>
         </div>
 
-        <div class="field">
+        <!-- <div class="field">
           <label>Confirm Password</label>
           <input name="repeated_password" v-model="form.repeated_password" type="password" />
           <span class="error" data-for="repeated_password">{{ errors.repeated_password }}</span>
-        </div>
+        </div> -->
 
         <div class="row">
           <div class="field">
             <label>Date of Birth</label>
-            <input name="birth_date" v-model="form.birth_date" type="date" />
-            <span class="error" data-for="birth_date">{{ errors.birth_date }}</span>
+            <input name="date_of_birth" v-model="form.date_of_birth" type="date" />
+            <span class="error" data-for="birth_date">{{ errors.date_of_birth }}</span>
           </div>
 
           <div class="field">
@@ -106,15 +100,15 @@ const avatarFile = ref(null)
 const form = reactive({
   first_name: '',
   last_name: '',
-  username: '',
   email: '',
   password: '',
-  repeated_password: '',
-  birth_date: '',
+  date_of_birth: '2004-11-02T00:00:00Z',
   gender: '',
   nickname: '',
   about_me: '',
+  is_public: true,  
 })
+
 
 const errors = reactive({})
 
@@ -130,16 +124,16 @@ const onSubmit = async () => {
   Object.assign(errors, validation)
   if (Object.keys(validation).length) return
 
-  const formData = new FormData()
+  // const formData = new FormData()
   
-  formData.append('user', JSON.stringify(form))
+  // formData.append(JSON.stringify(form))
   
-  if (avatarFile.value) {
-    formData.append('avatar_file', avatarFile.value)
-  }
+  // if (avatarFile.value) {
+  //   formData.append('avatar_file', avatarFile.value)
+  // }
 
   // for (const key in form) {
-    // if (form[key]) formData.append(key, form[key])
+  //   if (form[key]) formData.append(key, form[key])
   // }
   // if (avatarFile.value) {
     // formData.append('avatar_file', avatarFile.value)
@@ -149,22 +143,28 @@ const onSubmit = async () => {
   try {
     const res = await fetch('http://localhost:8080/auth/signup', {
       method: 'POST',
-      body: formData
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(form),
     })
 
     if (!res.ok) {
       const msg = await res.text()
-      throw new Error(msg || 'Signup failed')
+      throw new Error(msg || 'Failed to sign up.')
     }
+    console.log(res,"reees");
+     alert('Account created successfully!')
 
-    alert('Account created. Please login.')
-    router.push('/signin')
-  } catch (err) {
+    router.push('/signin') 
+
+   } catch (err) {
     generalError.value = err.message
   } finally {
     loading.value = false
   }
 }
+
 
 function validate(data) {
   const err = {}
@@ -175,18 +175,18 @@ function validate(data) {
 
   if (!nameRegex.test(data.first_name)) err.first_name = 'First name must be 3+ letters'
   if (!nameRegex.test(data.last_name)) err.last_name = 'Last name must be 3+ letters'
-  if (!userRegex.test(data.username)) err.username = 'Username must be 3-20 alphanumeric/underscore'
+  // if (!userRegex.test(data.username)) err.username = 'Username must be 3-20 alphanumeric/underscore'
   if (!emailRegex.test(data.email)) err.email = 'Invalid email'
 
-  const birthDate = new Date(data.birth_date)
+  const birthDate = new Date(data.date_of_birth)
   const age = new Date().getFullYear() - birthDate.getFullYear()
-  if (!data.birth_date || isNaN(birthDate)) err.birth_date = 'Invalid birth date'
+  if (!data.date_of_birth || isNaN(birthDate)) err.date_of_birth = 'Invalid birth date'
   else if (age < 13 || (age === 13 && Date.now() < birthDate.setFullYear(birthDate.getFullYear() + 13)))
-    err.birth_date = 'You must be at least 13'
+    err.date_of_birth = 'You must be at least 13'
 
   if (!['male', 'female'].includes(data.gender)) err.gender = 'Select male or female'
   if (!passRegex.test(data.password)) err.password = 'Password must be 8+ chars, include upper, digit & special'
-  if (data.password !== data.repeated_password) err.repeated_password = 'Passwords do not match'
+  // if (data.password !== data.repeated_password) err.repeated_password = 'Passwords do not match'
 
   return err
 }

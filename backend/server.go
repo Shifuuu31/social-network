@@ -21,7 +21,6 @@ func main() {
 	}
 	defer db.Close()
 
-
 	AppRoot := handlers.Root{
 		DL: &middleware.DataLayer{
 			Users: &models.UserModel{
@@ -51,7 +50,7 @@ func main() {
 	}
 	server := http.Server{
 		Addr:    port,
-		Handler: AppRoot.Router(),
+		Handler: AppRoot.DL.CORSMiddleware(AppRoot.Router()),
 	}
 
 	log.Println("server listening on http://localhost" + port)

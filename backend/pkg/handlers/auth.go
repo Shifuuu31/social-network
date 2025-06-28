@@ -12,16 +12,21 @@ import (
 )
 
 func (rt *Root) NewAuthHandler() (authMux *http.ServeMux) {
+	fmt.Println("Auth Ha")
 	authMux = http.NewServeMux()
 
 	authMux.HandleFunc("POST /signup", rt.SignUp)
 	authMux.HandleFunc("POST /signin", rt.SignIn)
 	authMux.HandleFunc("DELETE /signout", rt.SignOut)
 
+	fmt.Println("Auth Haaaaaaa")
+
 	return authMux
 }
 
 func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(1)
+
 	var user *models.User
 
 	if err := tools.DecodeJSON(r, &user); err != nil {
@@ -37,7 +42,7 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
+	fmt.Println(user)
 	// verify user input
 	if err := user.Validate(); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{

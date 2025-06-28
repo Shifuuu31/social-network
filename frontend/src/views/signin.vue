@@ -11,7 +11,7 @@
         <h2>Sign In</h2>
         <form @submit.prevent="onSubmit" id="signinForm">
           <div class="field">
-            <label>Username or Email</label>
+            <label>Nickname or Email</label>
             <input name="identifier" v-model.trim="form.identifier" type="text" />
             <span class="error">{{ errors.identifier }}</span>
           </div>
@@ -66,7 +66,7 @@ const onSubmit = async () => {
 
   const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.identifier)
   const payload = {
-    username: isEmail ? '' : form.identifier,
+    nickname: isEmail ? '' : form.identifier,
     email: isEmail ? form.identifier : '',
     password: form.password
   }
@@ -96,7 +96,7 @@ const onSubmit = async () => {
 }
 
 function saveUser(user) {
-  localStorage.setItem('username', user.username)
+  localStorage.setItem('nickname', user.nickname)
   localStorage.setItem('email', user.email)
   localStorage.setItem('profile_img', user.profile_img || '')
   localStorage.setItem('token', user.token)
@@ -106,12 +106,12 @@ function validate({ identifier, password }) {
   const errors = {}
 
   if (!identifier) {
-    errors.identifier = 'Email or username is required'
+    errors.identifier = 'Email or nickname is required'
   } else {
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)
-    const isUsername = /^[A-Za-z0-9_]{3,20}$/.test(identifier)
-    if (!isEmail && !isUsername) {
-      errors.identifier = 'Enter a valid email or username'
+    const isnickname = /^[A-Za-z0-9_]{3,20}$/.test(identifier)
+    if (!isEmail && !isnickname) {
+      errors.identifier = 'Enter a valid email or nickname'
     }
   }
 
