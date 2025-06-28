@@ -2,7 +2,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import PostDetailsView from '@/views/postDetailsView.vue'
 import PostsView from '@/views/postsView.vue'
-import Login from '@/views/login.vue'
+import Signin from '@/views/signin.vue'
 import Signup from '@/views/signup.vue'
 
 
@@ -26,7 +26,7 @@ const routes = [
     props: true
   },
     
-  { path: '/login', name: 'Login', component: Login },
+  { path: '/signin', name: 'Signin', component: Signin },
   { path: '/signup', name: 'Signup', component: Signup },
 
   // Add other routes as needed

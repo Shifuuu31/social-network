@@ -6,8 +6,6 @@ import (
 	"social-network/pkg/middleware"
 )
 
-
-
 type Root struct {
 	DL *middleware.DataLayer
 }
@@ -16,6 +14,7 @@ func (rt *Root) Router() (uh *http.ServeMux) {
 	authMux := rt.NewAuthHandler()
 	usersHandler := rt.NewUsersHandler()
 	groupsHandler := rt.NewGroupsHandler()
+	postsHandler := rt.NewPostHandler()
 
 	mainMux := http.NewServeMux()
 
@@ -23,6 +22,7 @@ func (rt *Root) Router() (uh *http.ServeMux) {
 	mainMux.Handle("/api/auth/", http.StripPrefix("/api/auth", authMux))
 	mainMux.Handle("/api/users/", http.StripPrefix("/api/users", usersHandler))
 	mainMux.Handle("/api/groups/", http.StripPrefix("/api/groups", groupsHandler))
+	mainMux.Handle("/api/posts/", http.StripPrefix("/api/posts", postsHandler))
 
 	return mainMux
 }
