@@ -171,7 +171,7 @@ fmt.Println(filter.Id)
 		LIMIT ?`
 		rows, err = pm.DB.Query(query, filter.Id, filter.Id, filter.Start, filter.NPost)
 
-	case "single":
+	case "user":
 		query = `
 		SELECT posts.id, posts.user_id, users.nickname, posts.group_id, 
 			   posts.content, posts.image_path as image, posts.privacy, posts.created_at,
