@@ -12,28 +12,24 @@ import (
 )
 
 func (rt *Root) NewAuthHandler() (authMux *http.ServeMux) {
-	fmt.Println("Auth Ha")
 	authMux = http.NewServeMux()
 
 	authMux.HandleFunc("POST /signup", rt.SignUp)
 	authMux.HandleFunc("POST /signin", rt.SignIn)
 	authMux.HandleFunc("DELETE /signout", rt.SignOut)
 
-	fmt.Println("Auth Haaaaaaa")
-
 	return authMux
 }
 
 func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(1)
-
 	var user *models.User
+	fmt.Println("s")
 
 	if err := tools.DecodeJSON(r, &user); err != nil {
-		rt.DL.Logger.Log(models.LogEntry{
+ 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to decode signup JSON",
-			Metadata: map[string]any{
+			Metadata: map[string]interface{}{
 				"ip":   r.RemoteAddr,
 				"path": r.URL.Path,
 				"err":  err.Error(),
@@ -42,13 +38,13 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	fmt.Println(user)
+
 	// verify user input
 	if err := user.Validate(); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "INFO",
 			Message: "Invalid signup input",
-			Metadata: map[string]any{
+			Metadata: map[string]interface{}{
 				"email": user.Email,
 				"ip":    r.RemoteAddr,
 				"path":  r.URL.Path,
@@ -65,7 +61,7 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Password hashing failed",
-			Metadata: map[string]any{
+			Metadata: map[string]interface{}{
 				"email": user.Email,
 				"ip":    r.RemoteAddr,
 				"path":  r.URL.Path,
@@ -78,11 +74,11 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 	user.PasswordHash = hash
 
 	// insert user into db
-	if err := rt.DL.Users.Insert(user); err != nil {
+	if err := rt.DL.Users.InsertUser(user); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to insert user into DB",
-			Metadata: map[string]any{
+			Metadata: map[string]interface{}{
 				"email": user.Email,
 				"ip":    r.RemoteAddr,
 				"path":  r.URL.Path,
@@ -96,7 +92,7 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "New user registered successfully",
-		Metadata: map[string]any{
+		Metadata: map[string]interface{}{
 			"email": user.Email,
 			"ip":    r.RemoteAddr,
 			"path":  r.URL.Path,
@@ -107,7 +103,7 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to send signup response",
-			Metadata: map[string]any{
+			Metadata: map[string]interface{}{
 				"email": user.Email,
 				"ip":    r.RemoteAddr,
 				"path":  r.URL.Path,
@@ -123,7 +119,7 @@ func (rt *Root) SignIn(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to decode signin JSON",
-			Metadata: map[string]any{
+			Metadata: map[string]interface{}{
 				"ip":   r.RemoteAddr,
 				"path": r.URL.Path,
 				"err":  err.Error(),
@@ -137,7 +133,7 @@ func (rt *Root) SignIn(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "INFO",
 			Message: "Invalid signin credentials",
-			Metadata: map[string]any{
+			Metadata: map[string]interface{}{
 				"email": user.Email,
 				"ip":    r.RemoteAddr,
 				"path":  r.URL.Path,
@@ -152,7 +148,7 @@ func (rt *Root) SignIn(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to set session during signin",
-			Metadata: map[string]any{
+			Metadata: map[string]interface{}{
 				"user_id": user.ID,
 				"email":   user.Email,
 				"ip":      r.RemoteAddr,
@@ -167,7 +163,7 @@ func (rt *Root) SignIn(w http.ResponseWriter, r *http.Request) {
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "User signed in successfully",
-		Metadata: map[string]any{
+		Metadata: map[string]interface{}{
 			"user_id": user.ID,
 			"email":   user.Email,
 			"ip":      r.RemoteAddr,
@@ -178,7 +174,7 @@ func (rt *Root) SignIn(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to send signin response",
-			Metadata: map[string]any{
+			Metadata: map[string]interface{}{
 				"email": user.Email,
 				"ip":    r.RemoteAddr,
 				"path":  r.URL.Path,
@@ -195,7 +191,7 @@ func (rt *Root) SignOut(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "WARN",
 			Message: "Missing session cookie during signout",
-			Metadata: map[string]any{
+			Metadata: map[string]interface{}{
 				"ip":   r.RemoteAddr,
 				"path": r.URL.Path,
 				"err":  err.Error(),
@@ -209,7 +205,7 @@ func (rt *Root) SignOut(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to delete session from DB",
-			Metadata: map[string]any{
+			Metadata: map[string]interface{}{
 				"token": cookie.Value,
 				"ip":    r.RemoteAddr,
 				"path":  r.URL.Path,
@@ -231,7 +227,7 @@ func (rt *Root) SignOut(w http.ResponseWriter, r *http.Request) {
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "User signed out successfully",
-		Metadata: map[string]any{
+		Metadata: map[string]interface{}{
 			"ip":   r.RemoteAddr,
 			"path": r.URL.Path,
 		},
@@ -241,7 +237,7 @@ func (rt *Root) SignOut(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to send signout response",
-			Metadata: map[string]any{
+			Metadata: map[string]interface{}{
 				"ip":   r.RemoteAddr,
 				"path": r.URL.Path,
 				"err":  err.Error(),

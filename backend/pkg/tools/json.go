@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-func JsonString(obj any) (string, error) {
+func JsonString(obj interface{}) (string, error) {
 	var buffer bytes.Buffer
 
 	enc := json.NewEncoder(&buffer)
@@ -21,7 +21,7 @@ func JsonString(obj any) (string, error) {
 	return buffer.String(), nil
 }
 
-func JsonObj(jsonStr string) (obj any, err error) {
+func JsonObj(jsonStr string) (obj interface{}, err error) {
 	decoder := json.NewDecoder(bytes.NewReader([]byte(jsonStr)))
 
 	decoder.DisallowUnknownFields()

@@ -1,2 +1,2 @@
--- Rollback: Drop event_votes table
-DROP TABLE event_votes;
+-- Rollback: Drop event_responses table
+DROP TABLE event_responses;

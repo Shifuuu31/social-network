@@ -1,30 +1,32 @@
 package handlers
 
+
 import (
-	"fmt"
+	// "fmt"
 	"net/http"
 
 	"social-network/pkg/middleware"
 )
+
+// TODO add routes...
 
 type Root struct {
 	DL *middleware.DataLayer
 }
 
 func (rt *Root) Router() (uh *http.ServeMux) {
-	fmt.Println("router")
 	authMux := rt.NewAuthHandler()
-	usersHandler := rt.NewUsersHandler()
-	groupsHandler := rt.NewGroupsHandler()
-	postsHandler := rt.NewPostHandler()
+	userHandler := rt.NewUserHandler()
 
 	mainMux := http.NewServeMux()
+	// mainMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	// 	fmt.Println("ROOT REQUEST: %s %s", r.Method, r.URL.Path)
+	// })
+	rt.SetupPostRoutes(mainMux)
 
 	// Mount sub-muxes under prefixes
 	mainMux.Handle("/auth/", http.StripPrefix("/auth", authMux))
-	mainMux.Handle("/users/", http.StripPrefix("/users", usersHandler))
-	mainMux.Handle("/groups/", http.StripPrefix("/groups", groupsHandler))
-	mainMux.Handle("/posts/", http.StripPrefix("/posts", postsHandler))
+	mainMux.Handle("/user/", http.StripPrefix("/user", userHandler))
 
 	return mainMux
 }

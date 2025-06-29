@@ -47,7 +47,7 @@
         <div class="row">
           <div class="field">
             <label>Date of Birth</label>
-            <input name="date_of_birth" v-model="form.date_of_birth" type="date" />
+            <input name="date_of_birth" :value="form.date_of_birth.slice(0, 10)" type="date" />
             <span class="error" data-for="birth_date">{{ errors.date_of_birth }}</span>
           </div>
 
@@ -97,6 +97,8 @@ const loading = ref(false)
 const generalError = ref('')
 const avatarFile = ref(null)
 
+
+
 const form = reactive({
   first_name: '',
   last_name: '',
@@ -108,6 +110,20 @@ const form = reactive({
   about_me: '',
   is_public: true,  
 })
+
+
+
+const onDateChange = (e) => {
+  const rawDate = e.target.value
+  if (rawDate) {
+    form.date_of_birth = new Date(rawDate).toISOString()
+  } else {
+    form.date_of_birth = ''
+  }
+}
+
+
+
 
 
 const errors = reactive({})

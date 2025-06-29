@@ -1,4 +1,4 @@
-package tools
+package models
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// UploadDir is the directory where images will be stored
 const UploadDir = "./pkg/db/data/uploads"
 
 // Allowed MIME types and their corresponding extensions
@@ -21,6 +22,7 @@ var allowedImageMIMEs = map[string]string{
 	"image/webp": "webp",
 }
 
+// EnsureUploadDir creates the upload directory if it doesn't exist
 func EnsureUploadDir() error {
 	// hadi 3abita usi nichan makdirall 7it recursive
 	return os.MkdirAll(UploadDir, os.ModePerm)

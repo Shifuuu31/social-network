@@ -15,17 +15,7 @@ func ConnectAndMigrate(dbPath string, migrationsPath string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open db: %w", err)
 	}
-	// Enable foreign key constraints
-	_, err = db.Exec("PRAGMA foreign_keys = ON")
-	if err != nil {
-		return nil, fmt.Errorf("failed to enable pragma: %w", err)
-	}
 
-	// enable concurrent sqlite writes
-	_, err = db.Exec("PRAGMA journal_mode = WAL")
-	if err != nil {
-		return nil, fmt.Errorf("failed to enable pragma: %w", err)
-	}
 	// Create migrate instance
 	m, err := migrate.New(
 		"file://"+migrationsPath,

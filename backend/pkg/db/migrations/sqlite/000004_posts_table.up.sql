@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
-    group_id INTEGER,
+    group_id INTEGER NOT NULL,
     content TEXT NOT NULL,
     image_url TEXT NOT NULL,
     privacy TEXT NOT NULL CHECK(privacy IN ('public', 'followers', 'selected', 'group')),
