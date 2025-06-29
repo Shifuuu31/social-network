@@ -41,12 +41,13 @@ func (post *Post) Validate() error {
 
 	// Validate privacy value
 	validPrivacyLevels := map[string]bool{
-		"public":         true,
-		"almost_private": true,
-		"private":        true,
+		"public":   true,
+		"selected": true,
+		"private":  true,
+		"group":    true,
 	}
 	if !validPrivacyLevels[post.Privacy] {
-		return errors.New("invalid privacy value; must be 'public', 'almost_private', or 'private'")
+		return errors.New("invalid privacy value; must be 'public', 'selected', 'group', or 'private'")
 	}
 
 	// Validate ChosenUsersIds
@@ -121,68 +122,70 @@ func (pfl *PostFilter) Validate() error {
 func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 	var query string
 	var rows *sql.Rows
-
+fmt.Println(filter.Id)
 	switch filter.Type {
 	case "group":
 		query = `
-            SELECT posts.id, posts.user_id, users.nickname, posts.group_id, 
-                   posts.content, posts.image, posts.privacy, posts.created_at,
-                   COALESCE(comment_counts.reply_count, 0) as replies
-            FROM posts
-            JOIN users ON posts.user_id = users.id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) as reply_count
-                FROM comments
-                GROUP BY post_id
-            ) comment_counts ON CAST(posts.id as TEXT) = comment_counts.post_id
-            WHERE posts.group_id = ? AND posts.privacy = '' AND posts.id > ?
-            ORDER BY posts.id ASC
-            LIMIT ?`
+		SELECT posts.id, posts.user_id, users.nickname, posts.group_id, 
+			   posts.content, posts.image_path as image, posts.privacy, posts.created_at,
+			   COALESCE(comment_counts.reply_count, 0) as replies
+		FROM posts
+		JOIN users ON posts.user_id = users.id
+		LEFT JOIN (
+			SELECT post_id, COUNT(*) as reply_count
+			FROM comments
+			GROUP BY post_id
+		) comment_counts ON CAST(posts.id AS TEXT) = comment_counts.post_id
+		WHERE posts.group_id = ? AND posts.privacy = 'group' AND posts.id > ?
+		ORDER BY posts.id ASC
+		LIMIT ?`
 		rows, err = pm.DB.Query(query, filter.Id, filter.Start, filter.NPost)
 
-	case "privacy":
+	case "feed":
 		query = `
-            SELECT posts.id, posts.user_id, users.nickname, posts.group_id, 
-                   posts.content, posts.image, posts.privacy, posts.created_at,
-                   COALESCE(comment_counts.reply_count, 0) as replies
-            FROM posts
-            JOIN users ON posts.user_id = users.id
-            LEFT JOIN follows 
-                ON follows.followee_id = posts.user_id AND follows.follower_id = ? AND follows.status = 'accepted'
-            LEFT JOIN post_privacy
-                ON post_privacy.post_id = posts.id AND post_privacy.chosen_id = ?
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) as reply_count
-                FROM comments
-                GROUP BY post_id
-            ) comment_counts ON CAST(posts.id as TEXT) = comment_counts.post_id
-            WHERE NOT (posts.group_id IS NOT NULL AND posts.privacy = '')
-              AND (
-                posts.privacy IN ('public')
-                OR (posts.privacy = 'almost_private' AND follows.follower_id IS NOT NULL)
-                OR (posts.privacy = 'private' AND post_privacy.chosen_id IS NOT NULL)
-              )
-              AND posts.id > ?
-            ORDER BY posts.id DESC
-            LIMIT ?`
+		SELECT posts.id, posts.user_id, users.nickname, posts.group_id, 
+			   posts.content, posts.image_path as image, posts.privacy, posts.created_at,
+			   COALESCE(comment_counts.reply_count, 0) as replies
+		FROM posts
+		JOIN users ON posts.user_id = users.id
+		LEFT JOIN follow_request 
+			ON follow_request.to_user_id = posts.user_id 
+			AND follow_request.from_user_id = ? 
+			AND follow_request.status = 'accepted'
+		LEFT JOIN post_privacy_selected
+			ON post_privacy_selected.post_id = posts.id 
+			AND post_privacy_selected.user_id = ?
+		LEFT JOIN (
+			SELECT post_id, COUNT(*) as reply_count
+			FROM comments
+			GROUP BY post_id
+		) comment_counts ON posts.id = comment_counts.post_id
+		WHERE NOT (posts.group_id IS NOT NULL AND posts.privacy = 'group')
+		  AND (
+				posts.privacy = 'public'
+				OR (posts.privacy = 'followers' AND follow_request.id IS NOT NULL)
+				OR (posts.privacy = 'selected' AND post_privacy_selected.id IS NOT NULL)
+			  )
+		  AND posts.id > ?
+		ORDER BY posts.id DESC
+		LIMIT ?`
 		rows, err = pm.DB.Query(query, filter.Id, filter.Id, filter.Start, filter.NPost)
 
 	case "single":
 		query = `
-            SELECT posts.id, posts.user_id, users.nickname, posts.group_id, 
-                   posts.content, posts.image, posts.privacy, posts.created_at,
-                   COALESCE(comment_counts.reply_count, 0) as replies
-            FROM posts
-            JOIN users ON posts.user_id = users.id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) as reply_count
-                FROM comments
-                GROUP BY post_id
-            ) comment_counts ON CAST(posts.id as TEXT) = comment_counts.post_id
-            WHERE posts.id = ?`
+		SELECT posts.id, posts.user_id, users.nickname, posts.group_id, 
+			   posts.content, posts.image_path as image, posts.privacy, posts.created_at,
+			   COALESCE(comment_counts.reply_count, 0) as replies
+		FROM posts
+		JOIN users ON posts.user_id = users.id
+		LEFT JOIN (
+			SELECT post_id, COUNT(*) as reply_count
+			FROM comments
+			GROUP BY post_id
+		) comment_counts ON CAST(posts.id AS TEXT) = comment_counts.post_id
+		WHERE posts.id = ?`
 		rows, err = pm.DB.Query(query, filter.Id)
 	}
-
 	if err != nil {
 		return nil, err
 	}

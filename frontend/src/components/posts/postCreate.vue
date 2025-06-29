@@ -101,23 +101,23 @@ onMounted(async () => {
   await fetchFollowers()
 })
 
-const fetchFollowers = async () => {
-  try {
-    isLoadingFollowers.value = true
-    const response = await fetch(`/api/post/${ownerId}/followers`)
-    if (!response.ok) throw new Error('Failed to fetch followers')
-    followers.value = await response.json()
-  } catch (err) {
-    error.value = err.message
-    console.error('Error fetching followers:', err)
-  } finally {
-    isLoadingFollowers.value = false
-  }
-}
+// const fetchFollowers = async () => {
+//   try {
+//     isLoadingFollowers.value = true
+//     const response = await fetch(`/api/post/${ownerId}/followers`)
+//     if (!response.ok) throw new Error('Failed to fetch followers')
+//     followers.value = await response.json()
+//   } catch (err) {
+//     error.value = err.message
+//     console.error('Error fetching followers:', err)
+//   } finally {
+//     isLoadingFollowers.value = false
+//   }
+// }
 
-const updateChosenUsers = () => {
-  chosenUsers.value = selectedFollowers.value.join(',')
-}
+// const updateChosenUsers = () => {
+//   chosenUsers.value = selectedFollowers.value.join(',')
+// }
 
 const handleSubmit = async () => {
   try {

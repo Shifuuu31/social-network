@@ -25,7 +25,8 @@ const { posts, loading, error, fetchPosts } = usePosts()
 // Create a wrapper function that calls fetchPosts with default params
 const refreshPosts = () => {
   fetchPosts({
-    type: 'privacy',
+    id: 1,
+    type: 'feed',
     start: 1,
     n_post: 10
   })

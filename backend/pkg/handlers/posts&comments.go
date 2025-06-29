@@ -25,7 +25,7 @@ func (rt *Root) SetupPostRoutes(mux *http.ServeMux) {
 	postMux := http.NewServeMux()
 	postMux.HandleFunc("POST /feed", rt.GetFeedPosts)
 	postMux.HandleFunc("POST /new", rt.NewPost)
-	postMux.HandleFunc("GET /followers", rt.GetFollowers) // it already in profile&follow.go
+	// postMux.HandleFunc("GET /followers", rt.GetFollowers) // it already in profile&follow.go
 	// log.Println("Mounting post multiplexer at /post/")
 	mux.Handle("/post/", http.StripPrefix("/post", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received request: %s %s", r.Method, r.URL.Path)
@@ -33,35 +33,35 @@ func (rt *Root) SetupPostRoutes(mux *http.ServeMux) {
 	})))
 }
 
-func (app *Root) GetFollowers(w http.ResponseWriter, r *http.Request) {
-	// userId := r.PathValue("user_id")
-	userId := app.DL.GetRequesterID(w, r)
-	// id, err := strconv.Atoi(userId)
-	if userId <= 0 {
-		log.Println("Error: user_id not provided or invalid")
-		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "user_id is required",
-		})
-		return
-	}
+// func (app *Root) GetFollowers(w http.ResponseWriter, r *http.Request) {
+// 	// userId := r.PathValue("user_id")
+// 	userId := app.DL.GetRequesterID(w, r)
+// 	// id, err := strconv.Atoi(userId)
+// 	if userId <= 0 {
+// 		log.Println("Error: user_id not provided or invalid")
+// 		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
+// 			"error": "user_id is required",
+// 		})
+// 		return
+// 	}
 
-	followers, err := app.DL.Follows.GetFollows(userId, "followers")
-	fmt.Println("GetFollowers userId:", userId, "Followers:", followers)
-	if err != nil {
-		log.Printf("Error ff followers for user %d: %v", userId, err)
-		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{
-			"error": "internal Error!",
-		})
-		return
-	}
+// 	followers, err := app.DL.Follows.GetFollows(userId, "followers")
+// 	fmt.Println("GetFollowers userId:", userId, "Followers:", followers)
+// 	if err != nil {
+// 		log.Printf("Error ff followers for user %d: %v", userId, err)
+// 		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{
+// 			"error": "internal Error!",
+// 		})
+// 		return
+// 	}
 
-	if err := tools.EncodeJSON(w, http.StatusOK, followers); err != nil {
-		log.Printf("Error encoding response: %v", err)
-		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{
-			"error": "internal Error!",
-		})
-	}
-}
+// 	if err := tools.EncodeJSON(w, http.StatusOK, followers); err != nil {
+// 		log.Printf("Error encoding response: %v", err)
+// 		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{
+// 			"error": "internal Error!",
+// 		})
+// 	}
+// }
 
 func (app *Root) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 	var filter *models.PostFilter
@@ -135,8 +135,8 @@ func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 		if err != nil  {
 			log.Printf("Error handling file upload: %v", err)
 			tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
-				// "error": err.Error(),
-				"error": "Error processing image upload",
+				"error": err.Error(),
+				// "error": "Error processing image upload",
 			})
 			return
 		}
@@ -163,7 +163,7 @@ func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(post.OwnerId, post.GroupId, len(post.Content), imagePath, post.Privacy)
 	// Insert post
 	result, err := tx.Exec(`
-		INSERT INTO posts (user_id, group_id, content, image, privacy, created_at)
+		INSERT INTO posts (user_id, group_id, content, image_path, privacy, created_at)
 		VALUES (?, ?, ?, ?, ?, ?)`,
 		post.OwnerId, post.GroupId, post.Content, imagePath, post.Privacy, time.Now())
 	if err != nil {
@@ -186,7 +186,7 @@ func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 
 	// Handle private post permissions
 	if post.Privacy == "private" && len(post.ChosenUsersIds) > 0 {
-		stmt, err := tx.Prepare("INSERT INTO post_privacy (chosen_id, post_id) VALUES (?, ?)")
+		stmt, err := tx.Prepare("INSERT INTO post_privacy_selected (user_id, post_id) VALUES (?, ?)")
 		if err != nil {
 			log.Printf("Error preparing privacy statement: %v", err)
 			tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{

@@ -2,7 +2,6 @@ package tools
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -13,7 +12,6 @@ import (
 
 func ImageUpload(r *http.Request) (string, error) {
 	file, handler, err := r.FormFile("image")
-	fmt.Println(r.FormFile("image"))
 	if err != nil {
 		return "", err
 	}
@@ -39,13 +37,13 @@ func ImageUpload(r *http.Request) (string, error) {
 	if !slices.Contains(allowedTypes, mimeType) {
 		return "", errors.New("file format is not valid")
 	}
-	err = os.MkdirAll("pkg/data", os.ModePerm)
+	err = os.MkdirAll("pkg/db/data", os.ModePerm)
 	if err != nil {
-		return "", errors.New("failed to create uploads dir")
+		return "", errors.New("failed to create data dir")
 	}
-
+	 fileName  := filepath.Join("pkg/db/data", handler.Filename) 
 	// Save the file
-	dst, err := os.Create(filepath.Join("pkg/data", handler.Filename))
+	dst, err := os.Create(fileName)
 	if err != nil {
 		return "", errors.New("failed to create file")
 	}
@@ -57,7 +55,7 @@ func ImageUpload(r *http.Request) (string, error) {
 	}
 	// = filepath.Join("images", handler.Filename)
 
-	return filepath.Join("uploads", handler.Filename), nil
+	return fileName, nil
 }
 
 // func UploadHandler(file multipart.File, handler *multipart.FileHeader) (string, int) {
