@@ -100,89 +100,54 @@ func (app *Root) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 	var post models.Post
 	var hasFile bool
-	contentType := r.Header.Get("Content-Type")
 
 	// Handle different content types
-	if strings.Contains(contentType, "multipart/form-data") {
-		// Parse multipart form data
-		if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB limit
-			log.Printf("Error parsing multipart form: %v", err)
-			tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
-				"error": "Invalid form data",
-			})
-			return
-		}
-		hasFile = true
-
-		// Parse post data from form values using tools function
-		if status := models.ParsePostFromForm(r, &post); status != 200 {
-			tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
-				"error": "Invalid form data",
-			})
-			return
-		}
-	} else if strings.Contains(contentType, "application/json") {
-		// Handle JSON request
-		if err := tools.DecodeJSON(r, &post); err != nil {
-			log.Printf("Error decoding JSON: %v", err)
-			tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
-				"error": "Invalid JSON format",
-			})
-			return
-		}
-	} else {
+	// Parse multipart form data
+	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB limit
+		log.Printf("Error parsing multipart form: %v", err)
 		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "Content-Type must be application/json or multipart/form-data",
+			"error": "Invalid form data",
+		})
+		return
+	}
+	hasFile = true
+
+	if status := models.ParsePostFromForm(r, &post); status != 200 {
+		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "Invalid form data",
 		})
 		return
 	}
 
-	// Validate post using existing tools function
 	if err := post.Validate(); err != nil {
 		tools.RespondError(w, "Invalid post data", http.StatusBadRequest)
+		fmt.Println(err)
 		return
 	}
+	// TODO path err file handler
 
-	// Handle file upload only if it's multipart form data
 	var imagePath string
+	var err error
 	if hasFile {
-		file, handler, err := r.FormFile("image")
-		if err == nil {
-			defer file.Close()
+		imagePath, err = tools.ImageUpload(r)
+		// fmt.Println(imagePath)
 
-			// Validate file size
-			if handler.Size > 5<<20 { // 5 MB limit
-				tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
-					"error": "Image file too large (max 5MB)",
-				})
-				return
-			}
-
-			// Validate file type using existing tools function
-			if !tools.IsAllowedFile(handler.Filename, file) {
-				tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
-					"error": "file format is not supported",
-				})
-				return
-			}
-
-			// Upload file using existing tools function
-			uploadedPath, status := tools.UploadHandler(file, handler)
-			if status != 200 {
-				tools.EncodeJSON(w, status, map[string]string{
-					"error": "Failed to upload image",
-				})
-				return
-			}
-			imagePath = uploadedPath
-		} else if err != http.ErrMissingFile {
+		if err != nil  {
 			log.Printf("Error handling file upload: %v", err)
 			tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
-				"error": err.Error(),
-				// "error": "Error processing image upload",
+				// "error": err.Error(),
+				"error": "Error processing image upload",
 			})
 			return
 		}
+		// if err != http.ErrMissingFile {
+		// 	log.Printf("Error handling file upload: %v", err)
+		// 	tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
+		// 		// "error": err.Error(),
+		// 		"error": "Error processing image upload",
+		// 	})
+		// 	return
+		// }
 	}
 
 	// Begin transaction
@@ -366,37 +331,17 @@ func (app *Root) NewComment(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("mok", comment)
 
 	var imagePath string
+	var err error
 	if hasFile {
-		file, handler, err := r.FormFile("image")
-		if err == nil {
-			defer file.Close()
+		imagePath, err = tools.ImageUpload(r)
 
-			// Validate file size
-			if handler.Size > 5<<20 { // 5 MB limit
-				tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
-					"error": "Image file too large (max 5MB)",
-				})
-				return
-			}
-
-			// Validate file type using existing tools function
-			if !tools.IsAllowedFile(handler.Filename, file) {
-				tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
-					"error": "file format is not supported",
-				})
-				return
-			}
-
-			// Upload file using existing tools function
-			uploadedPath, status := tools.UploadHandler(file, handler)
-			if status != 200 {
-				tools.EncodeJSON(w, status, map[string]string{
-					"error": "Failed to upload image",
-				})
-				return
-			}
-			imagePath = uploadedPath
-		} else if err != http.ErrMissingFile {
+		// if ! {
+		// 	tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
+		// 		"error": "file format is not supported",
+		// 	})
+		// 	return
+		// }
+		if err != http.ErrMissingFile {
 			log.Printf("Error handling file upload: %v", err)
 			tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
 				"error": err.Error(),

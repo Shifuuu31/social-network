@@ -1,9 +1,9 @@
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,64 +11,91 @@ import (
 	"strings"
 )
 
-func IsAllowedFile(filename string, file multipart.File) bool {
-	// Check extension
-	ext := strings.ToLower(filepath.Ext(filename))
+func ImageUpload(r *http.Request) (string, error) {
+	file, handler, err := r.FormFile("image")
+	fmt.Println(r.FormFile("image"))
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	ext := strings.ToLower(filepath.Ext(handler.Filename))
 	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".gif" {
-		return false
+		return "", errors.New("file extension not valid")
+	}
+	if handler.Size > 5<<20 { // 5 MB limit
+		return "", errors.New("size too big")
 	}
 
-	// Read first 512 bytes for content sniffing
 	buffer := make([]byte, 512)
 	if _, err := file.Read(buffer); err != nil {
-		return false
+		return "", errors.New("couldn't read the file")
 	}
 	// Reset file pointer ofr future reads
 	file.Seek(0, 0)
 
-	// Detect MIME type from sample (buffer)
 	mimeType := http.DetectContentType(buffer)
-	allowedTypes := []string{"image/jpeg", "image/png", "image/gif"}
-	return slices.Contains(allowedTypes, mimeType)
-}
-
-func UploadHandler(file multipart.File, handler *multipart.FileHeader) (string, int) {
-
-	// // Parse up to 10MB of form data
-	// err := r.ParseMultipartForm(10 << 20) // 10MB
-	// if err != nil {
-	// 	http.Error(w, "Failed to parse form", http.StatusBadRequest)
-	// 	return
-	// }
-
-	// Check if it's an image
-	ext := strings.ToLower(filepath.Ext(handler.Filename))
-	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".gif" {
-		fmt.Println("Invalid file type")
-		return "", 400
+	allowedTypes := []string{"image/jpeg", "image/jpg", "image/png", "image/gif"} // TODO add all types
+	if !slices.Contains(allowedTypes, mimeType) {
+		return "", errors.New("file format is not valid")
 	}
-
-	// Make sure the uploads directory exists
-	err := os.MkdirAll("uploads", os.ModePerm)
+	err = os.MkdirAll("pkg/data", os.ModePerm)
 	if err != nil {
-		return "", 500
+		return "", errors.New("failed to create uploads dir")
 	}
 
 	// Save the file
-	dst, err := os.Create(filepath.Join("uploads", handler.Filename)) // TODO might wann add user spicific folder assignment
+	dst, err := os.Create(filepath.Join("pkg/data", handler.Filename))
 	if err != nil {
-		return "", 500
+		return "", errors.New("failed to create file")
 	}
 	defer dst.Close()
 
 	_, err = io.Copy(dst, file)
 	if err != nil {
-		return "", 500
+		return "", errors.New("failed to save file")
 	}
 	// = filepath.Join("images", handler.Filename)
 
-	return filepath.Join("uploads", handler.Filename), 200
+	return filepath.Join("uploads", handler.Filename), nil
 }
+
+// func UploadHandler(file multipart.File, handler *multipart.FileHeader) (string, int) {
+// 	// // Parse up to 10MB of form data
+// 	// err := r.ParseMultipartForm(10 << 20) // 10MB
+// 	// if err != nil {
+// 	// 	http.Error(w, "Failed to parse form", http.StatusBadRequest)
+// 	// 	return
+// 	// }
+
+// 	// // Check if it's an image
+// 	// ext := strings.ToLower(filepath.Ext(handler.Filename))
+// 	// if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".gif" {
+// 	// 	fmt.Println("Invalid file type")
+// 	// 	return "", 400
+// 	// }
+
+// 	// Make sure the uploads directory exists
+// 	err := os.MkdirAll("uploads", os.ModePerm)
+// 	if err != nil {
+// 		return "", 500
+// 	}
+
+// 	// Save the file
+// 	dst, err := os.Create(filepath.Join("uploads", handler.Filename))
+// 	if err != nil {
+// 		return "", 500
+// 	}
+// 	defer dst.Close()
+
+// 	_, err = io.Copy(dst, file)
+// 	if err != nil {
+// 		return "", 500
+// 	}
+// 	// = filepath.Join("images", handler.Filename)
+
+// 	return filepath.Join("uploads", handler.Filename), 200
+// }
 
 // func ValidateComment(db *sql.DB, comment *models.Comment) int {
 // 	if comment.OwnerId <= 0 || comment.Post_id <= 0 {
