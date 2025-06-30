@@ -7,10 +7,10 @@ import (
 	"social-network/pkg/tools"
 )
 
-func (rt *Root) NewServeFiles() (serveFilesMux *http.ServeMux) {
+func (rt *Root) NewServeFilesHandler() (serveFilesMux *http.ServeMux) {
 	serveFilesMux = http.NewServeMux()
 
-	serveFilesMux.HandleFunc("GET /serve/img", rt.ServeImage)
+	serveFilesMux.HandleFunc("GET /img", rt.ServeImage)
 
 	return serveFilesMux
 }

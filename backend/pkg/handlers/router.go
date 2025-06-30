@@ -15,6 +15,7 @@ func (rt *Root) Router() (uh *http.ServeMux) {
 	authMux := rt.NewAuthHandler()
 	usersHandler := rt.NewUsersHandler()
 	groupsHandler := rt.NewGroupsHandler()
+	filesHandler := rt.NewServeFilesHandler()
 
 	mainMux := http.NewServeMux()
 
@@ -22,6 +23,9 @@ func (rt *Root) Router() (uh *http.ServeMux) {
 	mainMux.Handle("/auth/", http.StripPrefix("/auth", authMux))
 	mainMux.Handle("/users/", http.StripPrefix("/users", usersHandler))
 	mainMux.Handle("/groups/", http.StripPrefix("/groups", groupsHandler))
+	mainMux.Handle("/get/", http.StripPrefix("/get", filesHandler))
 
 	return mainMux
 }
+
+

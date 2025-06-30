@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
@@ -11,18 +12,8 @@ import (
 	"social-network/pkg/models"
 )
 
-func main() {
-	dbPath := "./pkg/db/data.db"
-	migrationsPath := "./pkg/db/migrations/sqlite"
-
-	db, err := setup.ConnectAndMigrate(dbPath, migrationsPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-
-	AppRoot := handlers.Root{
+func NewApp(db *sql.DB) *handlers.Root {
+	return &handlers.Root{
 		DL: &middleware.DataLayer{
 			Users: &models.UserModel{
 				DB: db,
@@ -39,11 +30,41 @@ func main() {
 			Groups: &models.GroupModel{
 				DB: db,
 			},
+			Members: &models.GroupMemberModel{
+				DB: db,
+			},
+			Events: &models.EventModel{
+				DB: db,
+			},
+			Votes: &models.EventVoteModel{
+				DB: db,
+			},
+			Messages: &models.MessageModel{
+				DB: db,
+			},
+			Images: &models.ImageModel{
+				DB: db,
+			},
+
 			Logger: &models.LoggerModel{
 				DB: db,
 			},
 		},
+		Hub: handlers.NewHub(),
 	}
+}
+
+func main() {
+	dbPath := "./pkg/db/data.db"
+	migrationsPath := "./pkg/db/migrations/sqlite"
+
+	db, err := setup.ConnectAndMigrate(dbPath, migrationsPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	App := NewApp(db)
 
 	port := ":" + os.Getenv("PORT")
 	if port == ":" {
@@ -51,7 +72,7 @@ func main() {
 	}
 	server := http.Server{
 		Addr:    port,
-		Handler: AppRoot.Router(),
+		Handler: App.Router(),
 	}
 
 	log.Println("server listening on http://localhost" + port)
