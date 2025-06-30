@@ -16,10 +16,11 @@ type DataLayer struct {
 	Posts    *models.PostModel
 	Follows  *models.FollowRequestModel
 	Groups   *models.GroupModel
-	Members   *models.GroupMemberModel
+	Members  *models.GroupMemberModel
 	Events   *models.EventModel
-	Votes   *models.EventVoteModel
-	Messages   *models.MessageModel
+	Votes    *models.EventVoteModel
+	Messages *models.MessageModel
+	Images *models.ImageModel
 	Logger   *models.LoggerModel
 	// link to other models db connection
 }
@@ -38,15 +39,15 @@ var skipPrefixes = []string{
 func (dl *DataLayer) GetRequesterID(w http.ResponseWriter, r *http.Request) (requesterID int) {
 	requesterID, ok := r.Context().Value(models.UserIDKey).(int)
 	if !ok {
-		tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
 		dl.Logger.Log(models.LogEntry{
-			Level:   "WARN",
-			Message: "Unauthorized",
+			Level:   "ERROR",
+			Message: "Unauthorized: requester ID not found",
 			Metadata: map[string]any{
 				"ip":   r.RemoteAddr,
 				"path": r.URL.Path,
 			},
 		})
+		tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
 		return 0
 	}
 	return requesterID

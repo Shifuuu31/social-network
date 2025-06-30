@@ -13,6 +13,7 @@ type Group struct {
 	CreatorID   int       `json:"creator_id"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
+	ImagePath   string    `json:"image"`
 	MemberCount int       `json:"member_count"`
 	CreatedAt   time.Time `json:"created_at"`
 }
@@ -49,14 +50,15 @@ type GroupModel struct {
 func (gm *GroupModel) Insert(group *Group) error {
 	query := `
 		INSERT INTO groups (
-			creator_id, title, description
-		) VALUES (?, ?, ?)
+			creator_id, title, description, image_path
+		) VALUES (?, ?, ?, ?)
 	`
 
 	res, err := gm.DB.Exec(query,
 		group.CreatorID,
 		group.Title,
 		group.Description,
+		group.ImagePath, // <-- add this
 	)
 	if err != nil {
 		return fmt.Errorf("insert group: %w", err)
@@ -100,8 +102,8 @@ func (gm *GroupModel) SearchGroups(search *SearchPayload) ([]*Group, error) {
 	}
 
 	query := `
-		SELECT g.id, g.creator_id, g.title, g.description, g.created_at,
-		       COUNT(m.id) AS member_count
+		SELECT g.id, g.creator_id, g.title, g.description, g.image_path, g.created_at,
+       COUNT(m.id) AS member_count
 		FROM groups g
 		LEFT JOIN group_members m ON g.id = m.group_id AND m.status = 'member'
 		WHERE (g.title LIKE ? OR g.description LIKE ?) AND g.id <= ?
@@ -120,7 +122,7 @@ func (gm *GroupModel) SearchGroups(search *SearchPayload) ([]*Group, error) {
 	var groups []*Group
 	for rows.Next() {
 		var g Group
-		if err := rows.Scan(&g.ID, &g.CreatorID, &g.Title, &g.Description, &g.CreatedAt, &g.MemberCount); err != nil {
+		if err := rows.Scan(&g.ID, &g.CreatorID, &g.Title, &g.Description, &g.ImagePath, &g.CreatedAt, &g.MemberCount); err != nil {
 			return nil, fmt.Errorf("scan group: %w", err)
 		}
 		groups = append(groups, &g)
@@ -140,7 +142,7 @@ func (gm *GroupModel) GetGroupByID(group *Group) error {
 	`
 
 	if err := gm.DB.QueryRow(query, group.ID, group.CreatorID).Scan(
-		&group.ID, &group.CreatorID, &group.Title, &group.Description, &group.CreatedAt, &group.MemberCount,
+		&group.ID, &group.CreatorID, &group.Title, &group.Description, &group.ImagePath, &group.CreatedAt, &group.MemberCount,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("group not found or unauthorized")
@@ -187,8 +189,8 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 			}
 		}
 		query = `
-			SELECT g.id, g.creator_id, g.title, g.description, g.created_at,
-			       COUNT(m.id) AS member_count
+			SELECT g.id, g.creator_id, g.title, g.description, g.image_path, g.created_at,
+       COUNT(m.id) AS member_count
 			FROM groups g
 			LEFT JOIN group_members m ON g.id = m.group_id AND m.status = 'member'
 			WHERE g.creator_id = ? AND g.id <= ?
@@ -205,8 +207,8 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 			}
 		}
 		query = `
-			SELECT g.id, g.creator_id, g.title, g.description, g.created_at,
-			       COUNT(m.id) AS member_count
+			SELECT g.id, g.creator_id, g.title, g.description, g.image_path, g.created_at,
+			COUNT(m.id) AS member_count
 			FROM groups g
 			LEFT JOIN group_members m ON g.id = m.group_id AND m.status = 'member'
 			WHERE g.id <= ?
@@ -229,7 +231,7 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 	var groups []*Group
 	for rows.Next() {
 		var g Group
-		if err := rows.Scan(&g.ID, &g.CreatorID, &g.Title, &g.Description, &g.CreatedAt, &g.MemberCount); err != nil {
+		if err := rows.Scan(&g.ID, &g.CreatorID, &g.Title, &g.Description, &g.ImagePath, &g.CreatedAt, &g.MemberCount); err != nil {
 			return nil, fmt.Errorf("scan group: %w", err)
 		}
 		groups = append(groups, &g)
