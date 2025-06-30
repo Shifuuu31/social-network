@@ -46,7 +46,7 @@ func (nm *NotificationModel) Delete(notificationID int) error {
 }
 
 // TODO
-// func (nm *NotificationModel) isLastSeen(userID int) error {}
+// func (nm *Notifica.
 
 // MarkAllAsSeen marks all user notifications as seen
 func (nm *NotificationModel) MarkAllAsSeen(userID int) error {

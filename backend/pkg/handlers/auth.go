@@ -18,6 +18,15 @@ func (rt *Root) NewAuthHandler() (authMux *http.ServeMux) {
 	authMux.HandleFunc("POST /signin", rt.SignIn)
 	authMux.HandleFunc("DELETE /signout", rt.SignOut)
 
+	// Log handler setup
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "INFO",
+		Message: "Auth routes registered",
+		Metadata: map[string]any{
+			"path": "/signup, /signin, /signout",
+		},
+	})
+
 	return authMux
 }
 
@@ -38,6 +47,7 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Signup input validated"})
 
 	// hash user password
 	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
@@ -56,6 +66,7 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user.PasswordHash = hash
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Password hashed successfully"})
 
 	// insert user into db
 	if err := rt.DL.Users.Insert(&user); err != nil {
@@ -72,6 +83,7 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "User inserted into DB"})
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
@@ -112,6 +124,7 @@ func (rt *Root) SignIn(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Signin JSON decoded"})
 
 	if err := rt.DL.Users.ValidateCredentials(user); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -127,6 +140,7 @@ func (rt *Root) SignIn(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Signin credentials validated"})
 
 	if err := rt.DL.Sessions.SetSession(w, user.ID); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -143,6 +157,7 @@ func (rt *Root) SignIn(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Session set for user"})
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
@@ -170,7 +185,8 @@ func (rt *Root) SignIn(w http.ResponseWriter, r *http.Request) {
 
 func (rt *Root) SignOut(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session_id")
-	fmt.Println(cookie, err)
+	fmt.Println(cookie, err) // existing debug print left as is
+
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "WARN",
@@ -184,6 +200,7 @@ func (rt *Root) SignOut(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, "Session not found", http.StatusBadRequest)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Session cookie found for signout"})
 
 	if err := rt.DL.Sessions.DeleteSessionByToken(cookie.Value); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -199,6 +216,7 @@ func (rt *Root) SignOut(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, "Failed to sign out", http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Session deleted from DB"})
 
 	http.SetCookie(w, &http.Cookie{
 		Name:    "session_id",

@@ -80,7 +80,7 @@ func (flm *FollowRequestModel) UpdateStatus(followRequest *FollowRequest) error 
 func (flm *FollowRequestModel) Delete(followRequest *FollowRequest) error {
 	query := `
 		DELETE FROM follow_requests
-		WHERE from_user_id = ? AND to_user_id = ? AND status = 'accepted'
+		WHERE from_user_id = ? AND to_user_id = ? 
 	`
 	res, err := flm.DB.Exec(query, followRequest.FromUserID, followRequest.ToUserID)
 	if err != nil {

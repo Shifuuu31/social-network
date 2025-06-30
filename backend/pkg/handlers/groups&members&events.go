@@ -18,6 +18,14 @@ func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 	groupsMux.HandleFunc("POST /group/event", rt.NewEvent)
 	groupsMux.HandleFunc("POST /group/event/vote", rt.EventVote)
 
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "INFO",
+		Message: "Group routes registered",
+		Metadata: map[string]any{
+			"path": "/group/new, /group/invite, /group/request, /group/accept-decline, /group/browse, /group/event, /group/event/vote",
+		},
+	})
+
 	return groupsMux
 }
 
@@ -36,6 +44,7 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "New group JSON decoded"})
 
 	// verify group creation input
 	if err := group.Validate(); err != nil {
@@ -52,6 +61,7 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group input validated"})
 
 	// insert user into db
 	if err := rt.DL.Groups.Insert(group); err != nil {
@@ -68,6 +78,7 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group inserted into DB"})
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
@@ -108,6 +119,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group invite JSON decoded"})
 
 	// TODO validate payload
 
@@ -120,7 +132,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	if err1 != nil && err2 != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
-			Message: "forbidden requester isn't the grup creator",
+			Message: "Forbidden: requester isn't the group creator",
 			Metadata: map[string]any{
 				"ip":     r.RemoteAddr,
 				"path":   r.URL.Path,
@@ -132,6 +144,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 		return
 
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Requester authorized for group invite"})
 
 	// Insert into group_members as "pending_invite"
 	// member.Status = "invited"
@@ -148,12 +161,13 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member inserted with pending invite status"})
 
 	// TODO Add notification to user
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
-		Message: "member invited successfully",
+		Message: "Member invited successfully",
 		Metadata: map[string]any{
 			"ip":   r.RemoteAddr,
 			"path": r.URL.Path,
@@ -178,7 +192,7 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	if err := tools.DecodeJSON(r, &member); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
-			Message: "Failed to decode group invite info JSON",
+			Message: "Failed to decode group join request JSON",
 			Metadata: map[string]any{
 				"ip":    r.RemoteAddr,
 				"path":  r.URL.Path,
@@ -188,6 +202,7 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group join request JSON decoded"})
 
 	// TODO validate payload
 
@@ -206,6 +221,8 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member inserted with pending join request status"})
+
 	// Notify group creator
 }
 
@@ -214,7 +231,7 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 	if err := tools.DecodeJSON(r, &member); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
-			Message: "Failed to decode group accept info JSON",
+			Message: "Failed to decode group accept/decline JSON",
 			Metadata: map[string]any{
 				"ip":    r.RemoteAddr,
 				"path":  r.URL.Path,
@@ -224,6 +241,7 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group accept/decline JSON decoded"})
 
 	// TODO validate payload
 
@@ -235,7 +253,7 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 		if err := rt.DL.Groups.IsUserCreator(member.GroupID, requesterID); err != nil {
 			rt.DL.Logger.Log(models.LogEntry{
 				Level:   "ERROR",
-				Message: "forbidden requester isn't the grup creator",
+				Message: "Forbidden: requester isn't the group creator",
 				Metadata: map[string]any{
 					"ip":    r.RemoteAddr,
 					"path":  r.URL.Path,
@@ -249,7 +267,7 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 		if requesterID != member.ID {
 			rt.DL.Logger.Log(models.LogEntry{
 				Level:   "ERROR",
-				Message: "forbidden requester isn't invited to the group",
+				Message: "Forbidden: requester isn't invited to the group",
 				Metadata: map[string]any{
 					"ip":   r.RemoteAddr,
 					"path": r.URL.Path,
@@ -262,16 +280,17 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 	default:
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
-			Message: "invalid",
+			Message: "Invalid status in payload",
 			Metadata: map[string]any{
 				"ip":   r.RemoteAddr,
 				"path": r.URL.Path,
 			},
 		})
-		tools.RespondError(w, "invalid payload", http.StatusBadRequest)
+		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
 		return
 
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Requester authorized for accept/decline"})
 
 	// Update status to "joined" or delete row
 	if err := rt.DL.Members.Upsert(member); err != nil {
@@ -287,6 +306,8 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member status updated in DB"})
+
 	// Notify group creator
 }
 
@@ -305,11 +326,13 @@ func (rt *Root) BrowseGroups(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Get groups JSON decoded"})
+
 	posts, err := rt.DL.Groups.GetGroups(payload)
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
-			Message: "Failed to insert group into DB",
+			Message: "Failed to get groups from DB",
 			Metadata: map[string]any{
 				"ip":   r.RemoteAddr,
 				"path": r.URL.Path,
@@ -319,6 +342,7 @@ func (rt *Root) BrowseGroups(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Groups retrieved from DB"})
 
 	if err := tools.EncodeJSON(w, http.StatusOK, posts); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -335,7 +359,7 @@ func (rt *Root) BrowseGroups(w http.ResponseWriter, r *http.Request) {
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
-		Message: "groups  sent successfully",
+		Message: "Groups sent successfully",
 		Metadata: map[string]any{
 			"ip":   r.RemoteAddr,
 			"path": r.URL.Path,
@@ -358,12 +382,13 @@ func (rt *Root) NewEvent(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "New event JSON decoded"})
 
 	// verify group creation input
 	if err := event.Validate(); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "INFO",
-			Message: "Invalid group input",
+			Message: "Invalid event input",
 			Metadata: map[string]any{
 				"event": event,
 				"ip":    r.RemoteAddr,
@@ -374,6 +399,7 @@ func (rt *Root) NewEvent(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Event input validated"})
 
 	// insert user into db
 	if err := rt.DL.Events.Insert(event); err != nil {
@@ -390,10 +416,11 @@ func (rt *Root) NewEvent(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Event inserted into DB"})
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
-		Message: "New group created successfully",
+		Message: "New event created successfully",
 		Metadata: map[string]any{
 			"event": event,
 			"ip":    r.RemoteAddr,
@@ -430,12 +457,13 @@ func (rt *Root) EventVote(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "New vote JSON decoded"})
 
 	// verify group creation input
 	if err := vote.Validate(); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "INFO",
-			Message: "Invalid group input",
+			Message: "Invalid vote input",
 			Metadata: map[string]any{
 				"vote": vote,
 				"ip":   r.RemoteAddr,
@@ -446,6 +474,7 @@ func (rt *Root) EventVote(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Vote input validated"})
 
 	// insert user into db
 	if err := rt.DL.Votes.UpsertVote(vote); err != nil {
@@ -462,6 +491,7 @@ func (rt *Root) EventVote(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Vote inserted/updated in DB"})
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",

@@ -19,6 +19,7 @@ type DataLayer struct {
 	Members   *models.GroupMemberModel
 	Events   *models.EventModel
 	Votes   *models.EventVoteModel
+	Messages   *models.MessageModel
 	Logger   *models.LoggerModel
 	// link to other models db connection
 }
