@@ -100,14 +100,14 @@ func (flm *FollowRequestModel) GetFollows(userID int, followType string) (users 
 	switch followType {
 	case "followers":
 		query = `
-			SELECT u.id, u.email, u.first_name, u.last_name, u.nickname, u.avatar_path
+			SELECT u.id, u.email, u.first_name, u.last_name, u.nickname, u.image_uuid
 			FROM users u
 			JOIN follow_requests fr ON fr.from_user_id = u.id
 			WHERE fr.to_user_id = ? AND fr.status = 'accepted'
 		`
 	case "following":
 		query = `
-			SELECT u.id, u.email, u.first_name, u.last_name, u.nickname, u.avatar_path
+			SELECT u.id, u.email, u.first_name, u.last_name, u.nickname, u.image_uuid
 			FROM users u
 			JOIN follow_requests fr ON fr.to_user_id = u.id
 			WHERE fr.from_user_id = ? AND fr.status = 'accepted'
@@ -124,7 +124,7 @@ func (flm *FollowRequestModel) GetFollows(userID int, followType string) (users 
 
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Email, &u.FirstName, &u.LastName, &u.Nickname, &u.AvatarPath); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &u.FirstName, &u.LastName, &u.Nickname, &u.ImgUUID); err != nil {
 			return nil, err
 		}
 		users = append(users, u)

@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS groups (
     creator_id INTEGER NOT NULL,
     title TEXT NOT NULL,
     description TEXT NOT NULL,
-    image_path TEXT NOT NULL,
+    image_uuid TEXT NOT NULL UNIQUE, 
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(creator_id) REFERENCES users(id) ON DELETE CASCADE
 );

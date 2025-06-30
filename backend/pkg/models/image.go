@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -21,7 +22,8 @@ const UploadDir = "./pkg/db/data/uploads"
 // GetImageIfAuthorized returns the image path from a given table (users, groups, posts, comments)
 // if the requesting user has permission to view the image.
 // Access is enforced per-table based on privacy rules.
-func (imgm *ImageModel) GetImageIfAuthorized(uuid, table string, requesterID int) (path string, err error) {
+func (imgm *ImageModel) IsAuthorized(uuid, table string, requesterID int) (err error) {
+	var foundUUID string
 	switch table {
 
 	case "users":
@@ -30,7 +32,7 @@ func (imgm *ImageModel) GetImageIfAuthorized(uuid, table string, requesterID int
 		// - Requester is the user themselves
 		// - Requester is a follower with accepted request
 		query := `
-			SELECT u.avatar_path
+			SELECT u.image_uuid
 			FROM users u
 			WHERE u.image_uuid = ?
 			  AND (
@@ -41,22 +43,16 @@ func (imgm *ImageModel) GetImageIfAuthorized(uuid, table string, requesterID int
 					WHERE fr.from_user_id = ? AND fr.to_user_id = u.id AND fr.status = 'accepted'
 				)
 			)`
-		err = imgm.DB.QueryRow(query, uuid, requesterID, requesterID).Scan(&path)
-		if err != nil {
-			return "", fmt.Errorf("unauthorized or not found: %w", err)
-		}
+		err = imgm.DB.QueryRow(query, uuid, requesterID, requesterID).Scan(&foundUUID)
 
 	case "groups":
 		// Allow viewing group image if requester is a confirmed group member
 		query := `
-			SELECT g.image_path
+			SELECT g.image_uuid
 			FROM groups g
 			JOIN group_members gm ON gm.group_id = g.id
 			WHERE g.image_uuid = ? AND gm.user_id = ? AND gm.status = 'member'`
-		err = imgm.DB.QueryRow(query, uuid, requesterID).Scan(&path)
-		if err != nil {
-			return "", fmt.Errorf("unauthorized or not found: %w", err)
-		}
+		err = imgm.DB.QueryRow(query, uuid, requesterID).Scan(&foundUUID)
 
 	case "posts":
 		// Allow viewing post image if:
@@ -66,7 +62,7 @@ func (imgm *ImageModel) GetImageIfAuthorized(uuid, table string, requesterID int
 		// - Group post & requester is a group member
 		// - Post owner is requester
 		query := `
-			SELECT p.image_path
+			SELECT p.image_uuid
 			FROM posts p
 			WHERE p.image_uuid = ? AND (
 				p.privacy = 'public'
@@ -84,16 +80,13 @@ func (imgm *ImageModel) GetImageIfAuthorized(uuid, table string, requesterID int
 				))
 				OR p.user_id = ?
 			)`
-		err = imgm.DB.QueryRow(query, uuid, requesterID, requesterID, requesterID, requesterID).Scan(&path)
-		if err != nil {
-			return "", fmt.Errorf("unauthorized or not found: %w", err)
-		}
+		err = imgm.DB.QueryRow(query, uuid, requesterID, requesterID, requesterID, requesterID).Scan(&foundUUID)
 
 	case "comments":
 		// Allow viewing comment image if requester is allowed to view the parent post
 		// Similar logic to post visibility
 		query := `
-			SELECT c.image_path
+			SELECT c.image_uuid
 			FROM comments c
 			JOIN posts p ON p.id = c.post_id
 			WHERE c.image_uuid = ? AND (
@@ -112,38 +105,39 @@ func (imgm *ImageModel) GetImageIfAuthorized(uuid, table string, requesterID int
 				))
 				OR p.user_id = ?
 			)`
-		err = imgm.DB.QueryRow(query, uuid, requesterID, requesterID, requesterID, requesterID).Scan(&path)
-		if err != nil {
-			return "", fmt.Errorf("unauthorized or not found: %w", err)
-		}
+		err = imgm.DB.QueryRow(query, uuid, requesterID, requesterID, requesterID, requesterID).Scan(&foundUUID)
 
 	default:
 		// Unsupported table
-		return "", errors.New("unsupported image table")
+		return errors.New("unsupported image table")
+	}
+
+	if err != nil || uuid != foundUUID {
+		return fmt.Errorf("unauthorized or not found: %w", err)
 	}
 
 	// Return relative path under the uploads folder
-	return filepath.Join(UploadDir, path), nil
+	return nil
 }
 
-func ImageUpload(r *http.Request) (string, error) {
+func ImageUpload(r *http.Request) error {
 	file, handler, err := r.FormFile("image")
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer file.Close()
 
 	ext := strings.ToLower(filepath.Ext(handler.Filename))
 	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".gif" {
-		return "", errors.New("file extension not valid")
+		return errors.New("file extension not valid")
 	}
-	if handler.Size > 5<<20 { // 5 MB limit
-		return "", errors.New("size too big")
+	if handler.Size > 5242880 { // 5 MB limit
+		return errors.New("size too big")
 	}
 
 	buffer := make([]byte, 512)
 	if _, err := file.Read(buffer); err != nil {
-		return "", errors.New("couldn't read the file")
+		return errors.New("couldn't read the file")
 	}
 	// Reset file pointer ofr future reads
 	file.Seek(0, 0)
@@ -152,31 +146,33 @@ func ImageUpload(r *http.Request) (string, error) {
 
 	mimeType := http.DetectContentType(buffer)
 	if !slices.Contains(allowedTypes, mimeType) {
-		return "", errors.New("file format is not valid")
+		return errors.New("file format is not valid")
 	}
 	err = os.MkdirAll(UploadDir, os.ModePerm)
 	if err != nil {
-		return "", errors.New("failed to create data dir")
+		return errors.New("failed to create data dir")
 	}
 
-	path := filepath.Join(UploadDir, handler.Filename)
+	imgPath := filepath.Join(UploadDir, handler.Filename)
 	// Save the file
-	outFile, err := os.Create(path)
+	outFile, err := os.Create(imgPath)
 	if err != nil {
-		return "", errors.New("failed to create file")
+		return errors.New("failed to create file")
 	}
 	defer outFile.Close()
 
 	_, err = io.Copy(outFile, file)
 	if err != nil {
-		return "", errors.New("failed to save file")
+		return errors.New("failed to save file")
 	}
 
-	return path, nil
+	return nil
 }
 
-func ImageServe(w http.ResponseWriter, imagePath string) (err error) {
-	file, err := os.Open(imagePath)
+func ImageServe(w http.ResponseWriter, imgUUID string) (err error) {
+	imgPath := filepath.Join(UploadDir, imgUUID)
+
+	file, err := os.Open(imgPath)
 	if err != nil {
 		return err
 	}
@@ -191,19 +187,20 @@ func ImageServe(w http.ResponseWriter, imagePath string) (err error) {
 
 	mimeType := http.DetectContentType(buffer[:n])
 	w.Header().Set("Content-Type", mimeType)
-	_, err = io.Copy(w, file)
+	length, err := io.Copy(w, file)
 	if err != nil {
 		return err
 	}
+	w.Header().Set("Content-length", strconv.Itoa(int(length)))
 	w.WriteHeader(http.StatusOK)
 	return nil
 }
 
 // DeleteImage removes the image file from disk
-func DeleteImage(filename string) error {
-	path := filepath.Join(UploadDir, filename)
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("error deleting image: %w", err)
-	}
-	return nil
-}
+// func DeleteImage(filename string) error {
+// 	path := filepath.Join(UploadDir, filename)
+// 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+// 		return fmt.Errorf("error deleting image: %w", err)
+// 	}
+// 	return nil
+// }

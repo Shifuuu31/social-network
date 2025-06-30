@@ -7,6 +7,14 @@ import (
 	"social-network/pkg/tools"
 )
 
+func (rt *Root) NewServeFiles() (serveFilesMux *http.ServeMux) {
+	serveFilesMux = http.NewServeMux()
+
+	serveFilesMux.HandleFunc("GET /serve/img", rt.ServeImage)
+
+	return serveFilesMux
+}
+
 func (rt *Root) ServeImage(w http.ResponseWriter, r *http.Request) {
 	imgUUID := r.URL.Query().Get("img_uuid")
 	table := r.URL.Query().Get("table")
@@ -39,7 +47,7 @@ func (rt *Root) ServeImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	imagePath, err := rt.DL.Images.GetImageIfAuthorized(imgUUID, table, requesterID)
+	err := rt.DL.Images.IsAuthorized(imgUUID, table, requesterID)
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -56,13 +64,13 @@ func (rt *Root) ServeImage(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Authorized to access image"})
 
-	if err := models.ImageServe(w, imagePath); err != nil {
+	if err := models.ImageServe(w, imgUUID); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Error opening image file",
 			Metadata: map[string]any{
-				"path":  imagePath,
-				"error": err.Error(),
+				"image_uuid": imgUUID,
+				"error":      err.Error(),
 			},
 		})
 		tools.RespondError(w, "Failed to open image", http.StatusInternalServerError)

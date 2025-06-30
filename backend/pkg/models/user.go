@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -23,7 +24,7 @@ type User struct {
 	FirstName    string    `json:"first_name"`
 	LastName     string    `json:"last_name"`
 	DateOfBirth  time.Time `json:"date_of_birth"`
-	AvatarPath   string    `json:"avatar_path"`
+	ImgUUID      string    `json:"image_uuid"`
 	Nickname     string    `json:"nickname"`
 	AboutMe      string    `json:"about_me"`
 	IsPublic     bool      `json:"is_public"`
@@ -39,13 +40,13 @@ func Validate(r *http.Request) (User, error) {
 	}
 
 	user := User{
-		Email:      strings.TrimSpace(r.FormValue("email")),
-		Password:   r.FormValue("password"),
-		FirstName:  strings.TrimSpace(r.FormValue("first_name")),
-		LastName:   strings.TrimSpace(r.FormValue("last_name")),
-		AvatarPath: strings.TrimSpace(r.FormValue("avatar_path")),
-		Nickname:   strings.TrimSpace(r.FormValue("nickname")),
-		AboutMe:    strings.TrimSpace(r.FormValue("about_me")),
+		Email:     strings.TrimSpace(r.FormValue("email")),
+		Password:  r.FormValue("password"),
+		FirstName: strings.TrimSpace(r.FormValue("first_name")),
+		LastName:  strings.TrimSpace(r.FormValue("last_name")),
+		ImgUUID:   strings.TrimSpace(r.FormValue("image_uuid")),
+		Nickname:  strings.TrimSpace(r.FormValue("nickname")),
+		AboutMe:   strings.TrimSpace(r.FormValue("about_me")),
 	}
 
 	fmt.Println(user)
@@ -80,13 +81,9 @@ func Validate(r *http.Request) (User, error) {
 	}
 	user.DateOfBirth = dob
 
-	// Optional: validate URL format
-	// if user.AvatarPath != "" {
-	// 	urlRegex := regexp.MustCompile(`^https?://[^\s]+$`)
-	// 	if !urlRegex.MatchString(user.AvatarPath) {
-	// 		return User{},errors.New("invalid avatar URL")
-	// 	}
-	// }
+	if err := uuid.Validate(strings.Split(user.ImgUUID, ".")[0]); err != nil {
+		return User{}, err
+	}
 
 	if user.Nickname != "" {
 		nickRegex := regexp.MustCompile(`^[a-zA-Z0-9_]{3,30}$`)
@@ -140,7 +137,7 @@ func (um *UserModel) Insert(user *User) error {
 	query := `
 		INSERT INTO users (
 			email, password_hash, first_name, last_name, date_of_birth,
-			avatar_path, nickname, about_me, is_public
+			image_uuid, nickname, about_me, is_public
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
 	`
 	res, err := um.DB.Exec(query,
@@ -149,7 +146,7 @@ func (um *UserModel) Insert(user *User) error {
 		&user.FirstName,
 		&user.LastName,
 		&user.DateOfBirth,
-		&user.AvatarPath,
+		&user.ImgUUID,
 		&user.Nickname,
 		&user.AboutMe,
 		&user.IsPublic,
@@ -170,7 +167,7 @@ func (um *UserModel) Insert(user *User) error {
 func (um *UserModel) Update(user *User) error {
 	query := `
 		UPDATE users
-		SET first_name = ?, last_name = ?, date_of_birth = ?, avatar_path = ?, nickname = ?,
+		SET first_name = ?, last_name = ?, date_of_birth = ?, image_uuid = ?, nickname = ?,
 			about_me = ?, is_public = ? = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
@@ -179,7 +176,7 @@ func (um *UserModel) Update(user *User) error {
 		user.FirstName,
 		user.LastName,
 		user.DateOfBirth,
-		user.AvatarPath,
+		user.ImgUUID,
 		user.Nickname,
 		user.AboutMe,
 		user.IsPublic,
@@ -204,7 +201,7 @@ func (um *UserModel) Delete(id int) error {
 func (um *UserModel) GetUserByID(user *User) error {
 	query := `
 		SELECT id, email, password_hash, first_name, last_name, date_of_birth,
-		       avatar_path, nickname, about_me, is_public, created_at
+		       image_uuid, nickname, about_me, is_public, created_at
 		FROM users
 		WHERE id = ?
 	`
@@ -216,7 +213,7 @@ func (um *UserModel) GetUserByID(user *User) error {
 		&user.FirstName,
 		&user.LastName,
 		&user.DateOfBirth,
-		&user.AvatarPath,
+		&user.ImgUUID,
 		&user.Nickname,
 		&user.AboutMe,
 		&user.IsPublic,

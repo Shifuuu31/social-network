@@ -5,6 +5,8 @@ import (
 
 	"social-network/pkg/models"
 	"social-network/pkg/tools"
+
+	"github.com/google/uuid"
 )
 
 func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
@@ -62,6 +64,10 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group input validated"})
+
+	// generate a unique uuid
+	group.ImgUUID = uuid.NewString()
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "img uuid generated successfully"})
 
 	// insert user into db
 	if err := rt.DL.Groups.Insert(group); err != nil {

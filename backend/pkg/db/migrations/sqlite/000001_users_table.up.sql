@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     date_of_birth DATE NOT NULL,
-    avatar_path TEXT NOT NULL, 
+    image_uuid TEXT NOT NULL UNIQUE, 
     nickname TEXT UNIQUE NOT NULL,
     about_me TEXT NOT NULL,
     is_public BOOLEAN NOT NULL DEFAULT 1,
