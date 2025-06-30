@@ -106,7 +106,6 @@ func (pfl *PostFilter) Validate() error {
 			"feed":   true,
 			"user":   true,
 			"group":  true,
-			"public": true,
 		}
 		if !validTypes[pfl.Type] {
 			return errors.New("type must be one of: feed, user, group, public")
