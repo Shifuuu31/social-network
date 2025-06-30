@@ -12,14 +12,18 @@ type Root struct {
 }
 
 func (rt *Root) Router() (uh *http.ServeMux) {
-	authMux := rt.NewAuthHandler()
-	usersHandler := rt.NewUsersHandler()
-	groupsHandler := rt.NewGroupsHandler()
-	filesHandler := rt.NewServeFilesHandler()
+	var (
+		wsHanler      = rt.NewWSHandler()
+		authMux       = rt.NewAuthHandler()
+		usersHandler  = rt.NewUsersHandler()
+		groupsHandler = rt.NewGroupsHandler()
+		filesHandler  = rt.NewServeFilesHandler()
+	)
 
 	mainMux := http.NewServeMux()
 
 	// Mount sub-muxes under prefixes
+	mainMux.Handle("/", http.StripPrefix("/ ", wsHanler))
 	mainMux.Handle("/auth/", http.StripPrefix("/auth", authMux))
 	mainMux.Handle("/users/", http.StripPrefix("/users", usersHandler))
 	mainMux.Handle("/groups/", http.StripPrefix("/groups", groupsHandler))
@@ -27,5 +31,3 @@ func (rt *Root) Router() (uh *http.ServeMux) {
 
 	return mainMux
 }
-
-

@@ -20,6 +20,7 @@ type DataLayer struct {
 	Events   *models.EventModel
 	Votes    *models.EventVoteModel
 	Messages *models.MessageModel
+	Notifications *models.NotificationModel
 	Images *models.ImageModel
 	Logger   *models.LoggerModel
 	// link to other models db connection

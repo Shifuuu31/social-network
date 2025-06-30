@@ -459,6 +459,8 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 				"path": r.URL.Path,
 			},
 		})
+
+		// TODO Send follow Notif
 	case "unfollow":
 		if err := rt.DL.Follows.Delete(followRequest); err != nil {
 			rt.DL.Logger.Log(models.LogEntry{
@@ -485,6 +487,8 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 				"path": r.URL.Path,
 			},
 		})
+		// TODO Send unfollow Notif
+
 	default:
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "WARN",
@@ -587,6 +591,7 @@ func (rt *Root) AcceptDeclineFollowRequest(w http.ResponseWriter, r *http.Reques
 			"action": payload.Action,
 		},
 	})
+	// TODO Send accept decline Notif
 
 	if err := tools.EncodeJSON(w, http.StatusOK, nil); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{

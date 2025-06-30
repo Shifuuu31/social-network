@@ -169,7 +169,6 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member inserted with pending invite status"})
 
-	// TODO Add notification to user
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
@@ -179,6 +178,9 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 			"path": r.URL.Path,
 		},
 	})
+	// TODO Add notification 
+
+
 
 	if err := tools.EncodeJSON(w, http.StatusCreated, nil); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -229,7 +231,7 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member inserted with pending join request status"})
 
-	// Notify group creator
+	// TODO Notify group creator
 }
 
 func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
@@ -434,6 +436,9 @@ func (rt *Root) NewEvent(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
+	// TODO send notification to group members
+
+
 	if err := tools.EncodeJSON(w, http.StatusCreated, event); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -508,6 +513,9 @@ func (rt *Root) EventVote(w http.ResponseWriter, r *http.Request) {
 			"path": r.URL.Path,
 		},
 	})
+
+	// TODO send notification to group members
+
 
 	if err := tools.EncodeJSON(w, http.StatusCreated, vote); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
