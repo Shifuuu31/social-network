@@ -78,6 +78,7 @@ func (post *Post) Validate() error {
 type PostModel struct {
 	DB *sql.DB
 }
+
 type PostFilter struct {
 	Id    int    `json:"id"`
 	Type  string `json:"type"`
@@ -122,7 +123,10 @@ func (pfl *PostFilter) Validate() error {
 func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 	var query string
 	var rows *sql.Rows
-fmt.Println(filter.Id)
+	var args []any
+	
+	fmt.Printf("Filter: Type=%s, Id=%v, Start=%v, NPost=%v\n", filter.Type, filter.Id, filter.Start, filter.NPost)
+
 	switch filter.Type {
 	case "group":
 		query = `
@@ -139,38 +143,38 @@ fmt.Println(filter.Id)
 		WHERE posts.group_id = ? AND posts.privacy = 'group' AND posts.id > ?
 		ORDER BY posts.id ASC
 		LIMIT ?`
-		rows, err = pm.DB.Query(query, filter.Id, filter.Start, filter.NPost)
-
+		args = append(args, filter.Id, filter.Start, filter.NPost)
+		
 	case "feed":
 		query = `
 		SELECT posts.id, posts.user_id, users.nickname, posts.group_id, 
 			   posts.content, posts.image_path as image, posts.privacy, posts.created_at,
 			   COALESCE(comment_counts.reply_count, 0) as replies
-		FROM posts
-		JOIN users ON posts.user_id = users.id
-		LEFT JOIN follow_request 
-			ON follow_request.to_user_id = posts.user_id 
-			AND follow_request.from_user_id = ? 
-			AND follow_request.status = 'accepted'
-		LEFT JOIN post_privacy_selected
-			ON post_privacy_selected.post_id = posts.id 
-			AND post_privacy_selected.user_id = ?
-		LEFT JOIN (
-			SELECT post_id, COUNT(*) as reply_count
-			FROM comments
+			   FROM posts
+			   JOIN users ON posts.user_id = users.id
+			   LEFT JOIN follow_request 
+			   ON follow_request.to_user_id = posts.user_id 
+			   AND follow_request.from_user_id = ? 
+			   AND follow_request.status = 'accepted'
+			   LEFT JOIN post_privacy_selected
+			   ON post_privacy_selected.post_id = posts.id 
+			   AND post_privacy_selected.user_id = ?
+			   LEFT JOIN (
+				SELECT post_id, COUNT(*) as reply_count
+				FROM comments
 			GROUP BY post_id
-		) comment_counts ON posts.id = comment_counts.post_id
-		WHERE NOT (posts.group_id IS NOT NULL AND posts.privacy = 'group')
-		  AND (
+			) comment_counts ON posts.id = comment_counts.post_id
+			WHERE NOT (posts.group_id IS NOT NULL AND posts.privacy = 'group')
+			AND (
 				posts.privacy = 'public'
 				OR (posts.privacy = 'followers' AND follow_request.id IS NOT NULL)
 				OR (posts.privacy = 'selected' AND post_privacy_selected.id IS NOT NULL)
-			  )
-		  AND posts.id > ?
-		ORDER BY posts.id DESC
-		LIMIT ?`
-		rows, err = pm.DB.Query(query, filter.Id, filter.Id, filter.Start, filter.NPost)
-
+				)
+				AND posts.id > ?
+				ORDER BY posts.id DESC
+				LIMIT ?`
+				args = append(args, filter.Id, filter.Id, filter.Start, filter.NPost)
+				
 	case "user":
 		query = `
 		SELECT posts.id, posts.user_id, users.nickname, posts.group_id, 
@@ -182,16 +186,19 @@ fmt.Println(filter.Id)
 			SELECT post_id, COUNT(*) as reply_count
 			FROM comments
 			GROUP BY post_id
-		) comment_counts ON CAST(posts.id AS TEXT) = comment_counts.post_id
-		WHERE posts.id = ?`
-		rows, err = pm.DB.Query(query, filter.Id)
+		) comment_counts ON posts.id = comment_counts.post_id
+		WHERE posts.user_id = ?`
+		args = append(args, filter.Id)
 	}
+
+	rows, err = pm.DB.Query(query, args...)
 	if err != nil {
+		fmt.Printf("Query error: %v\n", err)
 		return nil, err
 	}
-
 	defer rows.Close()
 
+	postCount := 0
 	for rows.Next() {
 		var post Post
 		err := rows.Scan(
@@ -205,19 +212,23 @@ fmt.Println(filter.Id)
 			&post.CreatedAt,
 			&post.Replies,
 		)
-		fmt.Println("Post:", post)
 		if err != nil {
+			fmt.Printf("Scan error: %v\n", err)
 			return nil, err
 		}
 		posts = append(posts, post)
+		postCount++
 	}
 
 	if err := rows.Err(); err != nil {
+		fmt.Printf("Rows error: %v\n", err)
 		return nil, err
 	}
 
 	return posts, nil
 }
+
+
 
 func ParsePostFromForm(r *http.Request, post *Post) int {
 	var err error
