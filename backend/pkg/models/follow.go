@@ -35,6 +35,7 @@ func (flm *FollowRequestModel) CanFollow(followRequest *FollowRequest) (bool, er
 	`
 
 	if err := flm.DB.QueryRow(query, followRequest.FromUserID, followRequest.ToUserID).Scan(&count); err != nil {
+		fmt.Println("err", err)
 		return false, err
 	}
 	return count == 0, nil
@@ -52,7 +53,7 @@ func (flm *FollowRequestModel) Insert(followRequest *FollowRequest) error {
 	}
 
 	query := `
-		INSERT INTO follow_request (from_user_id, to_user_id, status, created_at)
+		INSERT INTO follow_request (from_user_id, to_user_id, status)
 		VALUES (?, ?, 'pending')
 	`
 	_, err = flm.DB.Exec(query, followRequest.FromUserID, followRequest.ToUserID)
@@ -136,7 +137,9 @@ func (flm *FollowRequestModel) GetFollows(userID int, followType string) (users 
 func (flm *FollowRequestModel) GetFollowStatus(followRequest *FollowRequest) error {
 	query := `
 		SELECT status FROM follow_request
-		WHERE (from_user_id = ? AND to_user_id = ?) OR id = ? 
+		WHERE from_user_id = ? AND to_user_id = ?
+		OR id = ?
+
 	`
 
 	if err := flm.DB.QueryRow(query, followRequest.FromUserID, followRequest.ToUserID, followRequest.ID).Scan(&followRequest.Status); err != nil {
@@ -146,5 +149,6 @@ func (flm *FollowRequestModel) GetFollowStatus(followRequest *FollowRequest) err
 		}
 		return err
 	}
+
 	return nil
 }

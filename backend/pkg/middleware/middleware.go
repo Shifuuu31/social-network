@@ -66,6 +66,8 @@ func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type") // ✅ THIS LINE IS MANDATORY
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+
 		}
 		// Check if request path is in skipPaths
 		// Check if request path matches any skipPrefixes
@@ -89,6 +91,7 @@ func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 					"path":   r.URL.Path,
 				},
 			})
+			fmt.Println("Cookie", cookie)
 			fmt.Println("StatusUnauthorized Cookie", err)
 			tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
 			return

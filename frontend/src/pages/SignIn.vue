@@ -76,8 +76,8 @@ const onSubmit = async () => {
     const res = await fetch('http://localhost:8080/auth/signin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-        credentials: "include",
+      credentials: 'include',
+      body: JSON.stringify(payload)
     })
 
     if (!res.ok) {

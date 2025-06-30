@@ -13,6 +13,7 @@ func (rt *Root) NewUsersHandler() (usersMux *http.ServeMux) {
 	usersMux = http.NewServeMux()
 	fmt.Println("ss")
 	usersMux.HandleFunc("POST /profile/info", rt.ProfileInfo)
+	usersMux.HandleFunc("POST /profile/me", rt.GetCurrentUser)
 	usersMux.HandleFunc("POST /profile/activity", rt.ProfileActivity)
 	usersMux.HandleFunc("POST /profile/followers", rt.ProfileFollowers)
 	usersMux.HandleFunc("POST /profile/following", rt.ProfileFollowing)
@@ -21,6 +22,39 @@ func (rt *Root) NewUsersHandler() (usersMux *http.ServeMux) {
 	usersMux.HandleFunc("POST /follow/accept-decline", rt.AcceptDeclineFollowRequest)
 
 	return usersMux
+}
+
+type ProfileInfoResponse struct {
+	User         *models.User `json:"user"`
+	FollowStatus string       `json:"follow_status"`
+}
+
+func NewUserDTO(u *models.User) *models.UserDTO {
+	return &models.UserDTO{
+		ID:          u.ID,
+		Nickname:    u.Nickname,
+		FirstName:   u.FirstName,
+		LastName:    u.LastName,
+		AboutMe:     u.AboutMe,
+		DateOfBirth: u.DateOfBirth,
+		AvatarURL:   u.AvatarURL,
+		IsPublic:    u.IsPublic,
+		CreatedAt:   u.CreatedAt,
+	}
+}
+
+func (rt *Root) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(15551)
+	requesterID := rt.DL.GetRequesterID(w, r)
+	user := &models.User{ID: requesterID}
+
+	if err := rt.DL.Users.GetUserByID(user); err != nil {
+		tools.RespondError(w, "User not found", http.StatusUnauthorized)
+		return
+	}
+
+	dto := NewUserDTO(user)
+	tools.EncodeJSON(w, http.StatusOK, dto)
 }
 
 func (rt *Root) ProfileAccess(w http.ResponseWriter, r *http.Request, targetUser *models.User) bool {
@@ -89,8 +123,8 @@ func (rt *Root) ProfileAccess(w http.ResponseWriter, r *http.Request, targetUser
 					"path":      r.URL.Path,
 				},
 			})
-			fmt.Println(2)
-			tools.RespondError(w, "Private profile — follow to see more", http.StatusForbidden)
+			fmt.Println("ddd", 2)
+			// tools.RespondError(w, "Private profile — follow to see more", http.StatusForbidden)
 			return false
 		}
 	}
@@ -111,7 +145,8 @@ func (rt *Root) ProfileAccess(w http.ResponseWriter, r *http.Request, targetUser
 
 func (rt *Root) ProfileInfo(w http.ResponseWriter, r *http.Request) {
 	var user *models.User
-	fmt.Println("ssss")
+	fmt.Println("S_prfl")
+
 	if err := tools.DecodeJSON(r, &user); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -122,10 +157,11 @@ func (rt *Root) ProfileInfo(w http.ResponseWriter, r *http.Request) {
 				"error": err.Error(),
 			},
 		})
+		println(err)
 		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
-	fmt.Println("VVV")
+	// fmt.Println("VVV")
 
 	if !rt.ProfileAccess(w, r, user) {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -137,15 +173,38 @@ func (rt *Root) ProfileInfo(w http.ResponseWriter, r *http.Request) {
 				"path":    r.URL.Path,
 			},
 		})
-		fmt.Println("access denied")
+		fmt.Println("Profil access denied")
 
 		user.DateOfBirth = time.Unix(0, 0)
 		user.AboutMe = ""
 	}
+	requesterID := rt.DL.GetRequesterID(w, r)
 
-	fmt.Println("ok")
+	followRequest := &models.FollowRequest{FromUserID: requesterID, ToUserID: user.ID}
+	// followStaus := "none"
+	if err := rt.DL.Follows.GetFollowStatus(followRequest); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "WARN",
+			Message: "Follow status not found or error",
+			Metadata: map[string]any{
+				"from_user": requesterID,
+				"to_user":   user.ID,
+				"ip":        r.RemoteAddr,
+				"path":      r.URL.Path,
+				"error":     err.Error(),
+			},
+		})
+		fmt.Println(1, err)
+		tools.RespondError(w, "Private profile — follow to see more", http.StatusForbidden)
+		return
+	}
 
-	if err := tools.EncodeJSON(w, http.StatusOK, user); err != nil {
+	fmt.Println("Follow", followRequest.Status)
+	response := ProfileInfoResponse{
+		User:         user,
+		FollowStatus: followRequest.Status,
+	}
+	if err := tools.EncodeJSON(w, http.StatusOK, response); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to send profile info response",
@@ -160,7 +219,9 @@ func (rt *Root) ProfileInfo(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
 	fmt.Println("user", user)
+	fmt.Println("E_prfl")
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
@@ -290,6 +351,7 @@ func (rt *Root) ProfileFollowers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rt *Root) ProfileFollowing(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("follow")
 	var user *models.User
 	if err := tools.DecodeJSON(r, &user); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -446,7 +508,7 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
-
+	fmt.Println("Following")
 	requesterID := rt.DL.GetRequesterID(w, r)
 
 	followRequest := &models.FollowRequest{FromUserID: requesterID, ToUserID: payload.TargetId}
@@ -465,6 +527,7 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 					"path":  r.URL.Path,
 				},
 			})
+			fmt.Println("'Err'", err)
 			tools.RespondError(w, "Failed to send follow request", http.StatusInternalServerError)
 			return
 		}

@@ -4,7 +4,7 @@
     <div class="profile-banner">
       <!-- <img :src="user.profile_img || defaultAvatar" class="banner-pic" alt="Profile Picture" /> -->
       <div class="banner-info">
-        <h2>{{ user.nickname || user.first_name}}</h2>
+        <h2>{{ user.nickname || user.first_name }}</h2>
         <p>{{ user.about_me || 'No bio yet.' }}</p>
         <div class="profile-actions">
           <!-- If it's own profile -->
@@ -27,32 +27,35 @@
     </div>
 
     <!-- Main Content Sections -->
-    <div class="profile-layout">
+    <div class="profile-layout" v-if="canViewPrivateProfile">
       <div class="profile-left">
         <h3>About</h3>
-        <p>{{ user.nickname}}</p>
-        <p>{{ user.first_name, user.last_name }}</p>
+        <p>{{ user.nickname }}</p>
+        <p>{{ user.last_name }}</p>
         <p>{{ user.about_me || 'No bio provided yet.' }}</p>
         <p class="dob" v-if="user.date_of_birth">📅 {{ user.date_of_birth }}</p>
-        <!-- <p>{{ user.created_at}}</p> -->
       </div>
-
+    
       <div class="profile-middle">
         <h3>Posts</h3>
-        <!-- Future: Add post fetching logic here -->
         <p>Coming soon...</p>
-      </div>
-
+      </div> 
+    
       <div class="profile-right">
         <h3>Chat (Coming soon)</h3>
-        <!-- Future: Chat or message interface -->
       </div>
     </div>
+    
+    <!-- If user is private and viewer is not allowed -->
+    <div class="private-msg" v-else>
+      <p>This profile is private. Only followers can see more information.</p>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -60,32 +63,63 @@ const defaultAvatar = '/default-avatar.png'
 const user = reactive({})
 const followStatus = ref('none') // 'none', 'pending', 'accepted', 'incoming'
 const isOwner = ref(false)
+let targetId = null // will be set after fetching current user
 
-// Attempt to retrieve the ID from router state (hidden navigation data)
-let targetId = router.options.history.state?.targetId
-if (!targetId) {
-  // fallback to own profile
-  targetId = parseInt(localStorage.getItem('user_id'))
-}
 
 onMounted(async () => {
-  const currentId = parseInt(localStorage.getItem('user_id'))
-  isOwner.value = currentId === targetId
-
-  await fetchUserInfo()
+  const currentUserData = await fetchCurrentUser()
+  if (!currentUserData) return console.log("failed to fetch current user")
+  console.log("current", currentUserData)
+  
+  // Attempt to retrieve the ID from router state (hidden navigation data)
+  targetId = router.options.history.state?.targetId || currentUserData.id
+  targetId = 2  // hard code for testing
+  isOwner.value = currentUserData.id === targetId
   // await fetchFollowStatus()
+
+  console.log("targetId",targetId)
+  await fetchUserInfo(targetId)
+  console.log("followStatus", followStatus.value)
 })
 
-async function fetchUserInfo() {
+const canViewPrivateProfile = computed(() => {
+  return isOwner.value || user.is_public || followStatus.value === 'accepted'
+})
+
+
+async function fetchCurrentUser() {
+  try {
+    const res = await fetch('http://localhost:8080/users/profile/me', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include'
+    })
+
+    if (!res.ok) {
+      console.warn('Not logged in')
+      // router.push('/signin') 
+      return
+    }
+
+    return await res.json()
+  }catch(err){
+    console.log(err)
+  }
+}
+
+async function fetchUserInfo(targetid) {
   try {
     const res = await fetch('http://localhost:8080/users/profile/info', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: "include",
-    body: JSON.stringify({ id: 1 }),
+    body: JSON.stringify({id: targetid}),
 
-      // credentials: "include", // Required if you want to send cookies
     })
+    // if (res.status == 403){
+    // const data = await res
+    //   console.log(data)
+    // }
     if (!res.ok) {
       console.log("status", res.status)
       alert('Failed to fetch profile info')
@@ -95,7 +129,8 @@ async function fetchUserInfo() {
     const data = await res.json()
     console.log("res",res)
     console.log("data",data)
-    Object.assign(user, data)
+    Object.assign(user, data.user)
+    followStatus.value = data.follow_status
   }catch(err){
     // console.log("st", res.status)
     console.log("err",err)
@@ -103,43 +138,41 @@ async function fetchUserInfo() {
   }
 }
 
-// async function fetchFollowStatus() {
-//   const res = await fetch('http://localhost:8080/users/follow/status', {
-//     method: 'POST',
-//     headers: { 'Content-Type': 'application/json' },
-//     body: JSON.stringify({ target_id: 1 })
-//   })
-//   if (!res.ok) return
-//   const data = await res.json()
-//   followStatus.value = data.status
-// }
+async function followUser() {
+  try {
+    const res = await fetch('http://localhost:8080/users/follow/follow-unfollow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: "include",
+      body: JSON.stringify({ target_id: targetId, action: 'follow' })
+    })
+    if (res.ok) followStatus.value = 'pending'
+    // console.log(followStatus)
 
-// async function followUser() {
-//   const res = await fetch('http://localhost:8080/users/follow/follow-unfollow', {
-//     method: 'POST',
-//     headers: { 'Content-Type': 'application/json' },
-//     body: JSON.stringify({ target_id: targetId, action: 'follow' })
-//   })
-//   if (res.ok) followStatus.value = 'pending'
-// }
+  }catch(err){
+    console.log(err)
+  }
+}
 
-// async function unfollowUser() {
-//   const res = await fetch('http://localhost:8080/users/follow/follow-unfollow', {
-//     method: 'POST',
-//     headers: { 'Content-Type': 'application/json' },
-//     body: JSON.stringify({ target_id: targetId, action: 'unfollow' })
-//   })
-//   if (res.ok) followStatus.value = 'none'
-// }
+async function unfollowUser() {
+  const res = await fetch('http://localhost:8080/users/follow/follow-unfollow', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: "include",
+    body: JSON.stringify({ target_id: targetId, action: 'unfollow' })
+  })
+  if (res.ok) followStatus.value = 'none'
+}
 
-// async function respondToRequest(action) {
-//   const res = await fetch('http://localhost:8080/users/follow/accept-decline', {
-//     method: 'POST',
-//     headers: { 'Content-Type': 'application/json' },
-//     body: JSON.stringify({ target_id: targetId, action })
-//   })
-//   if (res.ok) followStatus.value = action === 'accepted' ? 'accepted' : 'none'
-// }
+async function respondToRequest(action) {
+  const res = await fetch('http://localhost:8080/users/follow/accept-decline', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target_id: targetId, action })
+  })
+  if (res.ok) followStatus.value = action === 'accepted' ? 'accepted' : 'none'
+}
 
 async function toggleVisibility() {
   try {

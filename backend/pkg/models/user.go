@@ -31,6 +31,19 @@ type User struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+// UserDTO is a safe representation of a user to be sent to the client
+type UserDTO struct {
+	ID          int       `json:"id"`
+	Nickname    string    `json:"nickname"`
+	FirstName   string    `json:"first_name"`
+	LastName    string    `json:"last_name"`
+	AboutMe     string    `json:"about_me"`
+	DateOfBirth time.Time `json:"date_of_birth"`
+	AvatarURL   string    `json:"avatar_url"`
+	IsPublic    bool      `json:"is_public"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 // Validate checks all required fields and ensures correct formats
 func (u *User) Validate() error {
 	u.Email = strings.TrimSpace(u.Email)
