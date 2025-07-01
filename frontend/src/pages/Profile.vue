@@ -17,10 +17,10 @@
             <button v-if="followStatus === 'none'" @click="followUser">Follow</button>
             <button v-else-if="followStatus === 'pending'" disabled>Pending</button>
             <button v-else-if="followStatus === 'accepted'" @click="unfollowUser">Unfollow</button>
-            <div v-else-if="followStatus === 'incoming'">
-              <button @click="respondToRequest('accepted')">Accept</button>
-              <button @click="respondToRequest('declined')">Decline</button>
-            </div>
+            <!-- <div v-else-if="followStatus === 'incoming'"> -->
+              <!-- <button @click="respondToRequest('accepted')">Accept</button>
+              <button @click="respondToRequest('declined')">Decline</button> -->
+            <!-- </div> -->
           </div>
         </div>
       </div>
@@ -57,6 +57,7 @@
 <script setup>
 import { onMounted, reactive, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+// import { useAuth } from '@/composables/useAuth'
 
 const router = useRouter()
 const defaultAvatar = '/default-avatar.png'
@@ -73,7 +74,7 @@ onMounted(async () => {
   
   // Attempt to retrieve the ID from router state (hidden navigation data)
   targetId = router.options.history.state?.targetId || currentUserData.id
-  targetId = 2  // hard code for testing
+  targetId = 1  // hard code for testing
   isOwner.value = currentUserData.id === targetId
   // await fetchFollowStatus()
 
@@ -131,6 +132,7 @@ async function fetchUserInfo(targetid) {
     console.log("data",data)
     Object.assign(user, data.user)
     followStatus.value = data.follow_status
+    console.log("followStatus",data.followStatus)
   }catch(err){
     // console.log("st", res.status)
     console.log("err",err)

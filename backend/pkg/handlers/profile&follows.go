@@ -178,8 +178,8 @@ func (rt *Root) ProfileInfo(w http.ResponseWriter, r *http.Request) {
 		user.DateOfBirth = time.Unix(0, 0)
 		user.AboutMe = ""
 	}
+	
 	requesterID := rt.DL.GetRequesterID(w, r)
-
 	followRequest := &models.FollowRequest{FromUserID: requesterID, ToUserID: user.ID}
 	// followStaus := "none"
 	if err := rt.DL.Follows.GetFollowStatus(followRequest); err != nil {

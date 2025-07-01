@@ -96,6 +96,7 @@ func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 			tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
+		
 		fmt.Println("Cookie", cookie)
 		fmt.Println("Coosssskie", cookie.Value)
 

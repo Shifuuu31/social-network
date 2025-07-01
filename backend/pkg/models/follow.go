@@ -136,13 +136,14 @@ func (flm *FollowRequestModel) GetFollows(userID int, followType string) (users 
 // GetFollowStatus returns "none", "pending", "accepted", or "declined".
 func (flm *FollowRequestModel) GetFollowStatus(followRequest *FollowRequest) error {
 	query := `
-		SELECT status FROM follow_request
+		SELECT from_user_id, to_user_id, status FROM follow_request
 		WHERE from_user_id = ? AND to_user_id = ?
-		OR id = ?
-
 	`
 
-	if err := flm.DB.QueryRow(query, followRequest.FromUserID, followRequest.ToUserID, followRequest.ID).Scan(&followRequest.Status); err != nil {
+	if err := flm.DB.QueryRow(query,
+		followRequest.FromUserID,
+		followRequest.ToUserID,
+	).Scan(&followRequest.FromUserID, &followRequest.ToUserID, &followRequest.Status); err != nil {
 		if err == sql.ErrNoRows {
 			followRequest.Status = "none"
 			return nil
