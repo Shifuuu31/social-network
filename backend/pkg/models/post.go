@@ -20,7 +20,8 @@ type Post struct {
 	Privacy        string `json:"privacy"` // [public', 'almost_private', 'private']
 	CreatedAt      string `json:"created_at"`
 	ChosenUsersIds []int  `json:"chosen_users_ids"`
-	Image_url string `json:"image_url"`
+	Image_url      string `json:"image_url"`
+	// Title string `json:"title"`  
 }
 
 func (post *Post) Validate() error {
@@ -122,7 +123,7 @@ func (pfl *PostFilter) Validate() error {
 func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 	var query string
 	var rows *sql.Rows
-
+	println("*************************", filter.Type, "^^^^^^^^^^^^^^^^^^^^^^^6")
 	switch filter.Type {
 	case "group":
 		query = `
@@ -182,8 +183,33 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
             ) comment_counts ON CAST(posts.id as TEXT) = comment_counts.post_id
             WHERE posts.id = ?`
 		rows, err = pm.DB.Query(query, filter.Id)
-	}
+	
 
+	case "public":
+    query = `
+        SELECT 
+            posts.id, 
+            posts.user_id, 
+            users.nickname, 
+            posts.group_id,
+  
+            posts.content, 
+             posts.privacy, 
+            posts.created_at,
+            COALESCE(comment_counts.reply_count, 0) as replies
+        FROM posts
+        JOIN users ON posts.user_id = users.id
+        LEFT JOIN (
+            SELECT post_id, COUNT(*) as reply_count
+            FROM comments
+            GROUP BY post_id
+        ) comment_counts ON posts.id = comment_counts.post_id
+        WHERE posts.privacy = 'public'
+          AND posts.id > ?
+        ORDER BY posts.created_at DESC
+        LIMIT ?`
+    rows, err = pm.DB.Query(query, filter.Start, filter.NPost)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +224,7 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 			&post.Owner,
 			&post.GroupId,
 			&post.Content,
-			&post.Image,
+ 			// &post.Image,
 			&post.Privacy,
 			&post.CreatedAt,
 			&post.Replies,

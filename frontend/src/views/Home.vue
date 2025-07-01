@@ -11,10 +11,18 @@
           
           <CreatePost @post-created="handlePostCreated" />
           
-          <PostList 
+          <!-- <PostList 
+            :key="postListKey" 
+            :refresh-trigger="refreshTrigger"
+          /> -->
+          
+
+                    <PostList 
             :key="postListKey" 
             :refresh-trigger="refreshTrigger"
           />
+
+
         </div>
       </main>
       

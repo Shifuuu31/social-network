@@ -271,6 +271,7 @@ input, select, textarea {
   padding: 0.5rem;
   border-radius: 4px;
   border: 1px solid #ccc;
+  resize: none;
 }
 .error {
   color: red;

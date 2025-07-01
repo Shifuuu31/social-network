@@ -92,35 +92,41 @@ function buildFormData(postData) {
 ///////////////
 
 
+ /**
+ * Fetches posts from the feed based on filter criteria.
+ * @param {Object} [filter] - Optional filter object (userId is required)
+ * @returns {Promise<Object>} Resolves with list of posts
+ */
+ 
 
 
-export async function getPosts(filter = {}) {
-  // filter example structure:
-  // {
-  //   userId: number,        // required - the requesting user's ID
-  //   groupId: number | null, // optional - filter by group
-  //   limit: number,         // optional - number of posts to return
-  //   offset: number,        // optional - for pagination
-  // }
+ export async function getPosts(filter = {}) {
+  const url = `${API_BASE_URL}/feed`;
+
+  // Normalize input to match Go backend expectations
+  const requestFilter = {
+    id: filter.id || 0,
+    type: filter.type || "public",
+    start: filter.start || 0,
+    n_post: filter.nPost || 20
+  };
 
   try {
-    const response = await fetch(`${API_BASE_URL}/feed`, {
+    const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(filter),
+      headers: HEADERS.JSON,
+      body: JSON.stringify(requestFilter)
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      const errorMsg = errorData.error || 'Failed to fetch posts';
+      const errorMsg = errorData.error || `HTTP error! Status: ${response.status}`;
       throw new Error(errorMsg);
     }
 
-    return await response.json();
+    return await response.json(); // Should return array of posts
   } catch (err) {
-    console.error('getPosts error:', err);
+    console.error('Error fetching posts:', err.message);
     throw err;
   }
 }

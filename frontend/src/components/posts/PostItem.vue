@@ -1,130 +1,97 @@
+<!-- PostItem.vue -->
 <template>
+  
   <div class="post-item">
-    <!-- Post Header -->
     <div class="post-header">
-      <div class="post-author">
-        <img :src="post.authorAvatar" alt="avatar" class="avatar" />
-        <div class="author-info">
-          <h3 class="author-name">{{ post.author }}</h3>
-          <p class="post-date">{{ post.date }}</p>
-        </div>
-      </div>
-      <button class="more-btn">•••</button>
+      <strong>{{ post.owner }}</strong>
+      <span class="post-time">{{ formatTime(post.created_at) }}</span>
+    </div>
+    <div class="post-title" v-if="post.title">
+      <h2>{{ post.title }}</h2>
     </div>
 
-    <!-- Post Content -->
-    <p class="post-content">{{ post.content }}</p>
-    <img v-if="post.image" :src="post.image" alt="Post Image" class="post-image" />
+    <div class="post-content">
+      {{ post.content }}
+    </div>
 
-    <!-- Post Actions -->
-    <div class="post-actions">
-      <button class="action-btn">👍 Like</button>
-      <button class="action-btn">💬 Comment</button>
-      <button class="action-btn">🔁 Share</button>
+    <div v-if="post.image" class="post-image">
+      <img :src="post.image" alt="Post image" />
+    </div>
+
+    <div class="post-footer">
+      <span>Replies: {{ post.replies }}</span>
+      <span class="privacy-tag">{{ post.privacy }}</span>
     </div>
   </div>
 </template>
 
 <script setup>
-defineProps({
+import { defineProps } from 'vue'
+
+const props = defineProps({
   post: {
     type: Object,
-    required: true,
-    default: () => ({
-      author: 'John Doe',
-      authorAvatar: 'https://via.placeholder.com/40',
-      date: 'June 29, 2025',
-      content: 'This is a sample post. Later this will come from backend!',
-      image: 'https://via.placeholder.com/600x300',
-    }),
-  },
+    required: true
+  }
 })
+// console.log(post,"|QWWWWWWWWWWW")
+
+function formatTime(timeStr) {
+  const date = new Date(timeStr)
+  return date.toLocaleString()
+}
 </script>
 
 <style scoped>
 .post-item {
-  background-color: white;
-  border: 1px solid #ddd;
+  background-color: #fff;
   border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  margin-bottom: 1rem;
 }
 
 .post-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
 }
 
-.post-author {
-  display: flex;
-  align-items: center;
-}
-
-.avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-  margin-right: 10px;
-  border: 1px solid #ccc;
-}
-
-.author-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.author-name {
-  margin: 0;
-  font-size: 16px;
-  font-weight: bold;
-}
-
-.post-date {
-  margin: 0;
-  font-size: 12px;
-  color: gray;
-}
-
-.more-btn {
-  background: none;
-  border: none;
-  font-size: 20px;
-  color: gray;
-  cursor: pointer;
+.post-time {
+  font-size: 0.9rem;
+  color: #999;
 }
 
 .post-content {
-  margin: 12px 0;
-  font-size: 14px;
+  font-size: 1rem;
+  margin-bottom: 1rem;
 }
 
-.post-image {
-  width: 100%;
-  max-height: 300px;
-  object-fit: cover;
-  border-radius: 6px;
-  margin-bottom: 12px;
+.post-image img {
+  max-width: 100%;
+  border-radius: 8px;
 }
 
-.post-actions {
+.post-footer {
+  font-size: 0.9rem;
+  color: #666;
   display: flex;
-  justify-content: space-around;
-  border-top: 1px solid #eee;
-  padding-top: 10px;
+  justify-content: space-between;
 }
 
-.action-btn {
-  background: none;
-  border: none;
-  color: #555;
-  cursor: pointer;
-  font-size: 14px;
+.privacy-tag {
+  text-transform: capitalize;
+  background: #eee;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
 }
 
-.action-btn:hover {
-  color: #000;
+.post-title h2 {
+  font-size: 1.5rem;
+  margin-top: 0;
+  color: #333;
 }
+
 </style>
