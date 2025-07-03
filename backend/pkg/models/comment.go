@@ -53,11 +53,9 @@ func (app *CommentModel) GetComments(postId int) ([]Comment, error) {
 		return nil, fmt.Errorf("error iterating over comments: %w", err)
 	}
 	return comments, nil
-
 }
 
 func ValidateComment(db *sql.DB, comment *Comment) (bool, int) {
-
 	if comment.OwnerId <= 0 || comment.Post_id <= 0 {
 		return false, 400
 	}
@@ -122,22 +120,65 @@ func ValidateComment(db *sql.DB, comment *Comment) (bool, int) {
 	}
 }
 
+// func ParseCommentFromForm(r *http.Request, comment *Comment) int {
+// 	var err error
+
+// 	if ownerIdStr := r.FormValue("owner_id"); ownerIdStr != "" {
+// 		if comment.OwnerId, err = strconv.Atoi(ownerIdStr); err != nil {
+// 			return 400
+// 		}
+// 	}
+
+// 	if PostIdStr := r.FormValue("group_id"); PostIdStr != "" {
+// 		if comment.Post_id, err = strconv.Atoi(PostIdStr); err != nil && comment.Post_id <= 0 {
+// 			return 400
+// 		}
+// 	}
+
+// 	comment.Content = r.FormValue("content")
+
+// 	return 200 // OK
+// }
+
 func ParseCommentFromForm(r *http.Request, comment *Comment) int {
-	var err error
+	// Get form values
+	content := r.FormValue("content")
+	postIDStr := r.FormValue("post_id")
+	ownerIDStr := r.FormValue("owner_id")
 
-	if ownerIdStr := r.FormValue("owner_id"); ownerIdStr != "" {
-		if comment.OwnerId, err = strconv.Atoi(ownerIdStr); err != nil {
-			return 400
-		}
+	// Validate required fields
+	if content == "" {
+		log.Println("Content is required")
+		return http.StatusBadRequest
 	}
 
-	if PostIdStr := r.FormValue("group_id"); PostIdStr != "" {
-		if comment.Post_id, err = strconv.Atoi(PostIdStr); err != nil && comment.Post_id <= 0 {
-			return 400
-		}
+	if postIDStr == "" {
+		log.Println("Post ID is required")
+		return http.StatusBadRequest
 	}
 
-	comment.Content = r.FormValue("content")
+	if ownerIDStr == "" {
+		log.Println("Owner ID is required")
+		return http.StatusBadRequest
+	}
 
-	return 200 // OK
+	// Convert string IDs to integers
+	postID, err := strconv.Atoi(postIDStr)
+	if err != nil {
+		log.Printf("Invalid post_id format: %v", err)
+		return http.StatusBadRequest
+	}
+
+	ownerID, err := strconv.Atoi(ownerIDStr)
+	if err != nil {
+		log.Printf("Invalid owner_id format: %v", err)
+		return http.StatusBadRequest
+	}
+
+	// Populate the comment struct
+	comment.Content = content
+	comment.Post_id = postID
+	comment.OwnerId = ownerID
+
+	return http.StatusOK
 }

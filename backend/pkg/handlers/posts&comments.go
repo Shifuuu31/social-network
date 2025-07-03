@@ -26,7 +26,13 @@ func (rt *Root) SetupPostRoutes(mux *http.ServeMux) {
 	postMux := http.NewServeMux()
 	postMux.HandleFunc("POST /feed", rt.GetFeedPosts)
 	postMux.HandleFunc("POST /new", rt.NewPost)
-	postMux.HandleFunc("GET /followers", rt.GetFollowers) // it already in profile&follow.go
+ 	postMux.HandleFunc("GET /followers", rt.GetFollowers) // it already in profile&follow.go
+	postMux.HandleFunc("GET /{post_id}/comments", rt.GetFeedComments)
+		// postMux.HandleFunc("POST /new",rt.NewComment)
+			postMux.HandleFunc("POST /comment/new", rt.NewComment)  // Changed to avoid conflict
+
+
+
 	// log.Println("Mounting post multiplexer at /post/")
 	mux.Handle("/post/", http.StripPrefix("/post", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received request: %s %s", r.Method, r.URL.Path)
@@ -85,7 +91,7 @@ func (app *Root) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	posts, err := app.DL.Posts.GetPosts(filter)
-	fmt.Println("waaaaaaaaaaaaaaaaaaaaaaaazi",posts)
+	fmt.Println("waaaaaaaaaaaaaaaaaaaaaaaazi", posts)
 	fmt.Println("GetFeedPosts filter:", filter, "Posts:", posts)
 
 	if err != nil {
@@ -322,13 +328,18 @@ func (app *Root) GetFeedComments(w http.ResponseWriter, r *http.Request) {
 	// fmt.Fprintln(w, "Listing all posts")
 }
 
-func (app *Root) NewComment(w http.ResponseWriter, r *http.Request) {
+ func (app *Root) NewComment(w http.ResponseWriter, r *http.Request) {
 	var comment models.Comment
 	var hasFile bool
+
+	fmt.Println("NewComment handler accessed")
 	if r.Method != http.MethodPost {
-		tools.EncodeJSON(w, 403, nil)
+		tools.EncodeJSON(w, http.StatusMethodNotAllowed, map[string]string{
+			"error": "Method not allowed",
+		})
 		return
 	}
+	
 	contentType := r.Header.Get("Content-Type")
 
 	if strings.Contains(contentType, "multipart/form-data") {
@@ -341,7 +352,7 @@ func (app *Root) NewComment(w http.ResponseWriter, r *http.Request) {
 		}
 		hasFile = true
 
-		// Parse post data from form values using tools function
+		// Parse comment data from form values
 		if status := models.ParseCommentFromForm(r, &comment); status != 200 {
 			tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
 				"error": "Invalid form data",
@@ -362,15 +373,14 @@ func (app *Root) NewComment(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	fmt.Println("mok", comment)
 
+	// Validate comment
 	if ok, status := models.ValidateComment(app.DL.Comments.DB, &comment); !ok {
 		tools.EncodeJSON(w, status, map[string]string{
-			"error": "Invalid post data",
+			"error": "Invalid comment data",
 		})
 		return
 	}
-	fmt.Println("mok", comment)
 
 	var imagePath string
 	if hasFile {
@@ -386,15 +396,15 @@ func (app *Root) NewComment(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Validate file type using existing tools function
+			// Validate file type
 			if !tools.IsAllowedFile(handler.Filename, file) {
 				tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
-					"error": "file format is not supported",
+					"error": "File format is not supported",
 				})
 				return
 			}
 
-			// Upload file using existing tools function
+			// Upload file
 			uploadedPath, status := tools.UploadHandler(file, handler)
 			if status != 200 {
 				tools.EncodeJSON(w, status, map[string]string{
@@ -406,15 +416,14 @@ func (app *Root) NewComment(w http.ResponseWriter, r *http.Request) {
 		} else if err != http.ErrMissingFile {
 			log.Printf("Error handling file upload: %v", err)
 			tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
-				"error": err.Error(),
-				// "error": "Error processing image upload",
+				"error": "Error processing image upload",
 			})
 			return
 		}
 	}
 
 	// Begin transaction
-	tx, err := app.DL.Posts.DB.Begin()
+	tx, err := app.DL.Comments.DB.Begin()
 	if err != nil {
 		log.Printf("Error starting transaction: %v", err)
 		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{
@@ -423,17 +432,16 @@ func (app *Root) NewComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	// fmt.Println(post.OwnerId, post.GroupId, len(post.Content), imagePath, post.Privacy)
-	// Insert post
 
-	_, err = tx.Exec(`
+	// Insert comment
+	result, err := tx.Exec(`
 		INSERT INTO comments (user_id, post_id, content, image, created_at)
 		VALUES (?, ?, ?, ?, ?)`,
 		comment.OwnerId, comment.Post_id, comment.Content, imagePath, time.Now())
 	if err != nil {
-		log.Printf("Error inserting post: %v", err)
+		log.Printf("Error inserting comment: %v", err)
 		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{
-			"error": "Failed to create post",
+			"error": "Failed to create comment",
 		})
 		return
 	}
@@ -442,13 +450,21 @@ func (app *Root) NewComment(w http.ResponseWriter, r *http.Request) {
 	if err = tx.Commit(); err != nil {
 		log.Printf("Error committing transaction: %v", err)
 		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{
-			"error": "Failed to create post",
+			"error": "Failed to create comment",
 		})
 		return
 	}
 
+	// Get the created comment ID and prepare response
+	commentID, _ := result.LastInsertId()
+	comment.Id = int(commentID)
+	comment.Image = imagePath
+	comment.CreatedAt = time.Now().Format("2006-01-02 15:04:05")
+
+	// Return the created comment
 	tools.EncodeJSON(w, http.StatusCreated, map[string]interface{}{
-		"message": "comment created successfully",
+		"message": "Comment created successfully",
+		"comment": comment,
 	})
 }
 
