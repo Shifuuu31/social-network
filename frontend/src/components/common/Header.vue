@@ -26,11 +26,10 @@
 
       <!-- User Dropdown -->
       <div class="user-dropdown" @click="toggleDropdown">
-        <img
-          src="https://via.placeholder.com/32"
-          alt="User Avatar"
-          class="avatar"
-        />
+    
+
+        <img src="https://ui-avatars.com/api/?name=John+Doe&size=32" alt="User Avatar" class="avatar" />
+
         <div v-if="dropdownOpen" class="dropdown-menu">
           <router-link to="/profile" class="dropdown-item">Profile</router-link>
           <button @click="logout" class="dropdown-item">Logout</button>

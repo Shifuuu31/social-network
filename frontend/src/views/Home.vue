@@ -17,9 +17,15 @@
           /> -->
           
 
-                    <PostList 
+                    <!-- <PostList 
             :key="postListKey" 
             :refresh-trigger="refreshTrigger"
+          /> -->
+          <PostList
+          :key="postListKey"
+          :refresh-trigger="refreshTrigger"
+          :user-id="1"
+
           />
 
 

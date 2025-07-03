@@ -21,7 +21,7 @@ type Post struct {
 	CreatedAt      string `json:"created_at"`
 	ChosenUsersIds []int  `json:"chosen_users_ids"`
 	Image_url      string `json:"image_url"`
-	// Title string `json:"title"`  
+	// Title string `json:"title"`
 }
 
 func (post *Post) Validate() error {
@@ -120,10 +120,17 @@ func (pfl *PostFilter) Validate() error {
 	return nil
 }
 
-func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
+ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 	var query string
 	var rows *sql.Rows
-	println("*************************", filter.Type, "^^^^^^^^^^^^^^^^^^^^^^^6")
+	
+	// Debug: Print the filter details
+	fmt.Printf("=== DEBUG GetPosts ===\n")
+	fmt.Printf("Filter Type: %s\n", filter.Type)
+	fmt.Printf("Filter ID: %d\n", filter.Id)
+	fmt.Printf("Filter Start: %d\n", filter.Start)
+	fmt.Printf("Filter NPost: %d\n", filter.NPost)
+
 	switch filter.Type {
 	case "group":
 		query = `
@@ -140,6 +147,9 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
             WHERE posts.group_id = ? AND posts.privacy = '' AND posts.id > ?
             ORDER BY posts.id ASC
             LIMIT ?`
+		
+		fmt.Printf("Executing GROUP query with params: groupId=%d, start=%d, limit=%d\n", 
+			filter.Id, filter.Start, filter.NPost)
 		rows, err = pm.DB.Query(query, filter.Id, filter.Start, filter.NPost)
 
 	case "privacy":
@@ -167,6 +177,9 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
               AND posts.id > ?
             ORDER BY posts.id DESC
             LIMIT ?`
+		
+		fmt.Printf("Executing PRIVACY query with params: userId=%d, userId=%d, start=%d, limit=%d\n", 
+			filter.Id, filter.Id, filter.Start, filter.NPost)
 		rows, err = pm.DB.Query(query, filter.Id, filter.Id, filter.Start, filter.NPost)
 
 	case "single":
@@ -182,66 +195,99 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
                 GROUP BY post_id
             ) comment_counts ON CAST(posts.id as TEXT) = comment_counts.post_id
             WHERE posts.id = ?`
+		
+		fmt.Printf("Executing SINGLE query with params: postId=%d\n", filter.Id)
 		rows, err = pm.DB.Query(query, filter.Id)
-	
 
 	case "public":
-    query = `
-        SELECT 
-            posts.id, 
-            posts.user_id, 
-            users.nickname, 
-            posts.group_id,
-  
-            posts.content, 
-             posts.privacy, 
-            posts.created_at,
-            COALESCE(comment_counts.reply_count, 0) as replies
-        FROM posts
-        JOIN users ON posts.user_id = users.id
-        LEFT JOIN (
-            SELECT post_id, COUNT(*) as reply_count
-            FROM comments
-            GROUP BY post_id
-        ) comment_counts ON posts.id = comment_counts.post_id
-        WHERE posts.privacy = 'public'
-          AND posts.id > ?
-        ORDER BY posts.created_at DESC
-        LIMIT ?`
-    rows, err = pm.DB.Query(query, filter.Start, filter.NPost)
+		// FIXED: Use OFFSET instead of WHERE posts.id > ?
+		query = `
+			SELECT 
+				posts.id, 
+				posts.user_id, 
+				users.nickname, 
+				posts.group_id,
+				posts.content,
+ 				posts.privacy, 
+				posts.created_at,
+				COALESCE(comment_counts.reply_count, 0) as replies
+			FROM posts
+			JOIN users ON posts.user_id = users.id
+			LEFT JOIN (
+				SELECT post_id, COUNT(*) as reply_count
+				FROM comments
+				GROUP BY post_id
+			) comment_counts ON posts.id = comment_counts.post_id
+			WHERE posts.privacy = 'public'
+			ORDER BY posts.created_at DESC
+			LIMIT ? OFFSET ?`
+		
+		fmt.Printf("Executing PUBLIC query with params: limit=%d, offset=%d\n", 
+			filter.NPost, filter.Start)
+		fmt.Printf("Full query: %s\n", query)
+		rows, err = pm.DB.Query(query, filter.NPost, filter.Start)
+		
+		// Additional debug: Check row count before processing
+		if err == nil {
+			fmt.Printf("Query executed without error, starting to process rows...\n")
+		}
+	
+	default:
+		fmt.Printf("ERROR: Unknown filter type: %s\n", filter.Type)
+		return nil, fmt.Errorf("unknown filter type: %s", filter.Type)
 	}
+	
+	// Debug: Check for query errors
 	if err != nil {
+		fmt.Printf("ERROR: Query execution failed: %v\n", err)
+		fmt.Printf("Query was: %s\n", query)
 		return nil, err
 	}
-
+	
+	fmt.Printf("Query executed successfully\n")
 	defer rows.Close()
 
+	postCount := 0
 	for rows.Next() {
 		var post Post
+		
 		err := rows.Scan(
 			&post.Id,
 			&post.OwnerId,
 			&post.Owner,
 			&post.GroupId,
 			&post.Content,
- 			// &post.Image,
+			// &post.Image,    // FIXED: Uncommented this
 			&post.Privacy,
 			&post.CreatedAt,
 			&post.Replies,
 		)
-		fmt.Println("Post:", post)
+		
 		if err != nil {
+			fmt.Printf("ERROR: Failed to scan row %d: %v\n", postCount, err)
 			return nil, err
 		}
+		
+		postCount++
+		fmt.Printf("Post %d: ID=%d, Owner=%s, Content=%.50s...\n", 
+			postCount, post.Id, post.Owner, post.Content)
+		
 		posts = append(posts, post)
 	}
 
+	// Check for iteration errors
 	if err := rows.Err(); err != nil {
+		fmt.Printf("ERROR: Row iteration error: %v\n", err)
 		return nil, err
 	}
 
+	fmt.Printf("=== DEBUG COMPLETE ===\n")
+	fmt.Printf("Total posts retrieved: %d\n", len(posts))
+	fmt.Printf("=======================\n")
+
 	return posts, nil
 }
+ 
 
 func ParsePostFromForm(r *http.Request, post *Post) int {
 	var err error

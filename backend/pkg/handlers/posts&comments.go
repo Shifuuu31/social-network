@@ -85,7 +85,9 @@ func (app *Root) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	posts, err := app.DL.Posts.GetPosts(filter)
+	fmt.Println("waaaaaaaaaaaaaaaaaaaaaaaazi",posts)
 	fmt.Println("GetFeedPosts filter:", filter, "Posts:", posts)
+
 	if err != nil {
 		log.Printf("Error fetching posts: %v", err)
 		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{

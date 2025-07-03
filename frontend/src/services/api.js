@@ -114,7 +114,14 @@ function buildFormData(postData) {
   try {
     const response = await fetch(url, {
       method: 'POST',
-      headers: HEADERS.JSON,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        // Add any auth headers if needed
+        // 'Authorization': `Bearer ${token}`
+      },
+      mode: 'cors', // Explicitly set CORS mode
+      credentials: 'include', // If you need cookies/auth
       body: JSON.stringify(requestFilter)
     });
 
@@ -124,9 +131,19 @@ function buildFormData(postData) {
       throw new Error(errorMsg);
     }
 
-    return await response.json(); // Should return array of posts
+    const data = await response.json();
+    
+    // Safely clone the data to avoid XrayWrapper issues
+    return JSON.parse(JSON.stringify(data));
+    
   } catch (err) {
     console.error('Error fetching posts:', err.message);
+    
+    // Check if it's a CORS error
+    if (err.message.includes('CORS') || err.message.includes('cross-origin')) {
+      throw new Error('Network error: Please check if the server is running and CORS is configured');
+    }
+    
     throw err;
   }
 }
