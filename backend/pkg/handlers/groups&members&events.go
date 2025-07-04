@@ -15,8 +15,9 @@ func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 	groupsMux.HandleFunc("POST /group/new", rt.NewGroup)
 	groupsMux.HandleFunc("POST /group/invite", rt.InviteToJoinGroup)
 	groupsMux.HandleFunc("POST /group/request", rt.RequestToJoinGroup)
-	groupsMux.HandleFunc("POST /group/accept-decline", rt.AcceptDeclineGroup)
-	groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups)
+	groupsMux.HandleFunc("POST /group/accept-decline-request", rt.AcceptDeclineRequestToJoin)
+	groupsMux.HandleFunc("POST /group/accept-decline-invitation", rt.AcceptDeclineInvitation)
+	groupsMux.HandleFunc("POST /browse", rt.BrowseGroups)
 	groupsMux.HandleFunc("POST /group/event", rt.NewEvent)
 	groupsMux.HandleFunc("POST /group/event/vote", rt.EventVote)
 
@@ -48,6 +49,7 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "New group JSON decoded"})
 
+	group.CreatorID = rt.DL.GetRequesterID(w, r)
 	// verify group creation input
 	if err := group.Validate(); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -169,7 +171,6 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member inserted with pending invite status"})
 
-
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "Member invited successfully",
@@ -178,9 +179,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 			"path": r.URL.Path,
 		},
 	})
-	// TODO Add notification 
-
-
+	// TODO Add notification
 
 	if err := tools.EncodeJSON(w, http.StatusCreated, nil); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -216,6 +215,7 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 
 	// Insert into group_members as "pending_request"
 	// member.Status = "requested"
+	member.UserID = rt.DL.GetRequesterID(w, r)
 	if err := rt.DL.Members.Upsert(member); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -234,89 +234,88 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	// TODO Notify group creator
 }
 
-func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
+// Notify group creator
+func (rt *Root) AcceptDeclineRequestToJoin(w http.ResponseWriter, r *http.Request) {
 	var member *models.GroupMember
 	if err := tools.DecodeJSON(r, &member); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "ERROR",
-			Message: "Failed to decode group accept/decline JSON",
-			Metadata: map[string]any{
-				"ip":    r.RemoteAddr,
-				"path":  r.URL.Path,
-				"error": err.Error(),
-			},
+			Level:    "ERROR",
+			Message:  "Failed to decode group accept/decline JSON (creator)",
+			Metadata: map[string]any{"ip": r.RemoteAddr, "path": r.URL.Path, "error": err.Error()},
 		})
 		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
-	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group accept/decline JSON decoded"})
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Decoded join request for group"})
 
-	// TODO validate payload
+	if member.PrevStatus != "requested" {
+		tools.RespondError(w, "Only group creator can act on 'requested' status", http.StatusBadRequest)
+		return
+	}
 
-	// Check if requester is creator
 	requesterID := rt.DL.GetRequesterID(w, r)
-
-	switch member.Status {
-	case "requested":
-		if err := rt.DL.Groups.IsUserCreator(member.GroupID, requesterID); err != nil {
-			rt.DL.Logger.Log(models.LogEntry{
-				Level:   "ERROR",
-				Message: "Forbidden: requester isn't the group creator",
-				Metadata: map[string]any{
-					"ip":    r.RemoteAddr,
-					"path":  r.URL.Path,
-					"error": err.Error(),
-				},
-			})
-			tools.RespondError(w, "Forbidden", http.StatusForbidden)
-			return
-		}
-	case "invited":
-		if requesterID != member.ID {
-			rt.DL.Logger.Log(models.LogEntry{
-				Level:   "ERROR",
-				Message: "Forbidden: requester isn't invited to the group",
-				Metadata: map[string]any{
-					"ip":   r.RemoteAddr,
-					"path": r.URL.Path,
-				},
-			})
-			tools.RespondError(w, "Forbidden", http.StatusForbidden)
-			return
-
-		}
-	default:
+	if err := rt.DL.Groups.IsUserCreator(member.GroupID, requesterID); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "ERROR",
-			Message: "Invalid status in payload",
-			Metadata: map[string]any{
-				"ip":   r.RemoteAddr,
-				"path": r.URL.Path,
-			},
+			Level:    "ERROR",
+			Message:  "Forbidden: requester isn't the group creator",
+			Metadata: map[string]any{"ip": r.RemoteAddr, "path": r.URL.Path, "error": err.Error()},
 		})
-		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
+		tools.RespondError(w, "Forbidden", http.StatusForbidden)
 		return
-
 	}
-	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Requester authorized for accept/decline"})
 
-	// Update status to "joined" or delete row
+	// Accept = change to "member", Decline = "declined" or delete
 	if err := rt.DL.Members.Upsert(member); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "ERROR",
-			Message: "Failed to insert member into DB",
-			Metadata: map[string]any{
-				"ip":   r.RemoteAddr,
-				"path": r.URL.Path,
-				"err":  err.Error(),
-			},
+			Level:    "ERROR",
+			Message:  "Failed to update group membership",
+			Metadata: map[string]any{"ip": r.RemoteAddr, "path": r.URL.Path, "err": err.Error()},
 		})
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member status updated in DB"})
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group creator processed request"})
+}
 
-	// Notify group creator
+func (rt *Root) AcceptDeclineInvitation(w http.ResponseWriter, r *http.Request) {
+	var member *models.GroupMember
+	if err := tools.DecodeJSON(r, &member); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:    "ERROR",
+			Message:  "Failed to decode group invitation accept/decline JSON (user)",
+			Metadata: map[string]any{"ip": r.RemoteAddr, "path": r.URL.Path, "error": err.Error()},
+		})
+		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
+		return
+	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Decoded invitation for group"})
+
+	if member.PrevStatus != "invited" {
+		tools.RespondError(w, "Only invited users can accept/decline", http.StatusBadRequest)
+		return
+	}
+
+	requesterID := rt.DL.GetRequesterID(w, r)
+	if requesterID != member.UserID {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:    "ERROR",
+			Message:  "Forbidden: requester is not the invited user",
+			Metadata: map[string]any{"ip": r.RemoteAddr, "path": r.URL.Path},
+		})
+		tools.RespondError(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	if err := rt.DL.Members.Upsert(member); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:    "ERROR",
+			Message:  "Failed to update group membership (invited user)",
+			Metadata: map[string]any{"ip": r.RemoteAddr, "path": r.URL.Path, "err": err.Error()},
+		})
+		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Invited user responded to invitation"})
 }
 
 func (rt *Root) BrowseGroups(w http.ResponseWriter, r *http.Request) {
@@ -336,7 +335,7 @@ func (rt *Root) BrowseGroups(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Get groups JSON decoded"})
 
-	posts, err := rt.DL.Groups.GetGroups(payload)
+	posts, err := rt.DL.Groups.GetGroups(rt.DL.GetRequesterID(w, r), payload)
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -438,7 +437,6 @@ func (rt *Root) NewEvent(w http.ResponseWriter, r *http.Request) {
 
 	// TODO send notification to group members
 
-
 	if err := tools.EncodeJSON(w, http.StatusCreated, event); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -515,7 +513,6 @@ func (rt *Root) EventVote(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// TODO send notification to group members
-
 
 	if err := tools.EncodeJSON(w, http.StatusCreated, vote); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{

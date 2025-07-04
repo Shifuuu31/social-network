@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS group_members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
+    prev_status TEXT NOT NULL CHECK(prev_status IN ('none','invited', 'requested', 'member', 'declined')),
     status TEXT NOT NULL CHECK(status IN ('invited', 'requested', 'member', 'declined')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(group_id, user_id),

@@ -15,6 +15,7 @@ import (
 func (rt *Root) NewAuthHandler() (authMux *http.ServeMux) {
 	authMux = http.NewServeMux()
 
+	// authMux.HandleFunc("GET /me", rt.GetActiveUser) // TODO to implement
 	authMux.HandleFunc("POST /signup", rt.SignUp)
 	authMux.HandleFunc("POST /signin", rt.SignIn)
 	authMux.HandleFunc("DELETE /signout", rt.SignOut)

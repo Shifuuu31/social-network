@@ -10,6 +10,7 @@ type GroupMember struct {
 	ID        int       `json:"id"`
 	GroupID   int       `json:"group_id"`
 	UserID    int       `json:"user_id"`
+	PrevStatus    string    `json:"prev_status"` // "invited", "requested", "member", "declined"
 	Status    string    `json:"status"` // "invited", "requested", "member", "declined"
 	CreatedAt time.Time `json:"created_at"`
 }
