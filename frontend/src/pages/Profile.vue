@@ -57,10 +57,10 @@
 <script setup>
 import { onMounted, reactive, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-// import { useAuth } from '@/composables/useAuth'
+import { useAuth } from '@/composables/useAuth'
 
 const router = useRouter()
-const defaultAvatar = '/default-avatar.png'
+// const defaultAvatar = '/default-avatar.png'
 const user = reactive({})
 const followStatus = ref('none') // 'none', 'pending', 'accepted', 'incoming'
 const isOwner = ref(false)
