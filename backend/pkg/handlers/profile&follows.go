@@ -178,7 +178,7 @@ func (rt *Root) ProfileInfo(w http.ResponseWriter, r *http.Request) {
 		user.DateOfBirth = time.Unix(0, 0)
 		user.AboutMe = ""
 	}
-	
+
 	requesterID := rt.DL.GetRequesterID(w, r)
 	followRequest := &models.FollowRequest{FromUserID: requesterID, ToUserID: user.ID}
 	// followStaus := "none"
@@ -279,6 +279,7 @@ func (rt *Root) ProfileActivity(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rt *Root) ProfileFollowers(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("ProflieFollowers")
 	var user *models.User
 	if err := tools.DecodeJSON(r, &user); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{

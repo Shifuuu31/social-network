@@ -12,19 +12,11 @@
         <h2>{{ profileUser.nickname || profileUser.first_name }}</h2>
         <!-- <p class="role"></p> -->
         <div class="profile-buttons">
-          <button v-if="isOwner" @click="toggleVisibility">
-            {{ profileUser.is_public ? '🔓 Public' : '🔒 Private' }}
-          </button>
+          <button v-if="isOwner" @click="toggleVisibility"> {{ profileUser.is_public ? '🔓 Public' : '🔒 Private' }} </button>
           <template v-else>
-            <button
-              v-if="followStatus === 'none'"
-              @click="toggleFollow('follow')"
-            >Follow</button>
-            <button v-else-if="followStatus === 'pending'" disabled>Pending</button>
-            <button
-              v-else-if="followStatus === 'accepted'"
-              @click="toggleFollow('unfollow')"
-            >Unfollow</button>
+            <button v-if="followStatus === 'none'" @click="toggleFollow('follow')"> Follow </button>
+            <button v-else-if="followStatus === 'pending'" disabled> Pending </button>
+            <button v-else-if="followStatus === 'accepted'" @click="toggleFollow('unfollow')"> Unfollow </button>
           </template>
         </div>
       </div>
@@ -37,10 +29,9 @@
         <h3>About</h3>
         <ul class="about-list">
           <li><strong>Gender:</strong> {{ profileUser.gender || 'N/A' }}</li>
-          <li><strong>DOB:</strong> {{ profileUser.date_of_birth || 'N/A' }}</li>
-          <li><strong>Location:</strong> {{ profileUser.location || 'N/A' }}</li>
+          <li><strong>Date Of Birth:</strong> {{ profileUser.date_of_birth || 'N/A' }}</li>
           <li><strong>Email:</strong> {{ profileUser.email || 'N/A' }}</li>
-          <li><strong>Phone:</strong> {{ profileUser.phone || 'N/A' }}</li>
+          <li><strong>About Me:</strong> {{ profileUser.about_me || 'N/A' }}</li>
         </ul>
       </div>
 
@@ -56,130 +47,165 @@
           <div v-if="activeTab === 'posts'">
             <p>Coming soon: posts will appear here.</p>
           </div>
+        
           <div v-if="activeTab === 'followers'">
-            <p>List of followers from backend...</p>
+            <ul v-if="followersList?.length">
+              <li v-for="f in followersList" :key="f.id">
+                {{ f.nickname || f.first_name }} — @{{ f.nickname }}
+              </li>
+            </ul>
+            <p v-else>No followers yet.</p>
           </div>
+
           <div v-if="activeTab === 'following'">
-            <p>List of following from backend...</p>
+            <ul v-if="followingList?.length">
+              <li v-for="f in followingList" :key="f.id">
+                {{ f.nickname || f.first_name }} — @{{ f.nickname }}
+              </li>
+            </ul>
+            <p v-else>Not following anyone yet.</p>
           </div>
+
         </div>
       </div>
 
       <!-- Right Column -->
       <div class="profile-right">
-        <h3>Chat</h3>
+        <h3>Coming Soon</h3>
         <p>Coming soon…</p>
       </div>
-    </div>
-    <div v-else class="locked-profile">
-    <div class="locked-card">
-      <h3>🔒 This profile is private</h3>
-      <p>You must follow this user to view their posts and profile details.</p>
-    </div>
-    </div>
+      </div>
+      <div v-else class="locked-profile">
+        <div class="locked-card">
+          <h3>🔒 This profile is private</h3>
+          <p>You must follow this user to view their posts and profile details.</p>
+        </div>
+      </div>
   </div>
 </template>
 
-
 <script setup>
-import { onMounted, reactive, ref, computed } from 'vue'
+import { onMounted, reactive, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
-// import Profile from './Profile.vue'
 
 const router = useRouter()
 const { user: currentUser, isAuthenticated, fetchCurrentUser } = useAuth()
 
+const defaultAvatar = '/images/default-avatar.png' //fake
 const profileUser = reactive({})
 const followStatus = ref('none')
 const isOwner = ref(false)
+const activeTab = ref('posts')
+const followersList = ref([])
+const followingList = ref([])
 let targetId = null
 
+onMounted(async () => {
+  if (!isAuthenticated.value) {
+    await fetchCurrentUser()
+  }
 
+  targetId = router.options.history.state?.targetId || currentUser.value?.id
+  // targetId = 1 // for testing
 
-onMounted(async ()=> {
-if (!isAuthenticated.value) {
-  await fetchCurrentUser()
-}
-// Determine which profile we’re looking at:
-targetId = router.options.history.state?.targetId || currentUser.value?.id
-// targetId = 1
-console.log("CurrentUserID: ", currentUser.value.id)
-console.log("TargetID: ", targetId)
-
-isOwner.value = currentUser.value.id === targetId
-console.log("OWn",isOwner.value)
-console.log("OWn",profileUser.is_public)
-console.log("OWn",followStatus.value)
+  isOwner.value = currentUser.value.id === targetId
 
   await fetchProfile()
 })
 
-const canViewPrivateProfile = computed(() =>{
+const canViewPrivateProfile = computed(() => {
   return isOwner.value || profileUser.is_public || followStatus.value === 'accepted'
 })
 
 async function fetchProfile() {
-  // Fetch profile info + follow status together
-  const res = await fetch(
-    'http://localhost:8080/users/profile/info',
-    {
+  try {
+    const res = await fetch('http://localhost:8080/users/profile/info', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: targetId }),
+    })
+
+    if (!res.ok) {
+      console.error('Error fetching profile:', res.status)
+      return
     }
-  )
 
-  if (!res.ok) {
-    console.error('Error fetching profile:', res.status)
-    return
+    const { user: u, follow_status } = await res.json()
+    Object.keys(u).forEach(key => {
+      profileUser[key] = u[key]
+    })
+
+    followStatus.value = follow_status
+  }catch(err){
+    console.log(err)
   }
-  const { user: u, follow_status } = await res.json()
-  // Object.assign(profileUser, u)
-  Object.keys(u).forEach(key => {
-  profileUser[key] = u[key]
-  })
-
-  console.log("PU",profileUser)
-  console.log("UU",u)
-  console.log("U",profileUser.date_of_birth)
-  
-
-  followStatus.value = follow_status
 }
 
-// Unified follow/unfollow:
 async function toggleFollow(action) {
-  const res = await fetch(
-    'http://localhost:8080/users/follow/follow-unfollow',
-    {
+  try {
+    const res = await fetch('http://localhost:8080/users/follow/follow-unfollow', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ target_id: targetId, action }),
+    })
+
+    if (res.ok) {
+      followStatus.value = action === 'follow' ? 'pending' : 'none'
     }
-  )
-  if (res.ok) {
-    followStatus.value = action === 'follow' ? 'pending' : 'none'
+  }catch(err){
+    console.log(err)
+  }  
+}
+
+async function toggleVisibility() {
+  try {
+    const res = await fetch('http://localhost:8080/users/profile/visibility', {
+      method: 'POST',
+      credentials: 'include',
+    })
+
+    if (!res.ok) {
+      return alert('Failed to toggle visibility')
+    }
+
+    const updated = await res.json()
+    profileUser.is_public = updated.is_public
+    console.log(profileUser.is_public)
+  }catch(err){
+    console.log(err)
   }
 }
 
-// Toggle your own visibility:
-async function toggleVisibility() {
-  const res = await fetch(
-    'http://localhost:8080/users/profile/visibility',
-    {
+async function fetchConnections(type) {
+  try {
+    const endpoint = type === 'followers' ? 'http://localhost:8080/users/profile/followers' : 'http://localhost:8080/users/profile/following'
+
+    const res = await fetch(endpoint, {
       method: 'POST',
       credentials: 'include',
-    }
-  )
-  if (!res.ok) {
-    return alert('Failed to toggle visibility')
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: targetId }),
+    })
+
+    if (!res.ok) return console.error(`Failed to load ${type}`)
+
+    const data = await res.json()
+    if (type === 'followers') followersList.value = data || []
+    if (type === 'following') followingList.value = data || []
+  }catch(err){
+    console.log(err)
   }
-  const updated = await res.json()
-  profileUser.is_public = updated.is_public
 }
+
+watch(activeTab, (newTab) => {
+  if (canViewPrivateProfile.value && (newTab === 'followers' || newTab === 'following')) {
+    fetchConnections(newTab)
+  }
+})
+
 </script>
 <style scoped>
 .profile-container {
