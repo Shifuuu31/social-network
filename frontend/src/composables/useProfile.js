@@ -24,13 +24,20 @@ export function useProfileView() {
       if (!isAuthenticated.value) {
         await fetchCurrentUser()
       }
-
-      targetId = router.options.history.state?.targetId || currentUser.value?.id
+      // const routeID = Number(route.params.id)
+      const routerID = Number(router.currentRoute.value.params.id)
+      // targetId = router.options.history.state?.targetId || currentUser.value?.id // un peux compliquer
       // targetId = 1 // for testing
+      targetId = routerID || currentUser.value?.id
 
       isOwner.value = currentUser.value.id === targetId
 
-      await fetchProfile()
+      const profileExist = await fetchProfile()
+      if (!profileExist){
+        targetId = currentUser.value.id
+        isOwner.value = true
+        await fetchProfile()
+      }
     }
 
     async function fetchProfile() {
@@ -44,7 +51,7 @@ export function useProfileView() {
 
         if (!res.ok) {
           console.error('Error fetching profile:', res.status)
-          return
+          return false
         }
 
         const { user: u, follow_status } = await res.json()
@@ -53,8 +60,11 @@ export function useProfileView() {
         })
 
         followStatus.value = follow_status
+        
+        return true
       }catch(err){
         console.log(err)
+        return false
       }
     }
 

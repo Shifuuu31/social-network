@@ -7,7 +7,7 @@
 
     <!-- Profile Info Card -->
     <div class="profile-header">
-      <img class="avatar" :src="profileUser.avatar || defaultAvatar" alt="Profile Picture" />
+      <img class="avatar" :src="profileUser.avatar" alt="Profile Picture" />
       <div class="profile-info">
         <h2>{{ profileUser.nickname || profileUser.first_name }}</h2>
         <!-- <p class="role"></p> -->
@@ -47,9 +47,9 @@
           <div v-if="activeTab === 'posts'">
             <p>Coming soon: posts will appear here.</p>
           </div>
-        
+        <!-- //todo  -->
           <div v-if="activeTab === 'followers'">
-            <ul v-if="followersList?.length">
+            <ul v-if="followersList.length">
               <li v-for="f in followersList" :key="f.id">
                 {{ f.nickname || f.first_name }} — @{{ f.nickname }}
               </li>
@@ -58,7 +58,7 @@
           </div>
 
           <div v-if="activeTab === 'following'">
-            <ul v-if="followingList?.length">
+            <ul v-if="followingList.length">
               <li v-for="f in followingList" :key="f.id">
                 {{ f.nickname || f.first_name }} — @{{ f.nickname }}
               </li>
@@ -74,13 +74,13 @@
         <h3>Coming Soon</h3>
         <p>Coming soon…</p>
       </div>
+    </div>
+    <div v-else class="locked-profile">
+      <div class="locked-card">
+        <h3>🔒 This profile is private</h3>
+        <p>You must follow this user to view their posts and profile details.</p>
       </div>
-      <div v-else class="locked-profile">
-        <div class="locked-card">
-          <h3>🔒 This profile is private</h3>
-          <p>You must follow this user to view their posts and profile details.</p>
-        </div>
-      </div>
+    </div>
   </div>
 </template>
 
