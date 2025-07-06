@@ -1,0 +1,136 @@
+import { reactive, ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuth } from '@/composables/useAuth'
+
+export function useProfileView() {
+    const router = useRouter()
+    const { user: currentUser, isAuthenticated, fetchCurrentUser } = useAuth()  
+
+    const defaultAvatar = '/images/default-avatar.png' //fake
+    const profileUser = reactive({})
+    const followStatus = ref('none')
+    const isOwner = ref(false)
+    const activeTab = ref('posts')
+    const followersList = ref([])
+    const followingList = ref([])
+
+    let targetId = null
+
+    const canViewPrivateProfile = computed(() => {
+      return isOwner.value || profileUser.is_public || followStatus.value === 'accepted'
+    })
+
+    async function initProfile() {
+      if (!isAuthenticated.value) {
+        await fetchCurrentUser()
+      }
+
+      targetId = router.options.history.state?.targetId || currentUser.value?.id
+      // targetId = 1 // for testing
+
+      isOwner.value = currentUser.value.id === targetId
+
+      await fetchProfile()
+    }
+
+    async function fetchProfile() {
+      try {
+        const res = await fetch('http://localhost:8080/users/profile/info', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: targetId }),
+        })
+
+        if (!res.ok) {
+          console.error('Error fetching profile:', res.status)
+          return
+        }
+
+        const { user: u, follow_status } = await res.json()
+        Object.keys(u).forEach(key => {
+          profileUser[key] = u[key]
+        })
+
+        followStatus.value = follow_status
+      }catch(err){
+        console.log(err)
+      }
+    }
+
+    async function toggleFollow(action) {
+      try {
+        const res = await fetch('http://localhost:8080/users/follow/follow-unfollow', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_id: targetId, action }),
+        })
+
+        if (res.ok) {
+          followStatus.value = action === 'follow' ? 'pending' : 'none'
+        }
+      }catch(err){
+        console.log(err)
+      }  
+    }
+
+    async function toggleVisibility() {
+      try {
+        const res = await fetch('http://localhost:8080/users/profile/visibility', {
+          method: 'POST',
+          credentials: 'include',
+        })
+
+        if (!res.ok) {
+          return alert('Failed to toggle visibility')
+        }
+
+        const updated = await res.json()
+        profileUser.is_public = updated.is_public
+        console.log(profileUser.is_public)
+      }catch(err){
+        console.log(err)
+      }
+    }
+
+    async function fetchConnections(type) {
+      try {
+        const endpoint = type === 'followers' ? 'http://localhost:8080/users/profile/followers' : 'http://localhost:8080/users/profile/following'
+
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: targetId }),
+        })
+
+        if (!res.ok) return console.error(`Failed to load ${type}`)
+
+        const data = await res.json()
+        if (type === 'followers') followersList.value = data || []
+        if (type === 'following') followingList.value = data || []
+      }catch(err){
+        console.log(err)
+      }
+    }
+
+    watch(activeTab, (newTab) => {
+      if (canViewPrivateProfile.value && (newTab === 'followers' || newTab === 'following')) {
+        fetchConnections(newTab)
+      }
+    })
+
+    return {
+        profileUser,
+        followStatus,
+        isOwner,
+        activeTab,
+        followersList,
+        followingList,
+        canViewPrivateProfile,
+        initProfile,
+        toggleFollow,
+        toggleVisibility,
+    }
+}

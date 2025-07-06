@@ -1,9 +1,15 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 
 const user = ref(null)
-const isAuthenticated = ref(false)
+const isAuthenticated = computed(() => !!user.value)
+const isLoading = ref(false)
+const error = ref(null)
 
 async function fetchCurrentUser() {
+  isLoading.value = true
+  error.value = null
+
   try {
     const res = await fetch('http://localhost:8080/users/profile/me', {
       method: 'POST',
@@ -12,30 +18,45 @@ async function fetchCurrentUser() {
     })
 
     if (!res.ok) {
-      user.value = null
-      isAuthenticated.value = false
-      return false
+      throw new Error("Unauthorized or invalid session")
     }
 
     user.value = await res.json()
-    console.log("user", user)
-    console.log("userID", user.value.id)
-    console.log("Nickname", user.value.nickname)
-
-
-    isAuthenticated.value = true
     return true
   } catch (err) {
     user.value = null
-    isAuthenticated.value = false
+    error.value = err.message
     return false
+  } finally {
+    isLoading.value = false
   }
+}
+
+async function logout() {
+  const router = useRouter()
+
+  try {
+    await fetch('http://localhost:8080/auth/signout', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    })
+  } catch (e) {
+    console.warn("Logout failed:", e)
+  }
+
+  user.value = null
+  error.value = null
+  router.push('/signin')
 }
 
 export function useAuth() {
   return {
     user,
     isAuthenticated,
-    fetchCurrentUser
+    isLoading,
+    error,
+    fetchCurrentUser,
+    logout
   }
 }

@@ -1,9 +1,8 @@
-// src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 import SignUp from '../pages/SignUp.vue'
 import SignIn from '../pages/SignIn.vue'
 import Profile from '../pages/ProfileView.vue'
-import { useAuth } from '../composables/useAuth'
+import { useAuth } from '@/composables/useAuth'
 
 const routes = [
   {
@@ -29,14 +28,13 @@ const router = createRouter({
   routes,
 })
 
-// Add guard
-router.beforeEach(async (to, from, next) => {
-  console.log("beffore each")
-  const { isAuthenticated, fetchCurrentUser } = useAuth()
+const auth = useAuth()
 
-  // Run check only if route requires auth
-  if (to.meta.requiresAuth && !isAuthenticated.value) {
-    const success = await fetchCurrentUser()
+// Add guard
+router.beforeEach(async (to, from, next) => {  
+  // Run check only if route requires auth  
+  if (to.meta.requiresAuth && !auth.isAuthenticated.value) {
+    const success = await auth.fetchCurrentUser()
 
     if (!success) {
       return next('/signin')
