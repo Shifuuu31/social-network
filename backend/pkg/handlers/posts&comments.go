@@ -26,12 +26,9 @@ func (rt *Root) SetupPostRoutes(mux *http.ServeMux) {
 	postMux := http.NewServeMux()
 	postMux.HandleFunc("POST /feed", rt.GetFeedPosts)
 	postMux.HandleFunc("POST /new", rt.NewPost)
- 	postMux.HandleFunc("GET /followers", rt.GetFollowers) // it already in profile&follow.go
+	postMux.HandleFunc("GET /followers", rt.GetFollowers) // it already in profile&follow.go
 	postMux.HandleFunc("GET /{post_id}/comments", rt.GetFeedComments)
-		// postMux.HandleFunc("POST /new",rt.NewComment)
-			postMux.HandleFunc("POST /comment/new", rt.NewComment)  // Changed to avoid conflict
-
-
+	postMux.HandleFunc("POST /{post_id}/comments/new", rt.NewComment)
 
 	// log.Println("Mounting post multiplexer at /post/")
 	mux.Handle("/post/", http.StripPrefix("/post", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -270,20 +267,7 @@ func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (app *Root) SetupCommentRoutes(mux *http.ServeMux) {
-	commentMux := http.NewServeMux()
-
-	commentMux.HandleFunc("POST /{post_id}/new", app.NewComment)
-	commentMux.HandleFunc("GET /{post_id}/comment", app.GetFeedComments)
-	// commentMux.HandleFunc("POST /new/upload", UploadHandler) // TODO need to handel image
-
-	log.Println("Mounting post multiplexer at /comments/")
-
-	mux.Handle("/comments/", http.StripPrefix("/comments", commentMux))
-}
-
 func (app *Root) GetFeedComments(w http.ResponseWriter, r *http.Request) {
-	// TODO need to specify the methode
 	fmt.Println("GetFeedComments path accessed:", r.URL.Path, "Method:", r.Method)
 	if r.Method != http.MethodGet {
 		tools.EncodeJSON(w, http.StatusMethodNotAllowed, map[string]string{
@@ -299,17 +283,16 @@ func (app *Root) GetFeedComments(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	// var err error
-	post_id, er := strconv.Atoi(post)
-	if er != nil {
-		log.Printf("Error converting post_id to integer: %v", er)
+
+	post_id, err := strconv.Atoi(post)
+	if err != nil {
+		log.Printf("Error converting post_id to integer: %v", err)
 		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
 			"error": "Invalid post_id format",
 		})
 		return
 	}
 
-	// comments := []models.Comment{}
 	comments, err := app.DL.Comments.GetComments(post_id)
 	if err != nil {
 		log.Printf("Error fetching comments: %v", err)
@@ -318,17 +301,18 @@ func (app *Root) GetFeedComments(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	// Return empty array instead of 404 for no comments
 	if comments == nil {
 		log.Println("No comments found for post_id:", post_id)
-		tools.EncodeJSON(w, 404, nil)
-
+		tools.EncodeJSON(w, http.StatusOK, []models.Comment{})
 		return
 	}
+
 	tools.EncodeJSON(w, http.StatusOK, comments)
-	// fmt.Fprintln(w, "Listing all posts")
 }
 
- func (app *Root) NewComment(w http.ResponseWriter, r *http.Request) {
+func (app *Root) NewComment(w http.ResponseWriter, r *http.Request) {
 	var comment models.Comment
 	var hasFile bool
 
@@ -339,8 +323,32 @@ func (app *Root) GetFeedComments(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
+
+	// CRITICAL FIX: Extract post_id from URL path
+	post := r.PathValue("post_id")
+	fmt.Println("post id is:", post)
+	if post == "" {
+		log.Println("Error: post_id is required")
+		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "post_id is required",
+		})
+		return
+	}
+
+	post_id, err := strconv.Atoi(post)
+	if err != nil {
+		log.Printf("Error converting post_id to integer: %v", err)
+		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "Invalid post_id format",
+		})
+		return
+	}
+
+	// Set the post_id in the comment struct
+	comment.Post_id = post_id
+
 	contentType := r.Header.Get("Content-Type")
+	fmt.Println(contentType, ":contenttype issssssssssssssssss")
 
 	if strings.Contains(contentType, "multipart/form-data") {
 		if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB limit
@@ -373,6 +381,9 @@ func (app *Root) GetFeedComments(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	// Ensure post_id is set (override any value from form/JSON)
+	comment.Post_id = post_id
 
 	// Validate comment
 	if ok, status := models.ValidateComment(app.DL.Comments.DB, &comment); !ok {
@@ -435,7 +446,7 @@ func (app *Root) GetFeedComments(w http.ResponseWriter, r *http.Request) {
 
 	// Insert comment
 	result, err := tx.Exec(`
-		INSERT INTO comments (user_id, post_id, content, image, created_at)
+		INSERT INTO comments (user_id, post_id, content, image_url, created_at)
 		VALUES (?, ?, ?, ?, ?)`,
 		comment.OwnerId, comment.Post_id, comment.Content, imagePath, time.Now())
 	if err != nil {
@@ -467,47 +478,3 @@ func (app *Root) GetFeedComments(w http.ResponseWriter, r *http.Request) {
 		"comment": comment,
 	})
 }
-
-// func (app *SocialApp) NewComment(w http.ResponseWriter, r *http.Request) {
-// 	log.Printf("New comment path accessed: %s", r.URL.Path)
-// 	// if r.URL.Path != "/new" {
-// 	// 	tools.EncodeJSON(w, 500, nil)
-// 	// 	return
-// 	// }
-// 	var comment models.Comment
-// 	if err := tools.DecodeJSON(r, &comment); err != nil {
-// 		tools.EncodeJSON(w, 500, nil)
-// 		return
-// 	}
-// 	stmt, err := app.Posts.DB.Prepare(`
-//     INSERT INTO comments (user_id, post_id, content, image, created_at) VALUES (?, ?, ?, ?, ?)`)
-// 	if err != nil {
-// 		tools.EncodeJson(w, 500, nil)
-// 		return
-// 	}
-// 	defer stmt.Close()
-
-// 	file, handler, err := r.FormFile("image")
-// 	if err != nil {
-// 		tools.EncodeJson(w, 500, nil)
-// 		return
-// 	}
-
-// 	defer file.Close()
-
-// 	temp, status := "", 0
-// 	if handler.Filename != "" {
-// 		temp, status = tools.UploadHandler(file, handler)
-// 		if status != 200 {
-// 			tools.EncodeJson(w, status, nil)
-// 			return
-// 		}
-// 	}
-
-// 	if _, err = stmt.Exec(comment.OwnerId, comment.Post_id, comment.Content, temp, time.Now()); err != nil {
-// 		tools.EncodeJson(w, 200, nil)
-// 		return
-// 	}
-
-// 	tools.EncodeJson(w, 200, nil)
-// }

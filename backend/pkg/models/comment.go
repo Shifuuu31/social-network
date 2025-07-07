@@ -120,32 +120,14 @@ func ValidateComment(db *sql.DB, comment *Comment) (bool, int) {
 	}
 }
 
-// func ParseCommentFromForm(r *http.Request, comment *Comment) int {
-// 	var err error
-
-// 	if ownerIdStr := r.FormValue("owner_id"); ownerIdStr != "" {
-// 		if comment.OwnerId, err = strconv.Atoi(ownerIdStr); err != nil {
-// 			return 400
-// 		}
-// 	}
-
-// 	if PostIdStr := r.FormValue("group_id"); PostIdStr != "" {
-// 		if comment.Post_id, err = strconv.Atoi(PostIdStr); err != nil && comment.Post_id <= 0 {
-// 			return 400
-// 		}
-// 	}
-
-// 	comment.Content = r.FormValue("content")
-
-// 	return 200 // OK
-// }
-
 func ParseCommentFromForm(r *http.Request, comment *Comment) int {
 	// Get form values
 	content := r.FormValue("content")
-	postIDStr := r.FormValue("post_id")
+	// postIDStr := r.FormValue("post_id")
+	postIDStr := r.PathValue("post_id")
 	ownerIDStr := r.FormValue("owner_id")
 
+	fmt.Println("postId from parse is ", postIDStr)
 	// Validate required fields
 	if content == "" {
 		log.Println("Content is required")
@@ -153,7 +135,7 @@ func ParseCommentFromForm(r *http.Request, comment *Comment) int {
 	}
 
 	if postIDStr == "" {
-		log.Println("Post ID is required")
+		log.Println("Post ID is required from pars comment")
 		return http.StatusBadRequest
 	}
 

@@ -62,12 +62,13 @@ function handlePostCreated() {
 }
 </script>
 
-<style scoped>
+ <style scoped>
 .layout {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background-color: #f8f9fa; /* Light soft background */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .body {
@@ -76,51 +77,58 @@ function handlePostCreated() {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+  padding: 20px 0;
+  gap: 24px;
 }
 
 .sidebar {
-  width: 280px;
+  width: 250px;
   display: none;
   background-color: white;
-  border-right: 1px solid #e1e8ed;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  padding: 16px;
 }
 
 .main {
   flex: 1;
-  padding: 0 16px;
-  min-width: 0; /* Prevents flex item from overflowing */
+  display: flex;
+  justify-content: center;
 }
 
 .main-content {
-  max-width: 600px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 640px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1da1f2;
+  text-align: center;
+  margin-bottom: 24px;
+  letter-spacing: -0.5px;
 }
 
 .right-sidebar {
   width: 280px;
-  padding: 16px;
   display: none;
+  flex-shrink: 0;
 }
 
 .widget {
   background: white;
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 16px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  margin-bottom: 20px;
 }
 
 .widget h3 {
   margin: 0 0 12px 0;
   font-size: 18px;
   font-weight: 600;
-}
-
-.title {
-  font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 24px;
-  color: #1da1f2;
-  text-align: center;
+  color: #333;
 }
 
 /* Responsive Design */
@@ -134,20 +142,30 @@ function handlePostCreated() {
   .right-sidebar {
     display: block;
   }
-  
+
   .main {
-    padding: 0 24px;
+    padding: 0;
   }
 }
 
 @media (max-width: 768px) {
-  .main {
+  .main-content {
     padding: 0 12px;
   }
-  
+
   .title {
-    font-size: 20px;
+    font-size: 22px;
     margin-bottom: 16px;
+  }
+
+  .body {
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .sidebar,
+  .right-sidebar {
+    display: none;
   }
 }
 </style>
