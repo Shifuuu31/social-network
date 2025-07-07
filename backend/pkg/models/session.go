@@ -32,7 +32,7 @@ func (sm *SessionModel) SetSession(w http.ResponseWriter, userId int) error {
 	}
 
 	cookie := http.Cookie{
-		Name:     "session_id",
+		Name:     "session_token",
 		Value:    newSession.Token,
 		Path:     "/",
 		// HttpOnly: true,

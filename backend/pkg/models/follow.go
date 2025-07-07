@@ -19,14 +19,12 @@ type FollowRequestModel struct {
 	DB *sql.DB
 }
 
-
-
 // CanFollow checks if follower can send a follow request or follow directly.
 // Return false if already following or a pending request exists.
 func (flm *FollowRequestModel) CanFollow(followRequest *FollowRequest) (bool, error) {
 	var count int
 	query := `
-		SELECT COUNT(*) FROM follow_requests
+		SELECT COUNT(*) FROM follow_request
 		WHERE from_user_id = ? AND to_user_id = ? AND status IN ('pending', 'accepted')
 	`
 	err := flm.DB.QueryRow(query, followRequest.FromUserID, followRequest.ToUserID).Scan(&count)
@@ -37,7 +35,7 @@ func (flm *FollowRequestModel) CanFollow(followRequest *FollowRequest) (bool, er
 }
 
 // SendFollowRequest inserts a new follow request with status = 'pending'.
-func (flm *FollowRequestModel) InsertFollowRequest(followRequest *FollowRequest) error {
+func (flm *FollowRequestModel) Insert(followRequest *FollowRequest) error {
 	// Prevent duplicate or conflicting requests
 	canFollow, err := flm.CanFollow(followRequest)
 	if err != nil {
@@ -48,16 +46,16 @@ func (flm *FollowRequestModel) InsertFollowRequest(followRequest *FollowRequest)
 	}
 
 	query := `
-		INSERT INTO follow_requests (from_user_id, to_user_id, status, created_at)
+		INSERT INTO follow_request (from_user_id, to_user_id, status)
 		VALUES (?, ?, 'pending')
 	`
 	_, err = flm.DB.Exec(query, followRequest.FromUserID, followRequest.ToUserID)
 	return err
 }
 
-func (flm *FollowRequestModel) UpdateFollowRequest(followRequest *FollowRequest) error {
+func (flm *FollowRequestModel) UpdateStatus(followRequest *FollowRequest) error {
 	query := `
-		UPDATE follow_requests
+		UPDATE follow_request
 		SET status = ?
 		WHERE from_user_id = ? AND to_user_id = ? AND status = 'pending'
 	`
@@ -73,9 +71,9 @@ func (flm *FollowRequestModel) UpdateFollowRequest(followRequest *FollowRequest)
 }
 
 // UnfollowUser deletes an accepted follow relationship.
-func (flm *FollowRequestModel) UnfollowUser(followRequest *FollowRequest) error {
+func (flm *FollowRequestModel) Delete(followRequest *FollowRequest) error {
 	query := `
-		DELETE FROM follow_requests
+		DELETE FROM follow_request
 		WHERE from_user_id = ? AND to_user_id = ? AND status = 'accepted'
 	`
 	res, err := flm.DB.Exec(query, followRequest.FromUserID, followRequest.ToUserID)
@@ -98,14 +96,14 @@ func (flm *FollowRequestModel) GetFollows(userID int, followType string) (users 
 		query = `
 			SELECT u.id, u.email, u.first_name, u.last_name, u.nickname, u.avatar_url
 			FROM users u
-			JOIN follow_requests fr ON fr.from_user_id = u.id
+			JOIN follow_request fr ON fr.from_user_id = u.id
 			WHERE fr.to_user_id = ? AND fr.status = 'accepted'
 		`
 	case "following":
 		query = `
 			SELECT u.id, u.email, u.first_name, u.last_name, u.nickname, u.avatar_url
 			FROM users u
-			JOIN follow_requests fr ON fr.to_user_id = u.id
+			JOIN follow_request fr ON fr.to_user_id = u.id
 			WHERE fr.from_user_id = ? AND fr.status = 'accepted'
 		`
 	default:
@@ -131,7 +129,7 @@ func (flm *FollowRequestModel) GetFollows(userID int, followType string) (users 
 // GetFollowStatus returns "none", "pending", "accepted", or "declined".
 func (flm *FollowRequestModel) GetFollowStatus(followRequest *FollowRequest) error {
 	query := `
-		SELECT status FROM follow_requests
+		SELECT status FROM follow_request
 		WHERE (from_user_id = ? AND to_user_id = ?) OR id = ? 
 	`
 	err := flm.DB.QueryRow(query, followRequest.FromUserID, followRequest.ToUserID, followRequest.ID).Scan(&followRequest.Status)

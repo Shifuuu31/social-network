@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"social-network/pkg/models"
@@ -12,34 +14,53 @@ import (
 type DataLayer struct {
 	Users    *models.UserModel
 	Sessions *models.SessionModel
-	Posts *models.PostModel
+	Posts    *models.PostModel
 	Comments *models.CommentModel
 	Follows  *models.FollowRequestModel
 	Logger   *models.LoggerModel
 	// link to other models db connection
 }
 
-
 func (dl *DataLayer) GetRequesterID(w http.ResponseWriter, r *http.Request) (requesterID int) {
-    requesterID, ok := r.Context().Value(models.UserIDKey).(int)
-    if !ok {
-        tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
-        dl.Logger.Log(models.LogEntry{
-            Level:   "WARN",
-            Message: "Unauthorized profile view attempt",
-            Metadata: map[string]any{
-                "ip":   r.RemoteAddr,
-                "path": r.URL.Path,
-            },
-        })
-        return 0
-    }
-    return requesterID
+	requesterID, ok := r.Context().Value(models.UserIDKey).(int)
+	if !ok {
+		fmt.Println("111")
+		tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
+		dl.Logger.Log(models.LogEntry{
+			Level:   "WARN",
+			Message: "Unauthorized profile view attempt",
+			Metadata: map[string]any{
+				"ip":   r.RemoteAddr,
+				"path": r.URL.Path,
+			},
+		})
+		return 0
+	}
+	return requesterID
+}
+
+var skipPaths = []string{
+	"/auth/signup",
+	"/signup",
+	"/signin",
+
+	"/auth/signin",
+}
+
+// Optional: define prefixes to skip (e.g., for /static/*)
+var skipPrefixes = []string{
+	"/public/",
 }
 
 // RequireAuth checks if a user is authenticated by session
 func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("FROM MIDLWER 111D")
+		if slices.Contains(skipPaths, r.URL.Path) || tools.SliceHasPrefix(skipPrefixes, r.URL.Path) {
+			fmt.Println("1")
+			next.ServeHTTP(w, r)
+			return
+		}
 		cookie, err := r.Cookie("session_token")
 		if err != nil || cookie.Value == "" {
 			dl.Logger.Log(models.LogEntry{
@@ -72,8 +93,8 @@ func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 			Message: "Authorized access granted",
 			Metadata: map[string]interface{}{
 				"requesterID": requesterID,
-				"token":  cookie.Value,
-				"path":   r.URL.Path,
+				"token":       cookie.Value,
+				"path":        r.URL.Path,
 			},
 		})
 		ctx := context.WithValue(r.Context(), models.UserIDKey, requesterID)

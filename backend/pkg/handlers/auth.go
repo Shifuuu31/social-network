@@ -185,7 +185,7 @@ func (rt *Root) SignIn(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rt *Root) SignOut(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("session_id")
+	cookie, err := r.Cookie("session_token")
 	fmt.Println(cookie, err)
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -217,7 +217,7 @@ func (rt *Root) SignOut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:    "session_id",
+		Name:    "session_token",
 		Value:   "",
 		Path:    "/",
 		Expires: time.Unix(0, 0),

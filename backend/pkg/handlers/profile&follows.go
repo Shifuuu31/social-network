@@ -1,46 +1,72 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	"social-network/pkg/models"
 	"social-network/pkg/tools"
 )
 
-func (rt *Root) NewUserHandler() (userMux *http.ServeMux) {
-	userMux = http.NewServeMux()
+func (rt *Root) NewUsersHandler() (usersMux *http.ServeMux) {
+	usersMux = http.NewServeMux()
+	fmt.Println("ss")
+	usersMux.HandleFunc("POST /profile/info", rt.ProfileInfo)
+	usersMux.HandleFunc("POST /profile/me", rt.GetCurrentUser)
+	usersMux.HandleFunc("POST /profile/activity", rt.ProfileActivity)
+	usersMux.HandleFunc("POST /profile/followers", rt.ProfileFollowers)
+	usersMux.HandleFunc("POST /profile/following", rt.ProfileFollowing)
+	usersMux.HandleFunc("POST /profile/visibility", rt.UpdateProfileVisibility)
+	usersMux.HandleFunc("POST /follow/follow-unfollow", rt.FollowUnfollow)
+	usersMux.HandleFunc("POST /follow/accept-decline", rt.AcceptDeclineFollowRequest)
 
-	userMux.HandleFunc("POST /profile/info", rt.ProfileInfo)
-	userMux.HandleFunc("POST /profile/activity", rt.ProfileActivity)
-	userMux.HandleFunc("POST /profile/connections", rt.ProfileConnections)
-	userMux.HandleFunc("POST /profile/visibility", rt.UpdateProfileVisibility)
-	userMux.HandleFunc("POST /follow/follow-unfollow", rt.FollowUnfollow)
-	userMux.HandleFunc("POST /follow/accept-decline", rt.AcceptDecline)
-
-	return userMux
+	return usersMux
 }
 
-func (rt *Root) canViewProfile(w http.ResponseWriter, r *http.Request, targetUser *models.User) bool {
-	requesterID, ok := r.Context().Value(models.UserIDKey).(int)
-	if !ok {
-		tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
-		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "WARN",
-			Message: "Unauthorized profile view attempt",
-			Metadata: map[string]interface{}{
-				"ip":   r.RemoteAddr,
-				"path": r.URL.Path,
-			},
-		})
-		return false
+type ProfileInfoResponse struct {
+	User         *models.User `json:"user"`
+	FollowStatus string       `json:"follow_status"`
+}
+
+func NewUserDTO(u *models.User) *models.UserDTO {
+	return &models.UserDTO{
+		ID:          u.ID,
+		Nickname:    u.Nickname,
+		FirstName:   u.FirstName,
+		LastName:    u.LastName,
+		AboutMe:     u.AboutMe,
+		DateOfBirth: u.DateOfBirth,
+		AvatarURL:   u.AvatarURL,
+		IsPublic:    u.IsPublic,
+		CreatedAt:   u.CreatedAt,
+	}
+}
+
+func (rt *Root) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(15551)
+	requesterID := rt.DL.GetRequesterID(w, r)
+	user := &models.User{ID: requesterID}
+
+	if err := rt.DL.Users.GetUserByID(user); err != nil {
+		tools.RespondError(w, "User not found", http.StatusUnauthorized)
+		return
 	}
 
+	dto := NewUserDTO(user)
+	tools.EncodeJSON(w, http.StatusOK, dto)
+}
+
+func (rt *Root) ProfileAccess(w http.ResponseWriter, r *http.Request, targetUser *models.User) bool {
+	fmt.Println("PrfAcc")
+	requesterID := rt.DL.GetRequesterID(w, r)
+	fmt.Println("requesterID", requesterID)
 	// Fetch latest user info
 	if err := rt.DL.Users.GetUserByID(targetUser); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to get user info for profile view",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"user_id": targetUser.ID,
 				"ip":      r.RemoteAddr,
 				"path":    r.URL.Path,
@@ -51,57 +77,62 @@ func (rt *Root) canViewProfile(w http.ResponseWriter, r *http.Request, targetUse
 		return false
 	}
 
+	targetUser.PasswordHash = nil
+
 	if targetUser.IsPublic {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "INFO",
 			Message: "Profile is public, access granted",
-			Metadata: map[string]interface{}{
-				"user_id":    targetUser.ID,
-				"requester":  requesterID,
-				"ip":         r.RemoteAddr,
-				"path":       r.URL.Path,
+			Metadata: map[string]any{
+				"user_id":   targetUser.ID,
+				"requester": requesterID,
+				"ip":        r.RemoteAddr,
+				"path":      r.URL.Path,
 			},
 		})
 		return true
 	}
-
-	// Check follow status if private
-	followRequest := &models.FollowRequest{FromUserID: requesterID, ToUserID: targetUser.ID}
-	if err := rt.DL.Follows.GetFollowStatus(followRequest); err != nil {
-		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "WARN",
-			Message: "Follow status not found or error",
-			Metadata: map[string]interface{}{
-				"from_user": requesterID,
-				"to_user":   targetUser.ID,
-				"ip":        r.RemoteAddr,
-				"path":      r.URL.Path,
-				"error":     err.Error(),
-			},
-		})
-		tools.RespondError(w, "Private profile — follow to see more", http.StatusForbidden)
-		return false
-	}
-	if followRequest.Status != "accepted" {
-		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "INFO",
-			Message: "Access denied due to non-accepted follow request",
-			Metadata: map[string]interface{}{
-				"from_user": requesterID,
-				"to_user":   targetUser.ID,
-				"status":    followRequest.Status,
-				"ip":        r.RemoteAddr,
-				"path":      r.URL.Path,
-			},
-		})
-		tools.RespondError(w, "Private profile — follow to see more", http.StatusForbidden)
-		return false
+	if requesterID != targetUser.ID {
+		// Check follow status if private
+		followRequest := &models.FollowRequest{FromUserID: requesterID, ToUserID: targetUser.ID}
+		if err := rt.DL.Follows.GetFollowStatus(followRequest); err != nil {
+			rt.DL.Logger.Log(models.LogEntry{
+				Level:   "WARN",
+				Message: "Follow status not found or error",
+				Metadata: map[string]any{
+					"from_user": requesterID,
+					"to_user":   targetUser.ID,
+					"ip":        r.RemoteAddr,
+					"path":      r.URL.Path,
+					"error":     err.Error(),
+				},
+			})
+			fmt.Println(1, err)
+			tools.RespondError(w, "Private profile — follow to see more", http.StatusForbidden)
+			return false
+		}
+		if followRequest.Status != "accepted" {
+			rt.DL.Logger.Log(models.LogEntry{
+				Level:   "INFO",
+				Message: "Access denied due to non-accepted follow request",
+				Metadata: map[string]any{
+					"from_user": requesterID,
+					"to_user":   targetUser.ID,
+					"status":    followRequest.Status,
+					"ip":        r.RemoteAddr,
+					"path":      r.URL.Path,
+				},
+			})
+			fmt.Println("ddd", 2)
+			// tools.RespondError(w, "Private profile — follow to see more", http.StatusForbidden)
+			return false
+		}
 	}
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "Access granted to private profile via accepted follow",
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"from_user": requesterID,
 			"to_user":   targetUser.ID,
 			"ip":        r.RemoteAddr,
@@ -114,52 +145,88 @@ func (rt *Root) canViewProfile(w http.ResponseWriter, r *http.Request, targetUse
 
 func (rt *Root) ProfileInfo(w http.ResponseWriter, r *http.Request) {
 	var user *models.User
+	fmt.Println("S_prfl")
+
 	if err := tools.DecodeJSON(r, &user); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to decode profile info JSON",
-			Metadata: map[string]interface{}{
-				"ip":   r.RemoteAddr,
-				"path": r.URL.Path,
-				"error":  err.Error(),
+			Metadata: map[string]any{
+				"ip":    r.RemoteAddr,
+				"path":  r.URL.Path,
+				"error": err.Error(),
 			},
 		})
+		println(err)
 		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
+	// fmt.Println("VVV")
 
-	if !rt.canViewProfile(w, r, user) {
+	if !rt.ProfileAccess(w, r, user) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "WARN",
 			Message: "Profile info access denied",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"user_id": user.ID,
 				"ip":      r.RemoteAddr,
 				"path":    r.URL.Path,
 			},
 		})
-		tools.RespondError(w, "Forbidden", http.StatusForbidden)
+		fmt.Println("Profil access denied")
+
+		user.DateOfBirth = time.Unix(0, 0)
+		user.AboutMe = ""
+	}
+
+	requesterID := rt.DL.GetRequesterID(w, r)
+	followRequest := &models.FollowRequest{FromUserID: requesterID, ToUserID: user.ID}
+	// followStaus := "none"
+	if err := rt.DL.Follows.GetFollowStatus(followRequest); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "WARN",
+			Message: "Follow status not found or error",
+			Metadata: map[string]any{
+				"from_user": requesterID,
+				"to_user":   user.ID,
+				"ip":        r.RemoteAddr,
+				"path":      r.URL.Path,
+				"error":     err.Error(),
+			},
+		})
+		fmt.Println(1, err)
+		tools.RespondError(w, "Private profile — follow to see more", http.StatusForbidden)
 		return
 	}
 
-	if err := tools.EncodeJSON(w, http.StatusOK, user); err != nil {
+	fmt.Println("Follow", followRequest.Status)
+	response := ProfileInfoResponse{
+		User:         user,
+		FollowStatus: followRequest.Status,
+	}
+	if err := tools.EncodeJSON(w, http.StatusOK, response); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to send profile info response",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"user_id": user.ID,
 				"ip":      r.RemoteAddr,
 				"path":    r.URL.Path,
 				"error":   err.Error(),
 			},
 		})
+		fmt.Println("err", err)
+
 		return
 	}
+
+	fmt.Println("user", user)
+	fmt.Println("E_prfl")
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "Profile info sent successfully",
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"user_id": user.ID,
 			"ip":      r.RemoteAddr,
 			"path":    r.URL.Path,
@@ -173,26 +240,27 @@ func (rt *Root) ProfileActivity(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to decode profile activity JSON",
-			Metadata: map[string]interface{}{
-				"ip":   r.RemoteAddr,
-				"path": r.URL.Path,
-				"error":  err.Error(),
+			Metadata: map[string]any{
+				"ip":    r.RemoteAddr,
+				"path":  r.URL.Path,
+				"error": err.Error(),
 			},
 		})
 		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
-	
-	if !rt.canViewProfile(w, r, user) {
+
+	if !rt.ProfileAccess(w, r, user) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "WARN",
 			Message: "Profile activity access denied",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"user_id": user.ID,
 				"ip":      r.RemoteAddr,
 				"path":    r.URL.Path,
 			},
 		})
+		fmt.Println(3)
 		tools.RespondError(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -200,7 +268,7 @@ func (rt *Root) ProfileActivity(w http.ResponseWriter, r *http.Request) {
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "Profile activity request received but not implemented",
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"user_id": user.ID,
 			"ip":      r.RemoteAddr,
 			"path":    r.URL.Path,
@@ -210,68 +278,59 @@ func (rt *Root) ProfileActivity(w http.ResponseWriter, r *http.Request) {
 	tools.RespondError(w, "Not implemented", http.StatusNotImplemented)
 }
 
-func (rt *Root) ProfileConnections(w http.ResponseWriter, r *http.Request) {
+func (rt *Root) ProfileFollowers(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("ProflieFollowers")
 	var user *models.User
 	if err := tools.DecodeJSON(r, &user); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to decode profile connections JSON",
-			Metadata: map[string]interface{}{
-				"ip":   r.RemoteAddr,
-				"path": r.URL.Path,
-				"error":  err.Error(),
+			Metadata: map[string]any{
+				"ip":    r.RemoteAddr,
+				"path":  r.URL.Path,
+				"error": err.Error(),
 			},
 		})
 		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
 
-	if !rt.canViewProfile(w, r, user) {
+	if !rt.ProfileAccess(w, r, user) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "WARN",
 			Message: "Profile connections access denied",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"user_id": user.ID,
 				"ip":      r.RemoteAddr,
 				"path":    r.URL.Path,
 			},
 		})
+		fmt.Println(4)
 		tools.RespondError(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
-	followers, err1 := rt.DL.Follows.GetFollows(user.ID, "followers")
-	following, err2 := rt.DL.Follows.GetFollows(user.ID, "following")
-
-	if err1 != nil || err2 != nil {
+	followers, err := rt.DL.Follows.GetFollows(user.ID, "followers")
+	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to fetch profile connections",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"user_id": user.ID,
 				"ip":      r.RemoteAddr,
 				"path":    r.URL.Path,
-				"error1":  err1,
-				"error2":  err2,
+				"error":   err,
 			},
 		})
 		tools.RespondError(w, "Failed to fetch connections", http.StatusInternalServerError)
 		return
 	}
 
-	follows := &struct {
-		Followers []models.User `json:"followers"`
-		Following []models.User `json:"following"`
-	}{
-		Followers: followers,
-		Following: following,
-	}
-
-	if err := tools.EncodeJSON(w, http.StatusOK, follows); err != nil {
+	if err := tools.EncodeJSON(w, http.StatusOK, followers); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
-			Message: "Failed to send profile connections response",
-			Metadata: map[string]interface{}{
+			Message: "Failed to send profile followers response",
+			Metadata: map[string]any{
 				"user_id": user.ID,
 				"ip":      r.RemoteAddr,
 				"path":    r.URL.Path,
@@ -284,7 +343,80 @@ func (rt *Root) ProfileConnections(w http.ResponseWriter, r *http.Request) {
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "Profile connections sent successfully",
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
+			"user_id": user.ID,
+			"ip":      r.RemoteAddr,
+			"path":    r.URL.Path,
+		},
+	})
+}
+
+func (rt *Root) ProfileFollowing(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("follow")
+	var user *models.User
+	if err := tools.DecodeJSON(r, &user); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to decode profile connections JSON",
+			Metadata: map[string]any{
+				"ip":    r.RemoteAddr,
+				"path":  r.URL.Path,
+				"error": err.Error(),
+			},
+		})
+		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
+		return
+	}
+
+	if !rt.ProfileAccess(w, r, user) {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "WARN",
+			Message: "Profile connections access denied",
+			Metadata: map[string]any{
+				"user_id": user.ID,
+				"ip":      r.RemoteAddr,
+				"path":    r.URL.Path,
+			},
+		})
+		fmt.Println(5)
+		tools.RespondError(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	following, err := rt.DL.Follows.GetFollows(user.ID, "following")
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to fetch profile connections",
+			Metadata: map[string]any{
+				"user_id": user.ID,
+				"ip":      r.RemoteAddr,
+				"path":    r.URL.Path,
+				"error":   err,
+			},
+		})
+		tools.RespondError(w, "Failed to fetch connections", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tools.EncodeJSON(w, http.StatusOK, following); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to send profile following response",
+			Metadata: map[string]any{
+				"user_id": user.ID,
+				"ip":      r.RemoteAddr,
+				"path":    r.URL.Path,
+				"error":   err.Error(),
+			},
+		})
+		return
+	}
+
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "INFO",
+		Message: "Profile connections sent successfully",
+		Metadata: map[string]any{
 			"user_id": user.ID,
 			"ip":      r.RemoteAddr,
 			"path":    r.URL.Path,
@@ -293,26 +425,14 @@ func (rt *Root) ProfileConnections(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rt *Root) UpdateProfileVisibility(w http.ResponseWriter, r *http.Request) {
-	requesterID, ok := r.Context().Value(models.UserIDKey).(int)
-	if !ok {
-		tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
-		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "WARN",
-			Message: "Unauthorized visibility toggle attempt",
-			Metadata: map[string]interface{}{
-				"ip":   r.RemoteAddr,
-				"path": r.URL.Path,
-			},
-		})
-		return
-	}
-	
-	var user = &models.User{ID: requesterID}
+	requesterID := rt.DL.GetRequesterID(w, r)
+
+	user := &models.User{ID: requesterID}
 	if err := rt.DL.Users.GetUserByID(user); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to fetch user for visibility toggle",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"user_id": requesterID,
 				"ip":      r.RemoteAddr,
 				"path":    r.URL.Path,
@@ -320,31 +440,35 @@ func (rt *Root) UpdateProfileVisibility(w http.ResponseWriter, r *http.Request) 
 			},
 		})
 		tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
+		fmt.Println("err", err)
 		return
 	}
-	
+	fmt.Println(user.IsPublic)
 	user.IsPublic = !user.IsPublic
-	
-	if err := rt.DL.Users.UpdateUser(user); err != nil {
+	fmt.Println(user.IsPublic)
+
+	if err := rt.DL.Users.Update(user); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to update user visibility",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"user_id": user.ID,
 				"ip":      r.RemoteAddr,
 				"path":    r.URL.Path,
 				"error":   err.Error(),
 			},
 		})
+		fmt.Println("err", err)
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	fmt.Println(user.IsPublic)
 
 	if err := tools.EncodeJSON(w, http.StatusOK, user); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to send profile visibility response",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"user_id": user.ID,
 				"ip":      r.RemoteAddr,
 				"path":    r.URL.Path,
@@ -357,11 +481,11 @@ func (rt *Root) UpdateProfileVisibility(w http.ResponseWriter, r *http.Request) 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "User visibility toggled successfully",
-		Metadata: map[string]interface{}{
-			"user_id": user.ID,
+		Metadata: map[string]any{
+			"user_id":   user.ID,
 			"is_public": user.IsPublic,
-			"ip":      r.RemoteAddr,
-			"path":    r.URL.Path,
+			"ip":        r.RemoteAddr,
+			"path":      r.URL.Path,
 		},
 	})
 }
@@ -376,54 +500,42 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to decode follow/unfollow JSON",
-			Metadata: map[string]interface{}{
-				"ip":   r.RemoteAddr,
-				"path": r.URL.Path,
-				"error":  err.Error(),
+			Metadata: map[string]any{
+				"ip":    r.RemoteAddr,
+				"path":  r.URL.Path,
+				"error": err.Error(),
 			},
 		})
 		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
-
-	requesterID, ok := r.Context().Value(models.UserIDKey).(int)
-	if !ok {
-		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "WARN",
-			Message: "Unauthorized follow/unfollow request",
-			Metadata: map[string]interface{}{
-				"target_id": payload.TargetId,
-				"ip":        r.RemoteAddr,
-				"path":      r.URL.Path,
-			},
-		})
-		tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	fmt.Println("Following")
+	requesterID := rt.DL.GetRequesterID(w, r)
 
 	followRequest := &models.FollowRequest{FromUserID: requesterID, ToUserID: payload.TargetId}
 
 	switch payload.Action {
 	case "follow":
-		if err := rt.DL.Follows.InsertFollowRequest(followRequest); err != nil {
+		if err := rt.DL.Follows.Insert(followRequest); err != nil {
 			rt.DL.Logger.Log(models.LogEntry{
 				Level:   "ERROR",
 				Message: "Failed to insert follow request",
-				Metadata: map[string]interface{}{
-					"from": requesterID,
-					"to":   payload.TargetId,
+				Metadata: map[string]any{
+					"from":  requesterID,
+					"to":    payload.TargetId,
 					"error": err.Error(),
 					"ip":    r.RemoteAddr,
 					"path":  r.URL.Path,
 				},
 			})
+			fmt.Println("'Err'", err)
 			tools.RespondError(w, "Failed to send follow request", http.StatusInternalServerError)
 			return
 		}
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "INFO",
 			Message: "Follow request sent",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"from": requesterID,
 				"to":   payload.TargetId,
 				"ip":   r.RemoteAddr,
@@ -431,13 +543,13 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 	case "unfollow":
-		if err := rt.DL.Follows.UnfollowUser(followRequest); err != nil {
+		if err := rt.DL.Follows.Delete(followRequest); err != nil {
 			rt.DL.Logger.Log(models.LogEntry{
 				Level:   "ERROR",
 				Message: "Failed to unfollow user",
-				Metadata: map[string]interface{}{
-					"from": requesterID,
-					"to":   payload.TargetId,
+				Metadata: map[string]any{
+					"from":  requesterID,
+					"to":    payload.TargetId,
 					"error": err.Error(),
 					"ip":    r.RemoteAddr,
 					"path":  r.URL.Path,
@@ -449,7 +561,7 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "INFO",
 			Message: "User unfollowed",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"from": requesterID,
 				"to":   payload.TargetId,
 				"ip":   r.RemoteAddr,
@@ -460,7 +572,7 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "WARN",
 			Message: "Invalid follow/unfollow action",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"action": payload.Action,
 				"from":   requesterID,
 				"to":     payload.TargetId,
@@ -476,7 +588,7 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to send follow/unfollow response",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"payload": payload,
 				"ip":      r.RemoteAddr,
 				"path":    r.URL.Path,
@@ -486,7 +598,7 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (rt *Root) AcceptDecline(w http.ResponseWriter, r *http.Request) {
+func (rt *Root) AcceptDeclineFollowRequest(w http.ResponseWriter, r *http.Request) {
 	payload := &struct {
 		TargetId int    `json:"target_id"`
 		Action   string `json:"action"`
@@ -496,39 +608,26 @@ func (rt *Root) AcceptDecline(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to decode accept/decline JSON",
-			Metadata: map[string]interface{}{
-				"ip":   r.RemoteAddr,
-				"path": r.URL.Path,
-				"error":  err.Error(),
+			Metadata: map[string]any{
+				"ip":    r.RemoteAddr,
+				"path":  r.URL.Path,
+				"error": err.Error(),
 			},
 		})
 		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
 
-	userID, ok := r.Context().Value(models.UserIDKey).(int)
-	if !ok {
-		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "WARN",
-			Message: "Unauthorized accept/decline attempt",
-			Metadata: map[string]interface{}{
-				"target_id": payload.TargetId,
-				"ip":        r.RemoteAddr,
-				"path":      r.URL.Path,
-			},
-		})
-		tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	requesterID := rt.DL.GetRequesterID(w, r)
 
 	if payload.Action != "accepted" && payload.Action != "declined" {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "WARN",
 			Message: "Invalid accept/decline action",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"action": payload.Action,
 				"from":   payload.TargetId,
-				"to":     userID,
+				"to":     requesterID,
 				"ip":     r.RemoteAddr,
 				"path":   r.URL.Path,
 			},
@@ -539,17 +638,17 @@ func (rt *Root) AcceptDecline(w http.ResponseWriter, r *http.Request) {
 
 	followRequest := &models.FollowRequest{
 		FromUserID: payload.TargetId,
-		ToUserID:   userID,
+		ToUserID:   requesterID,
 		Status:     payload.Action,
 	}
 
-	if err := rt.DL.Follows.UpdateFollowRequest(followRequest); err != nil {
+	if err := rt.DL.Follows.UpdateStatus(followRequest); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to update follow request status",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"from":   payload.TargetId,
-				"to":     userID,
+				"to":     requesterID,
 				"status": payload.Action,
 				"error":  err.Error(),
 				"ip":     r.RemoteAddr,
@@ -563,9 +662,9 @@ func (rt *Root) AcceptDecline(w http.ResponseWriter, r *http.Request) {
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "Follow request " + payload.Action,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"from":   payload.TargetId,
-			"to":     userID,
+			"to":     requesterID,
 			"ip":     r.RemoteAddr,
 			"path":   r.URL.Path,
 			"action": payload.Action,
@@ -576,7 +675,7 @@ func (rt *Root) AcceptDecline(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to send accept/decline response",
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"payload": payload,
 				"ip":      r.RemoteAddr,
 				"path":    r.URL.Path,

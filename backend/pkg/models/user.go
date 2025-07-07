@@ -16,12 +16,12 @@ type contextKey string
 const UserIDKey = contextKey("userID")
 
 type User struct {
-	ID           int       `json:"id"`
-	Email        string    `json:"email"`
-	Password     string    `json:"password"`
-	FirstName    string    `json:"first_name"`
-	LastName     string    `json:"last_name"`
-	Gender string 	`json:"gender"`
+	ID        int    `json:"id"`
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Gender    string `json:"gender"`
 
 	DateOfBirth  time.Time `json:"date_of_birth"`
 	AvatarURL    string    `json:"avatar_url"`
@@ -30,6 +30,20 @@ type User struct {
 	IsPublic     bool      `json:"is_public"`
 	PasswordHash []byte    `json:"-"`
 	CreatedAt    time.Time `json:"created_at"`
+}
+
+// UserDTO is a safe representation of a user to be sent to the client
+type UserDTO struct {
+	ID          int       `json:"id"`
+	Nickname    string    `json:"nickname"`
+	FirstName   string    `json:"first_name"`
+	LastName    string    `json:"last_name"`
+	Gender      string    `json:"gender"`
+	AboutMe     string    `json:"about_me"`
+	DateOfBirth time.Time `json:"date_of_birth"`
+	AvatarURL   string    `json:"avatar_url"`
+	IsPublic    bool      `json:"is_public"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // Validate checks all required fields and ensures correct formats
@@ -157,15 +171,15 @@ func (um *UserModel) InsertUser(user *User) error {
 }
 
 // UpdateUser updates an existing user's profile data.
-func (um *UserModel) UpdateUser(user *User) error {
+func (um *UserModel) Update(user *User) error {
 	query := `
 		UPDATE users
 		SET first_name = ?, last_name = ?, date_of_birth = ?, avatar_url = ?, nickname = ?,
-			about_me = ?, is_public = ? = CURRENT_TIMESTAMP
+			about_me = ?, is_public = ?
 		WHERE id = ?
 	`
 
-	_, err := um.DB.Exec(query,
+	if _, err := um.DB.Exec(query,
 		user.FirstName,
 		user.LastName,
 		user.DateOfBirth,
@@ -174,8 +188,7 @@ func (um *UserModel) UpdateUser(user *User) error {
 		user.AboutMe,
 		user.IsPublic,
 		user.ID,
-	)
-	if err != nil {
+	); err != nil {
 		return fmt.Errorf("update user: %w", err)
 	}
 	return nil

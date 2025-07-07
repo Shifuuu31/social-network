@@ -52,7 +52,7 @@ func main() {
 	}
 	server := http.Server{
 		Addr:    port,
-		Handler: 	AppRoot.DL.CORSMiddleware(AppRoot.Router()),
+		Handler: AppRoot.DL.CORSMiddleware(AppRoot.DL.AccessMiddleware(AppRoot.Router())),
 	}
 
 	log.Println("server listening on http://localhost" + port)

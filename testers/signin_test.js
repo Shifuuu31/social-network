@@ -33,5 +33,5 @@ const password = "Logout123";
   });
   const cookie = goodSignin.headers.get("set-cookie");
   console.log("✅ Signin valid:", goodSignin.status === 200);
-  console.log("🍪 Cookie present:", cookie?.includes("session_id"));
+  console.log("🍪 Cookie present:", cookie?.includes("session_token"));
 })();

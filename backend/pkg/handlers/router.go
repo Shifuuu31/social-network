@@ -1,6 +1,5 @@
 package handlers
 
-
 import (
 	// "fmt"
 	"net/http"
@@ -16,7 +15,7 @@ type Root struct {
 
 func (rt *Root) Router() (uh *http.ServeMux) {
 	authMux := rt.NewAuthHandler()
-	userHandler := rt.NewUserHandler()
+	userHandler := rt.NewUsersHandler()
 
 	mainMux := http.NewServeMux()
 	// mainMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +25,7 @@ func (rt *Root) Router() (uh *http.ServeMux) {
 
 	// Mount sub-muxes under prefixes
 	mainMux.Handle("/auth/", http.StripPrefix("/auth", authMux))
-	mainMux.Handle("/user/", http.StripPrefix("/user", userHandler))
+	mainMux.Handle("/users/", http.StripPrefix("/users", userHandler))
 
 	return mainMux
 }
