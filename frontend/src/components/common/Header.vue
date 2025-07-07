@@ -5,10 +5,7 @@
       Introvia
     </router-link>
 
-    <!-- Search Bar -->
-    <div class="search-container">
-      <input type="text" placeholder="Search..." class="search-input" />
-    </div>
+ 
 
     <!-- Right Icons -->
     <div class="icons">
@@ -52,7 +49,7 @@ function toggleDropdown() {
 }
 
 function logout() {
-  localStorage.removeItem('token')
+  // localStorage.removeItem('token')
   router.push('/login')
 }
 </script>
