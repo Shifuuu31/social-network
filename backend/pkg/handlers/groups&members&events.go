@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"social-network/pkg/models"
@@ -16,7 +17,7 @@ func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 	groupsMux.HandleFunc("POST /group/invite", rt.InviteToJoinGroup)
 	groupsMux.HandleFunc("POST /group/request", rt.RequestToJoinGroup)
 	groupsMux.HandleFunc("POST /group/accept-decline", rt.AcceptDeclineGroup)
-	groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups)
+	groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups) // TODO why are we using POST for browsing?
 	groupsMux.HandleFunc("POST /group/event", rt.NewEvent)
 	groupsMux.HandleFunc("POST /group/event/vote", rt.EventVote)
 
@@ -31,7 +32,7 @@ func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 	return groupsMux
 }
 
-func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
+func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) { 
 	var group *models.Group
 	if err := tools.DecodeJSON(r, &group); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -47,7 +48,7 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "New group JSON decoded"})
-
+	// group.CreatorID = rt.DL.GetRequesterID(w, r)
 	// verify group creation input
 	if err := group.Validate(); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -169,7 +170,6 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member inserted with pending invite status"})
 
-
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "Member invited successfully",
@@ -178,9 +178,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 			"path": r.URL.Path,
 		},
 	})
-	// TODO Add notification 
-
-
+	// TODO Add notification
 
 	if err := tools.EncodeJSON(w, http.StatusCreated, nil); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -198,6 +196,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	var member *models.GroupMember
 	if err := tools.DecodeJSON(r, &member); err != nil {
+		fmt.Println(err)
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to decode group join request JSON",
@@ -211,9 +210,8 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group join request JSON decoded"})
-
 	// TODO validate payload
-
+	fmt.Println("Request to join group:", member)
 	// Insert into group_members as "pending_request"
 	// member.Status = "requested"
 	if err := rt.DL.Members.Upsert(member); err != nil {
@@ -231,7 +229,9 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member inserted with pending join request status"})
 
+
 	// TODO Notify group creator
+	tools.EncodeJSON(w, http.StatusCreated, member.Status)
 }
 
 func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
@@ -331,12 +331,14 @@ func (rt *Root) BrowseGroups(w http.ResponseWriter, r *http.Request) {
 				"err":  err.Error(),
 			},
 		})
+
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Get groups JSON decoded"})
 
-	posts, err := rt.DL.Groups.GetGroups(payload)
+	groups, err := rt.DL.Groups.GetGroups(payload)
+	fmt.Println(groups)
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -352,7 +354,7 @@ func (rt *Root) BrowseGroups(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Groups retrieved from DB"})
 
-	if err := tools.EncodeJSON(w, http.StatusOK, posts); err != nil {
+	if err := tools.EncodeJSON(w, http.StatusOK, groups); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to send groups response",
@@ -438,7 +440,6 @@ func (rt *Root) NewEvent(w http.ResponseWriter, r *http.Request) {
 
 	// TODO send notification to group members
 
-
 	if err := tools.EncodeJSON(w, http.StatusCreated, event); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -515,7 +516,6 @@ func (rt *Root) EventVote(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// TODO send notification to group members
-
 
 	if err := tools.EncodeJSON(w, http.StatusCreated, vote); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{

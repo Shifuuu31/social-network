@@ -1,0 +1,443 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+
+export const useGroupsStore = defineStore('groups', () => {
+  const groups = ref([])
+  const currentGroup = ref(null)
+  const groupPosts = ref([])
+  const groupEvents = ref([])
+  const isLoading = ref(false)
+  const error = ref(null)
+
+  const API_BASE = '/api'
+
+  // Getters remain the same
+  const getGroupById = computed(() => (id) => {
+    return groups.value.find(group => group.id === id)
+  })
+
+  const getCurrentGroupPosts = computed(() => {
+    return groupPosts.value.filter(post => post.groupId === currentGroup.value?.id)
+  })
+
+  const getCurrentGroupEvents = computed(() => {
+    return groupEvents.value.filter(event => event.groupId === currentGroup.value?.id)
+  })
+
+  // Transform API group data to match frontend expectations
+  const transformGroupData = (apiGroup) => {
+    return {
+      id: apiGroup.id,
+      name: apiGroup.title,
+      description: apiGroup.description,
+      image: apiGroup.image_uuid ? `${API_BASE}/images/${apiGroup.image_uuid}` : '/default-group.jpg',
+      isPublic: true,
+      memberCount: apiGroup.member_count || 0,
+      isMember: apiGroup.is_member || false,
+      createdAt: apiGroup.created_at,
+      creatorId: apiGroup.creator_id
+    }
+  }
+
+  // Transform post data
+  const transformPostData = (apiPost) => {
+    return {
+      id: apiPost.id,
+      groupId: apiPost.group_id,
+      title: apiPost.title,
+      content: apiPost.content,
+      author: apiPost.author_name,
+      authorAvatar: apiPost.author_avatar ? `${API_BASE}/images/${apiPost.author_avatar}` : '/default-avatar.jpg',
+      createdAt: apiPost.created_at,
+      likes: apiPost.likes_count || 0,
+      comments: apiPost.comments_count || 0
+    }
+  }
+
+  // Transform event data
+  const transformEventData = (apiEvent) => {
+    return {
+      id: apiEvent.id,
+      groupId: apiEvent.group_id,
+      title: apiEvent.title,
+      description: apiEvent.description,
+      date: apiEvent.date_time,
+      location: apiEvent.location,
+      attendees: apiEvent.attendees_count || 0,
+      maxAttendees: apiEvent.max_attendees || 0,
+      image: apiEvent.image_uuid ? `${API_BASE}/images/${apiEvent.image_uuid}` : '/default-event.jpg',
+      organizer: apiEvent.organizer_name,
+      isAttending: apiEvent.is_attending || false
+    }
+  }
+
+  // Fetch groups (already implemented correctly)
+  const fetchGroups = async () => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const response = await fetch(`${API_BASE}/groups/group/browse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start: 1, n_items: 20, type: 'all' })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      let groupsData = []
+      
+      if (Array.isArray(data)) {
+        groupsData = data
+      } else if (data.groups && Array.isArray(data.groups)) {
+        groupsData = data.groups
+      } else if (data.data && Array.isArray(data.data)) {
+        groupsData = data.data
+      } else {
+        groupsData = []
+      }
+
+      const transformedGroups = groupsData.map(transformGroupData)
+      groups.value = transformedGroups
+
+    } catch (err) {
+      error.value = err.message
+      groups.value = []
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const fetchGroup = async (groupId) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      // First check if we already have the group in our store
+      const group = getGroupById.value(groupId)
+      if (group) {
+        currentGroup.value = group
+        return group
+      }
+
+      // If not, fetch it from the API
+      const response = await fetch(`${API_BASE}/groups/group/${groupId}`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const transformedGroup = transformGroupData(data)
+      
+      // Add to groups array and set as current
+      groups.value.push(transformedGroup)
+      currentGroup.value = transformedGroup
+      
+      return transformedGroup
+    } catch (err) {
+      error.value = err.message
+      console.error('Error fetching group:', err)
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const fetchGroupPosts = async (groupId) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const response = await fetch(`${API_BASE}/groups/group/${groupId}/posts`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const transformedPosts = Array.isArray(data) 
+        ? data.map(transformPostData)
+        : []
+      
+      groupPosts.value = transformedPosts
+      return transformedPosts
+    } catch (err) {
+      error.value = err.message
+      console.error('Error fetching group posts:', err)
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const fetchGroupEvents = async (groupId) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const response = await fetch(`${API_BASE}/groups/group/${groupId}/events`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const transformedEvents = Array.isArray(data)
+        ? data.map(transformEventData)
+        : []
+      
+      groupEvents.value = transformedEvents
+      return transformedEvents
+    } catch (err) {
+      error.value = err.message
+      console.error('Error fetching group events:', err)
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const createGroup = async (groupData) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const apiGroupData = {
+        creator_id: 1, // TODO Replace with actual user ID from context or store
+        title: groupData.name, 
+        description: groupData.description,
+        image_uuid: groupData.image || '', 
+      }
+
+      const response = await fetch(`${API_BASE}/groups/group/new`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(apiGroupData)
+      })
+
+      if (!response.ok) {
+        console.trace('Error creating group:', response.status, response.statusText)
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      }
+
+      const newGroupData = await response.json()
+      const newGroup = transformGroupData(newGroupData)
+
+      groups.value.unshift(newGroup)
+      return newGroup
+    } catch (err) {
+      error.value = err.message
+      console.error('Error creating group:', err)
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const createPost = async (groupId, postData) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const response = await fetch(`${API_BASE}/groups/group/${groupId}/post`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: postData.title,
+          content: postData.content
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      }
+
+      const newPostData = await response.json()
+      const newPost = transformPostData(newPostData)
+
+      groupPosts.value.unshift(newPost)
+      return newPost
+    } catch (err) {
+      error.value = err.message
+      console.error('Error creating post:', err)
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const createEvent = async (groupId, eventData) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const response = await fetch(`${API_BASE}/groups/group/event`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          group_id: groupId,
+          title: eventData.title,
+          description: eventData.description,
+          date_time: eventData.date,
+          location: eventData.location,
+          max_attendees: eventData.maxAttendees
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      }
+
+      const newEventData = await response.json()
+      const newEvent = transformEventData(newEventData)
+
+      groupEvents.value.unshift(newEvent)
+      return newEvent
+    } catch (err) {
+      error.value = err.message
+      console.error('Error creating event:', err)
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const requestJoinGroup = async (groupId) => {
+    isLoading.value = true
+    error.value = null
+    
+    try {
+      const response = await fetch(`${API_BASE}/groups/group/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: 1, // TODO Replace with actual user ID from context or store
+          group_id: groupId,
+          status: 'requested',
+          prev_status: 'requested'
+        })
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || 'Failed to join group')
+      }
+      
+      const data = await response.json()
+      
+      // Update local state
+      const updatedGroups = groups.value.map(group => {
+        if (group.id === groupId) {
+          return { 
+            ...group,
+            isMember: data.is_member || false,
+            memberCount: data.is_member ? group.memberCount + 1 : group.memberCount
+          }
+        }
+        return group
+      })
+      
+      groups.value = updatedGroups
+      
+      if (currentGroup.value?.id === groupId) {
+        currentGroup.value = {
+          ...currentGroup.value,
+          isMember: data.is_member || false,
+          memberCount: data.is_member ? currentGroup.value.memberCount + 1 : currentGroup.value.memberCount
+        }
+      }
+      
+      // return data
+    } catch (err) {
+      error.value = err.message
+      console.error('Error joining group:', err)
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const leaveGroup = async (groupId) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const response = await fetch(`${API_BASE}/groups/group/${groupId}/leave`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      // Update local state
+      const updatedGroups = groups.value.map(group => {
+        if (group.id === groupId) {
+          return { 
+            ...group,
+            isMember: false,
+            memberCount: Math.max(0, group.memberCount - 1)
+          }
+        }
+        return group
+      })
+      
+      groups.value = updatedGroups
+      
+      if (currentGroup.value?.id === groupId) {
+        currentGroup.value = {
+          ...currentGroup.value,
+          isMember: false,
+          memberCount: Math.max(0, currentGroup.value.memberCount - 1)
+        }
+      }
+
+      return data
+    } catch (err) {
+      error.value = err.message
+      console.error('Error leaving group:', err)
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const clearError = () => {
+    error.value = null
+  }
+
+  return {
+    // State
+    groups,
+    currentGroup,
+    groupPosts,
+    groupEvents,
+    isLoading,
+    error,
+
+    // Getters
+    getGroupById,
+    getCurrentGroupPosts,
+    getCurrentGroupEvents,
+
+    // Actions
+    fetchGroups,
+    fetchGroup,
+    fetchGroupPosts,
+    fetchGroupEvents,
+    createGroup,
+    createPost,
+    createEvent,
+    requestJoinGroup,
+    leaveGroup,
+    clearError
+  }
+})

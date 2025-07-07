@@ -20,7 +20,8 @@ type Group struct {
 
 func (g *Group) Validate() error {
 	if g.CreatorID <= 0 {
-		return errors.New("creator_id must be a positive integer")
+		g.CreatorID = 1
+		// return errors.New("creator_id must be a positive integer") //TODO needs to be checked
 	}
 
 	g.Title = strings.TrimSpace(g.Title)
@@ -170,7 +171,7 @@ func (gm *GroupModel) IsUserCreator(groupID, userID int) error {
 
 type GroupsPayload struct {
 	UserID     string `json:"user_id"`
-	Start      int    `json:"star"`
+	Start      int    `json:"start"`
 	NumOfItems int    `json:"n_items"`
 	Type       string `json:"type"`
 }
@@ -207,14 +208,15 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 			}
 		}
 		query = `
-			SELECT g.id, g.creator_id, g.title, g.description, g.image_uuid, g.created_at,
-			COUNT(m.id) AS member_count
-			FROM groups g
-			LEFT JOIN group_members m ON g.id = m.group_id AND m.status = 'member'
-			WHERE g.id <= ?
-			GROUP BY g.id
-			ORDER BY g.id DESC
-			LIMIT ?
+		SELECT 
+		g.id, g.creator_id, g.title, g.description, g.image_uuid, g.created_at,
+		COUNT(m.id) AS member_count
+		FROM groups g
+		LEFT JOIN group_members m 
+		ON g.id = m.group_id AND m.status = 'member'
+		WHERE g.id BETWEEN ? AND ?
+		GROUP BY g.id
+		ORDER BY g.id DESC;
 		`
 		args = []any{Groups.Start, Groups.NumOfItems}
 

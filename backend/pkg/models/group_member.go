@@ -12,6 +12,7 @@ type GroupMember struct {
 	UserID    int       `json:"user_id"`
 	Status    string    `json:"status"` // "invited", "requested", "member", "declined"
 	CreatedAt time.Time `json:"created_at"`
+	PrevStatus string    `json:"prev_status"` // Previous status for comparison, not stored in DB
 }
 // TODO
 func (gm *GroupMember) Validate() error {
@@ -25,12 +26,12 @@ type GroupMemberModel struct {
 // UpsertMember insert member or update mehis status.
 func (gmm *GroupMemberModel) Upsert(member *GroupMember) error {
 	query := `
-		INSERT INTO group_members (group_id, user_id, status)
-		VALUES (?, ?, ?)
+		INSERT INTO group_members (group_id, user_id, prev_status, status)
+		VALUES (?, ?, ?, ?)
 		ON CONFLICT(group_id, user_id) DO UPDATE SET status=excluded.status
 	`
-	
-	if _, err := gmm.DB.Exec(query, member.GroupID, member.UserID, member.Status);err != nil {
+
+	if _, err := gmm.DB.Exec(query, member.GroupID, member.UserID, member.PrevStatus, member.Status); err != nil {
 		return fmt.Errorf("upsert group member: %w", err)
 	}
 	return nil
