@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../views/Home.vue'
 import Groups from '../views/Groups.vue'
 import GroupView from '../views/GroupView.vue'
 import CreateGroup from '../views/CreateGroup.vue'
@@ -7,8 +6,8 @@ import CreateGroup from '../views/CreateGroup.vue'
 const routes = [
   {
     path: '/',
-    name: 'Home',
-    component: Home
+    name: 'groups',
+    component: Groups
   },
   {
     path: '/groups',

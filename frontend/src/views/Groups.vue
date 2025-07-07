@@ -5,56 +5,40 @@
         <h1 class="page-title">Découvrir les groupes</h1>
         <p class="page-subtitle">Trouvez des communautés qui partagent vos passions</p>
       </div>
-      
+
       <div class="groups-filters">
         <div class="search-bar">
-          <input 
-            type="text" 
-            placeholder="Rechercher un groupe..."
-            v-model="searchQuery"
-            class="search-input"
-          />
+          <input type="text" placeholder="Rechercher un groupe..." v-model="searchQuery" class="search-input" />
           <button class="search-btn">
             <span class="icon">🔍</span>
           </button>
         </div>
-        
+
         <div class="filter-buttons">
-          <button 
-            :class="['filter-btn', { active: activeFilter === 'all' }]"
-            @click="setFilter('all')"
-          >
+          <button :class="['filter-btn', { active: activeFilter === 'all' }]" @click="setFilter('all')">
             Tous les groupes
           </button>
-          <button 
-            :class="['filter-btn', { active: activeFilter === 'joined' }]"
-            @click="setFilter('joined')"
-          >
+          <button :class="['filter-btn', { active: activeFilter === 'joined' }]" @click="setFilter('joined')">
             Mes groupes
           </button>
         </div>
       </div>
-      
+
       <div v-if="groupsStore.isLoading" class="loading">
         <div class="spinner"></div>
         <p>Chargement des groupes...</p>
       </div>
-      
+
       <div v-else-if="groupsStore.error" class="error">
         <p>{{ groupsStore.error }}</p>
         <button @click="loadGroups" class="btn btn-primary">Réessayer</button>
       </div>
-      
+
       <div v-else class="groups-grid">
-        <GroupCard 
-          v-for="group in filteredGroups" 
-          :key="group.id"
-          :group="group"
-          @group-joined="handleGroupJoined"
-          @group-left="handleGroupLeft"
-        />
+        <GroupCard v-for="group in filteredGroups" :key="group.id" :group="group" @group-joined="handleGroupJoined"
+          @group-left="handleGroupLeft" />
       </div>
-      
+
       <div v-if="filteredGroups.length === 0 && !groupsStore.isLoading" class="empty-state">
         <div class="empty-icon">📭</div>
         <h3>Aucun groupe trouvé</h3>
@@ -79,42 +63,32 @@ const activeFilter = ref('all')
 
 const filteredGroups = computed(() => {
   let filtered = groupsStore.groups
-  // console.log('🔍 Filtered groups:', filtered, groupsStore.groups);
-  
 
   // Filter by search query
   if (searchQuery.value) {
-    filtered = filtered.filter(group => 
-      group.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      group.description.toLowerCase().includes(searchQuery.value.toLowerCase())
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(group =>
+      group.name.toLowerCase().includes(query) ||
+      group.description.toLowerCase().includes(query)
     )
-  }
-
-  // Filter by active filter
-  switch (activeFilter.value) {
-    case 'public':
-      filtered = filtered.filter(group => group.isPublic)
-      break
-    case 'joined':
-      filtered = filtered.filter(group => group.isMember)// TODO i need to check if the user is joining the group
-      break
-    default:
-      break
   }
 
   return filtered
 })
 
+// Watch for filter changes, but don't run immediately
+watch(activeFilter, (newFilter) => {
+  const filterType = newFilter === 'joined' ? 'user' : 'all'
+  groupsStore.fetchGroups(filterType)
+})
+
 const setFilter = (filter) => {
-  activeFilter.value = filter  
+  activeFilter.value = filter
 }
 
-watch(() => groupsStore.groups, (val) => {
-  // console.log('🔍 groups value:', val)
-}, { immediate: true })
-
 const loadGroups = async () => {
-  await groupsStore.fetchGroups()
+  const filterType = activeFilter.value === 'joined' ? 'user' : 'all'
+  await groupsStore.fetchGroups(filterType)
 }
 
 const handleGroupJoined = (groupId) => {
@@ -256,8 +230,13 @@ onMounted(() => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .error {
@@ -315,15 +294,15 @@ onMounted(() => {
   .groups-filters {
     flex-direction: column;
   }
-  
+
   .search-bar {
     min-width: auto;
   }
-  
+
   .filter-buttons {
     justify-content: center;
   }
-  
+
   .groups-grid {
     grid-template-columns: 1fr;
   }

@@ -14,6 +14,7 @@ type Group struct {
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	ImgUUID     string    `json:"image_uuid"`
+	IsMember    bool      `json:"is_member"`   // Indicates if the user is a member of the group
 	MemberCount int       `json:"member_count"`
 	CreatedAt   time.Time `json:"created_at"`
 }
@@ -236,6 +237,13 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 		if err := rows.Scan(&g.ID, &g.CreatorID, &g.Title, &g.Description, &g.ImgUUID, &g.CreatedAt, &g.MemberCount); err != nil {
 			return nil, fmt.Errorf("scan group: %w", err)
 		}
+		// Check if the user is a member of the group
+		var isMember int
+		err = gm.DB.QueryRow(`SELECT COUNT(*) FROM group_members WHERE group_id = ? AND user_id = ?`, g.ID, g.ID).Scan(&isMember)
+		if err != nil {
+			return nil, fmt.Errorf("check group membership: %w", err)
+		}
+		g.IsMember = isMember > 0
 		groups = append(groups, &g)
 	}
 	return groups, nil

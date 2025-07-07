@@ -81,7 +81,7 @@ const formData = reactive({
 })
 
 const canSubmit = computed(() => {
-  return formData.name.trim().length > 5 && formData.description.trim().length > 10
+  return formData.name.trim().length > 5 && formData.description.trim().length > 10 //TODO
 })
 
 const triggerFileInput = () => {

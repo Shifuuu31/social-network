@@ -4,7 +4,7 @@
       <div class="header-left">
         <router-link to="/" class="logo">
           <span class="logo-icon">🌐</span>
-          <span class="logo-text">GroupsApp</span>
+          <span class="logo-text">Social NETWORK</span>
         </router-link>
       </div>
       
