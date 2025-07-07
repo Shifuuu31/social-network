@@ -105,21 +105,21 @@ onMounted(
   initProfile
 )
 </script>
-
 <style scoped>
 .profile-container {
-  background: #fff;
-  color: #1e1e1e;
-  max-width: 1200px;
-  margin: auto;
-  padding-bottom: 2rem;
-  font-family: 'Segoe UI', sans-serif;
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 2rem;
+  background: var(--bg-dark);
+  color: var(--text-light);
 }
 
 /* Top banner */
 .profile-banner .banner-image {
   height: 200px;
-  background: linear-gradient(to right, #8a2be2, #6a0dad);
+  background: linear-gradient(to right, var(--accent-purple), var(--bg-purple));
   border-radius: 8px 8px 0 0;
 }
 
@@ -128,7 +128,7 @@ onMounted(
   display: flex;
   align-items: center;
   padding: 1rem 2rem;
-  background: #f9f9f9;
+  background: #1a1a1a;
   border-radius: 0 0 8px 8px;
   margin-bottom: 2rem;
   gap: 1.5rem;
@@ -138,9 +138,9 @@ onMounted(
   width: 100px;
   height: 100px;
   border-radius: 100px;
-  border: 4px solid white;
+  border: 4px solid var(--accent-purple);
   object-fit: cover;
-  background: #eee;
+  background: #2e2e2e;
 }
 
 .profile-info {
@@ -152,45 +152,14 @@ onMounted(
   margin-bottom: 0.2rem;
 }
 
-.role {
-  color: #6a0dad;
-  font-weight: bold;
-  margin-bottom: 0.5rem;
-}
-
 .profile-buttons {
   display: flex;
   gap: 1rem;
   margin-top: 0.5rem;
 }
-.locked-profile {
-  display: flex;
-  justify-content: center;
-  padding: 2rem;
-}
-
-.locked-card {
-  background: #f5f5f5;
-  border: 1px solid #ddd;
-  padding: 2rem;
-  border-radius: 12px;
-  text-align: center;
-  max-width: 500px;
-  width: 100%;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-
-.locked-card h3 {
-  color: #6a0dad;
-  margin-bottom: 0.5rem;
-}
-
-.locked-card p {
-  color: #444;
-}
 
 button {
-  background: #6a0dad;
+  background: var(--accent-purple);
   color: white;
   padding: 0.5rem 1.2rem;
   border: none;
@@ -201,12 +170,12 @@ button {
 }
 
 button:hover {
-  background: #7d20c0;
+  background: var(--accent-hover);
 }
 
 button:disabled {
-  background: #bbb;
-  cursor: default;
+  background: #555;
+  cursor: not-allowed;
 }
 
 /* Main Layout */
@@ -214,12 +183,12 @@ button:disabled {
   display: grid;
   grid-template-columns: 1fr 2fr 1fr;
   gap: 2rem;
-  padding: 0 2rem;
 }
 
 /* Left Column */
-.profile-left {
-  background: #f5f5f5;
+.profile-left,
+.profile-right {
+  background: #1a1a1a;
   border-radius: 8px;
   padding: 1rem;
 }
@@ -235,7 +204,7 @@ button:disabled {
 
 /* Center Column */
 .profile-center {
-  background: #fefefe;
+  background: #212121;
   border-radius: 8px;
   padding: 1rem;
 }
@@ -244,25 +213,41 @@ button:disabled {
   display: flex;
   gap: 2rem;
   margin-bottom: 1rem;
-  border-bottom: 2px solid #ddd;
+  border-bottom: 2px solid #333;
 }
 
 .tabs span {
   padding: 0.5rem;
   cursor: pointer;
   font-weight: bold;
-  color: #444;
+  color: var(--text-muted);
 }
 
 .tabs span.active {
-  color: #6a0dad;
-  border-bottom: 3px solid #6a0dad;
+  color: var(--accent-purple);
+  border-bottom: 3px solid var(--accent-purple);
 }
 
-/* Right Column */
-.profile-right {
-  background: #f5f5f5;
-  border-radius: 8px;
-  padding: 1rem;
+/* Locked Card */
+.locked-profile {
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.locked-card {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  padding: 2rem;
+  border-radius: 12px;
+  text-align: center;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.locked-card h3 {
+  color: var(--accent-purple);
+  margin-bottom: 0.5rem;
 }
 </style>
