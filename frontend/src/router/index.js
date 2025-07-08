@@ -29,7 +29,7 @@ const routes = [
   { path:'/',name:'home',component:Home},
   { path: '/signin', name: 'Signin', component: Signin },
   { path: '/signup', name: 'Signup', component: Signup },
-  { path: '/profile/:id?', name: 'Profile', component: Profile, meta: { requiresAuth: true }} 
+  { path: '/profile/:id?', name: 'Profile', component: Profile} 
 
   // Add other routes as needed
 ]
@@ -39,19 +39,20 @@ const router = createRouter({
   routes
 })
 
-const auth = useAuth()
-
+const publicr = ['/signin', '/signup']
 // Add guard
 router.beforeEach(async (to, from, next) => {  
-  // Run check only if route requires auth  
-  if (to.meta.requiresAuth && !auth.isAuthenticated.value) {
-    const success = await auth.fetchCurrentUser()
-
+  const auth = useAuth()
+  const pp = publicr.includes(to.path)
+  
+  // Run check only if route requires auth 
+  if (!pp){
+    const success = auth.isAuthenticated.value || await auth.fetchCurrentUser()
     if (!success) {
+      await auth.logout()
       return next('/signin')
     }
-  }
-
+  } 
   next()
 })
 

@@ -33,8 +33,6 @@ async function fetchCurrentUser() {
 }
 
 async function logout() {
-  const router = useRouter()
-
   try {
     await fetch('http://localhost:8080/auth/signout', {
       method: 'POST',
@@ -47,7 +45,6 @@ async function logout() {
 
   user.value = null
   error.value = null
-  router.push('/signin')
 }
 
 export function useAuth() {
