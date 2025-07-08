@@ -27,26 +27,21 @@
         <font-awesome-icon icon="fa-solid fa-bell" class="icon" />
         <span class="badge red">3</span>
       </router-link>
-
+ 
       <!-- Message Icon -->
       <router-link to="/messages" class="icon-container" aria-label="Messages">
         <font-awesome-icon icon="fa-solid fa-envelope" class="icon" />
         <span class="badge green">2</span>
       </router-link>
+      <!-- Profile Icon -->
 
-      <!-- User Avatar (Profile) -->
-      <div class="user-dropdown">
-        <img
-          src="https://ui-avatars.com/api/?name=John+Doe&size=32"
-          alt="User Avatar"
-          class="avatar"
-          @click="goToProfile"
-        />
-        <div v-if="dropdownOpen" class="dropdown-menu">
-          <router-link to="/profile" class="dropdown-item">Profile</router-link>
-          <button @click="logout" class="dropdown-item">Logout</button>
-        </div>
-      </div>
+
+      <router-link to="/profile" class="icon-container" aria-label="Profile">
+        <font-awesome-icon icon="fa-solid fa-user" class="icon" />
+        <span class="badge green">1</span>
+      </router-link>
+  
+
     </div>
   </header>
 </template>
@@ -144,7 +139,7 @@ function goToProfile() {
   position: absolute;
   top: 2px;
   right: 2px;
-  min-width: 16px;
+  min-width: 14px;
   height: 16px;
   font-size: 10px;
   background: linear-gradient(90deg, #ef4444, #f59e42);

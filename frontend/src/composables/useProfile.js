@@ -5,7 +5,7 @@ import { useAuth } from '@/composables/useAuth'
 export function useProfileView() {
     const router = useRouter()
     const { user: currentUser, isAuthenticated, fetchCurrentUser } = useAuth()  
-
+    console.log(currentUser,"allos")
     const defaultAvatar = '/images/default-avatar.png' //fake
     const profileUser = reactive({})
     const followStatus = ref('none')

@@ -1,7 +1,6 @@
 <template>
   <div class="layout">
-    <Header />
-    
+     
     <div class="body">
       <Sidebar class="sidebar" />
       
@@ -132,13 +131,13 @@ function handlePostCreated() {
 }
 
 /* Responsive Design */
-@media (min-width: 768px) {
+@media (min-width: 780px) {
   .sidebar {
     display: block;
   }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1070px) {
   .right-sidebar {
     display: block;
   }
