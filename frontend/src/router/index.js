@@ -19,7 +19,6 @@ const routes = [
     path: '/profile/:id?',
     name: 'Profile',
     component: Profile,
-    meta: { requiresAuth: true }
   } 
 ]
 
@@ -28,15 +27,19 @@ const router = createRouter({
   routes,
 })
 
-const auth = useAuth()
+const publicPaths = ['/signin', '/signup']
 
 // Add guard
 router.beforeEach(async (to, from, next) => {  
-  // Run check only if route requires auth  
-  if (to.meta.requiresAuth && !auth.isAuthenticated.value) {
-    const success = await auth.fetchCurrentUser()
+  const auth = useAuth()
+  const isPublic = publicPaths.includes(to.path)
+
+  // Run check only for unpublic paths
+  if (!isPublic) {
+    const success = auth.isAuthenticated.value || await auth.fetchCurrentUser()
 
     if (!success) {
+      await auth.logout()
       return next('/signin')
     }
   }

@@ -1,14 +1,15 @@
 <template>
   <div class="signup-container">
     <div class="left-panel">
-      <div class="left-panel-content">
+      <!-- <div class="left-panel-content"> -->
         <h1>Welcome</h1>
         <p>Join our social network and stay connected.</p>
-        <div class="signin-link-wrapper">
+        <!-- <div class="signin-link-wrapper"> -->
           <p>If you already have an account, <router-link to="/signin" class="signin-link">Sign In</router-link></p>
-        </div>
-      </div>
+        <!-- </div> -->
+      <!-- </div> -->
     </div>
+    <div class="form-wrapper">
 
     <div class="form-panel">
       <h2>Create Account</h2>
@@ -85,6 +86,7 @@
         <p class="error" v-if="generalError">{{ generalError }}</p>
       </form>
     </div>
+    </div>
   </div>
 </template>
 
@@ -154,7 +156,7 @@ const onSubmit = async () => {
       throw new Error(msg || 'Failed to sign up.')
     }
     console.log(res,"reees");
-     alert('Account created successfully!')
+    alert('Account created successfully!')
 
     router.push('/signin') 
 
@@ -203,16 +205,17 @@ function validate(data) {
   background: #4f46e5;
   color: white;
   display: flex;
+  align-items: center;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
   padding: 2rem;
 }
-.left-panel-content {
+/* .left-panel-content {
   display: flex;
   flex-direction: column;
   align-items: center;
   flex-grow: 1;
-}
+} */
 .signin-link-wrapper {
   text-align: center;
   margin-top: auto;
@@ -229,6 +232,14 @@ function validate(data) {
   padding: 3rem;
   background: #f3f4f6;
   overflow-y: auto;
+}
+.form-wrapper {
+  flex: 2;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f3f4f6;
+  padding: 3rem;
 }
 form {
   display: flex;

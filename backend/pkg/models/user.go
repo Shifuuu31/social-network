@@ -37,6 +37,7 @@ type UserDTO struct {
 	Nickname    string    `json:"nickname"`
 	FirstName   string    `json:"first_name"`
 	LastName    string    `json:"last_name"`
+	Gender      string    `json:"gender"`
 	AboutMe     string    `json:"about_me"`
 	DateOfBirth time.Time `json:"date_of_birth"`
 	AvatarURL   string    `json:"avatar_url"`
@@ -140,7 +141,7 @@ func (um *UserModel) ValidateCredentials(user *User) error {
 func (um *UserModel) Insert(user *User) error {
 	query := `
 		INSERT INTO users (
-			email, password_hash, first_name, last_name, date_of_birth,
+			email, password_hash, first_name, last_name, gender, date_of_birth,
 			avatar_url, nickname, about_me, is_public
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
 	`
@@ -149,6 +150,7 @@ func (um *UserModel) Insert(user *User) error {
 		&user.PasswordHash,
 		&user.FirstName,
 		&user.LastName,
+		&user.Gender,
 		&user.DateOfBirth,
 		&user.AvatarURL,
 		&user.Nickname,
@@ -204,7 +206,7 @@ func (um *UserModel) Delete(id int) error {
 // GetUserByID retrieves a user by ID.
 func (um *UserModel) GetUserByID(user *User) error {
 	query := `
-		SELECT id, email, password_hash, first_name, last_name, date_of_birth,
+		SELECT id, email, password_hash, first_name, last_name, gender, date_of_birth,
 		       avatar_url, nickname, about_me, is_public, created_at
 		FROM users
 		WHERE id = ?
@@ -216,6 +218,7 @@ func (um *UserModel) GetUserByID(user *User) error {
 		&user.PasswordHash,
 		&user.FirstName,
 		&user.LastName,
+		&user.Gender,
 		&user.DateOfBirth,
 		&user.AvatarURL,
 		&user.Nickname,

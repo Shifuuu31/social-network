@@ -60,17 +60,6 @@ func (dl *DataLayer) GetRequesterID(w http.ResponseWriter, r *http.Request) (req
 // RequireAuth checks if a user is authenticated by session
 func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := r.Header.Get("Origin")
-		if origin == "http://localhost:5173" {
-			fmt.Println("wwwwwaaaa")
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type") // ✅ THIS LINE IS MANDATORY
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-
-		}
-		// Check if request path is in skipPaths
-		// Check if request path matches any skipPrefixes
 		if slices.Contains(skipPaths, r.URL.Path) || tools.SliceHasPrefix(skipPrefixes, r.URL.Path) {
 			fmt.Println("1")
 			next.ServeHTTP(w, r)
@@ -96,7 +85,7 @@ func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 			tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		
+
 		fmt.Println("Cookie", cookie)
 		fmt.Println("Coosssskie", cookie.Value)
 
