@@ -1,55 +1,165 @@
-/* assets/main.css */
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
-
 :root {
-  --twitter-blue: #1DA1F2;
-  --twitter-dark: #15202B;
-  --twitter-light: #E8F5FE;
-  --twitter-gray: #657786;
-  --twitter-light-gray: #AAB8C2;
-  --twitter-extra-light-gray: #E1E8ED;
-  --twitter-extra-extra-light-gray: #F5F8FA;
-  --twitter-red: #E0245E;
-  --twitter-green: #17BF63;
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #1da1f2;
+  --background: #f8fafc;
+  --background-card: #fff;
+  --background-glass: rgba(255,255,255,0.85);
+  --text-main: #222;
+  --text-light: #555;
+  --border-radius: 18px;
+  --shadow: 0 6px 24px rgba(0,0,0,0.08), 0 1.5px 4px rgba(0,0,0,0.04);
+  --transition: 0.18s cubic-bezier(.4,0,.2,1);
+  --font-main: 'Segoe UI', 'Inter', 'Avenir', 'Helvetica', 'Arial', sans-serif;
 }
 
-* {
+html, body {
+  height: 100%;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-color: white;
-  color: #0F1419;
-  line-height: 1.5;
+  font-family: var(--font-main);
+  background: var(--background);
+  color: var(--text-main);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background 0.3s, color 0.3s;
 }
 
 #app {
-  display: flex;
   min-height: 100vh;
-}
-
-main {
-  flex: 1;
-  /* max-width: 600px; */
+  width: 100%;
   margin: 0 auto;
-  border-left: 1px solid var(--twitter-extra-light-gray);
-  border-right: 1px solid var(--twitter-extra-light-gray);
-  min-height: 100vh;
+  padding: 0;
+  background: none;
 }
 
-button {
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: color var(--transition);
+  font-weight: 500;
+}
+a:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-main);
+  font-weight: 800;
+  margin-top: 0;
+  color: var(--primary);
+  letter-spacing: -0.5px;
+}
+
+h1 {
+  font-size: 2.2rem;
+}
+h2 {
+  font-size: 1.5rem;
+}
+h3 {
+  font-size: 1.2rem;
+}
+
+p {
+  color: var(--text-light);
+  line-height: 1.7;
+}
+
+button, .btn {
+  border-radius: 10px;
+  border: none;
+  padding: 0.7em 1.5em;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: inherit;
+  background: var(--primary);
+  color: #fff;
   cursor: pointer;
-  font-weight: 700;
-  border-radius: 9999px;
-  padding: 0.5rem 1rem;
-  transition: background-color 0.2s;
+  box-shadow: 0 2px 8px rgba(37,99,235,0.08);
+  transition: background var(--transition), box-shadow var(--transition);
+}
+button:hover, .btn:hover {
+  background: var(--primary-dark);
+  box-shadow: 0 4px 16px rgba(37,99,235,0.12);
+}
+button:focus, .btn:focus {
+  outline: 2px solid var(--accent);
 }
 
-@media (min-width: 1024px) {
-  #app {
-    justify-content: center;
+input, textarea, select {
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  padding: 0.7em 1em;
+  font-size: 1rem;
+  font-family: inherit;
+  background: #f4f6fb;
+  color: var(--text-main);
+  transition: border var(--transition), background var(--transition);
+}
+input:focus, textarea:focus, select:focus {
+  border: 1.5px solid var(--primary);
+  background: #fff;
+  outline: none;
+}
+
+.card, .glass {
+  background: var(--background-card);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  padding: 2em;
+  margin-bottom: 2em;
+  transition: box-shadow var(--transition);
+}
+.glass {
+  background: var(--background-glass);
+  backdrop-filter: blur(8px);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  background: #e5e7eb;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+
+@media (max-width: 768px) {
+  .card, .glass {
+    padding: 1em;
+    border-radius: 12px;
+  }
+  h1 {
+    font-size: 1.3rem;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #181c24;
+    --background-card: #23293a;
+    --background-glass: rgba(30,34,44,0.92);
+    --text-main: #f3f4f6;
+    --text-light: #bfc7d5;
+    --primary: #60a5fa;
+    --primary-dark: #2563eb;
+    --accent: #38bdf8;
+    --shadow: 0 6px 24px rgba(0,0,0,0.32), 0 1.5px 4px rgba(0,0,0,0.18);
+  }
+  body {
+    background: var(--background);
+    color: var(--text-main);
+  }
+  .card, .glass {
+    background: var(--background-card);
+    color: var(--text-main);
+  }
+  input, textarea, select {
+    background: #23293a;
+    color: var(--text-main);
+    border: 1px solid #374151;
   }
 }

@@ -98,7 +98,7 @@ function handlePostCreated() {
 
 .main-content {
   width: 100%;
-  max-width: 640px;
+  /* max-width: 640px; */
 }
 
 .title {
