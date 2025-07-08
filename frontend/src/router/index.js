@@ -6,6 +6,11 @@ import { useAuth } from '@/composables/useAuth'
 
 const routes = [
   {
+    path: '/',
+    name: 'Home',
+
+  },
+  {
     path: '/signup',
     name: 'Signup',
     component: SignUp,
@@ -29,22 +34,29 @@ const router = createRouter({
 
 const publicPaths = ['/signin', '/signup']
 
-// Add guard
-router.beforeEach(async (to, from, next) => {  
-  const auth = useAuth()
+const auth = useAuth()
+
+router.beforeEach(async (to, from, next) => {
   const isPublic = publicPaths.includes(to.path)
 
-  // Run check only for unpublic paths
-  if (!isPublic) {
-    const success = auth.isAuthenticated.value || await auth.fetchCurrentUser()
+  // Always ensure user state is loaded once
+  if (!auth.isAuthenticated.value) {
+    await auth.fetchCurrentUser()
+  }
 
-    if (!success) {
-      await auth.logout()
-      return next('/signin')
-    }
+  // If user is already authenticated, redirect away from public pages
+  if (isPublic && auth.isAuthenticated.value) {
+    return next('/')
+  }
+
+  // If user is accessing protected page, ensure auth is valid
+  if (!isPublic && !auth.isAuthenticated.value) {
+    await auth.logout()
+    return next('/signin')
   }
 
   next()
 })
+
 
 export default router

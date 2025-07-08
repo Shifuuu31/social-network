@@ -6,6 +6,10 @@ const isLoading = ref(false)
 const error = ref(null)
 
 async function fetchCurrentUser() {
+  if (user.value) return true
+
+  console.log("Fetching user...")
+  
   isLoading.value = true
   error.value = null
 
