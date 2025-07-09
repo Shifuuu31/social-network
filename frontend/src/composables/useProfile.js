@@ -9,6 +9,7 @@ export function useProfileView() {
   const defaultAvatar = '/images/default-avatar.png' //fake
   const profileUser = reactive({})
   const followStatus = ref('none')
+  const isRequestToMe = ref(false)
   const isOwner = ref(false)
   const activeTab = ref('posts')
   const followersList = ref([])
@@ -53,7 +54,7 @@ export function useProfileView() {
         return false
       }
 
-      const { user: u, follow_status } = await res.json()
+      const { user: u, follow_status, is_request_to_me } = await res.json()
       Object.keys(u).forEach(key => {
         profileUser[key] = u[key]
       })
@@ -61,6 +62,7 @@ export function useProfileView() {
       console.log("profileUser", profileUser)
 
       followStatus.value = follow_status
+      isRequestToMe.value = is_request_to_me
       return true
     }catch(err){
       console.log(err)
@@ -104,6 +106,29 @@ export function useProfileView() {
     }
   }
 
+  async function respondToRequest(action) {
+    try {
+      const res = await fetch('http://localhost:8080/users/follow/accept-decline', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_id: profileUser.id,
+          action: action,
+        }),
+      })
+
+      if (!res.ok) {
+        console.error('Failed to respond to follow request:', res.status, res.text)
+        return alert('Failed to respond to follow request')
+      }
+
+      isRequestToMe.value = false // hide buttons
+    } catch (err) {
+      console.error('Failed to respond to request:', err)
+    }
+  }
+
   async function fetchConnections(type) {
     try {
       const endpoint = type === 'followers' ? 'http://localhost:8080/users/profile/followers' : 'http://localhost:8080/users/profile/following'
@@ -134,12 +159,14 @@ export function useProfileView() {
   return {
       profileUser,
       followStatus,
+      isRequestToMe,
       isOwner,
       activeTab,
       followersList,
       followingList,
       canViewPrivateProfile,
       initProfile,
+      respondToRequest,
       toggleFollow,
       toggleVisibility,
   }

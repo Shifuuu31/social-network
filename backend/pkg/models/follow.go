@@ -61,19 +61,36 @@ func (flm *FollowRequestModel) Insert(followRequest *FollowRequest) error {
 }
 
 func (flm *FollowRequestModel) UpdateStatus(followRequest *FollowRequest) error {
-	query := `
-		UPDATE follow_request
-		SET status = ?
-		WHERE from_user_id = ? AND to_user_id = ? AND status = 'pending'
-	`
-	res, err := flm.DB.Exec(query, followRequest.Status, followRequest.FromUserID, followRequest.ToUserID)
+	var (
+		query string
+		args  []interface{}
+	)
+
+	if followRequest.Status == "declined" {
+		query = `
+			DELETE FROM follow_request
+			WHERE from_user_id = ? AND to_user_id = ? AND status = 'pending'
+		`
+		args = []interface{}{followRequest.FromUserID, followRequest.ToUserID}
+	} else {
+		query = `
+			UPDATE follow_request
+			SET status = ?
+			WHERE from_user_id = ? AND to_user_id = ? AND status = 'pending'
+		`
+		args = []interface{}{followRequest.Status, followRequest.FromUserID, followRequest.ToUserID}
+	}
+
+	res, err := flm.DB.Exec(query, args...)
 	if err != nil {
 		return err
 	}
+
 	affected, _ := res.RowsAffected()
 	if affected == 0 {
-		return errors.New("no pending follow request to decline")
+		return errors.New("no pending follow request to " + followRequest.Status)
 	}
+
 	return nil
 }
 

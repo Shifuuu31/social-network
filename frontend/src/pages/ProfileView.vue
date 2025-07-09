@@ -11,14 +11,44 @@
       <div class="profile-info">
         <h2>{{ profileUser.nickname || profileUser.first_name }}</h2>
         <!-- <p class="role"></p> -->
+        <!-- Profile Buttons -->
         <div class="profile-buttons">
-          <button v-if="isOwner" @click="toggleVisibility"> {{ profileUser.is_public ? '🔓 Public' : '🔒 Private' }} </button>
+          <!-- 🔐 Toggle Public/Private -->
+          <button v-if="isOwner" @click="toggleVisibility">
+            {{ profileUser.is_public ? '🔓 Public' : '🔒 Private' }}
+          </button>
+        
+          <!-- 👤 Follow/Unfollow Section -->
           <template v-else>
-            <button v-if="followStatus === 'none'" @click="toggleFollow('follow')"> Follow </button>
-            <button v-else-if="followStatus === 'pending'" disabled> Pending </button>
-            <button v-else-if="followStatus === 'accepted'" @click="toggleFollow('unfollow')"> Unfollow </button>
+            <button 
+              v-if="followStatus === 'none' || followStatus === 'declined'" 
+              @click="toggleFollow('follow')"
+            >
+              Follow
+            </button>
+          
+            <button 
+              v-else-if="followStatus === 'pending'" 
+              disabled
+            >
+              Pending
+            </button>
+          
+            <button 
+              v-else-if="followStatus === 'accepted'" 
+              @click="toggleFollow('unfollow')"
+            >
+              Unfollow
+            </button>
           </template>
         </div>
+
+        <!-- Accept/Decline Buttons (if I'm the target of a pending request) -->
+        <div class="profile-requests" v-if="isRequestToMe">
+          <button @click="respondToRequest('accepted')">✅ Accept</button>
+          <button @click="respondToRequest('declined')">❌ Decline</button>
+        </div>
+
       </div>
     </div>
 
@@ -91,15 +121,21 @@ import { useProfileView } from '@/composables/useProfile'
 const {
   profileUser,
   followStatus,
+  isRequestToMe,
   isOwner,
   activeTab,
   followersList,
   followingList,
   canViewPrivateProfile,
   initProfile,
+  respondToRequest,
   toggleFollow,
   toggleVisibility
 } = useProfileView()
+
+console.log('isRequestToMe', isRequestToMe.value )
+console.log('followStatus', followStatus.value )
+
 
 onMounted(
   initProfile
@@ -153,7 +189,25 @@ onMounted(
   font-size: 1.5rem;
   margin-bottom: 0.5rem;
 }
+.profile-requests {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
 
+.profile-requests button {
+  background: #444;
+  color: white;
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.profile-requests button:hover {
+  background: #6a0dad;
+}
 .profile-buttons {
   display: flex;
   gap: 0.5rem;

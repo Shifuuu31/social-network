@@ -25,8 +25,9 @@ func (rt *Root) NewUsersHandler() (usersMux *http.ServeMux) {
 }
 
 type ProfileInfoResponse struct {
-	User         *models.User `json:"user"`
-	FollowStatus string       `json:"follow_status"`
+	User          *models.User `json:"user"`
+	FollowStatus  string       `json:"follow_status"`
+	IsRequestToMe bool         `json:"is_request_to_me"`
 }
 
 func NewUserDTO(u *models.User) *models.UserDTO {
@@ -181,7 +182,7 @@ func (rt *Root) ProfileInfo(w http.ResponseWriter, r *http.Request) {
 
 	requesterID := rt.DL.GetRequesterID(w, r)
 	followRequest := &models.FollowRequest{FromUserID: requesterID, ToUserID: user.ID}
-	// followStaus := "none"
+	fmt.Println("Followrequeste1", followRequest)
 	if err := rt.DL.Follows.GetFollowStatus(followRequest); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "WARN",
@@ -194,16 +195,35 @@ func (rt *Root) ProfileInfo(w http.ResponseWriter, r *http.Request) {
 				"error":     err.Error(),
 			},
 		})
-		fmt.Println(1, err)
+		fmt.Println("I don't know man", err)
 		tools.RespondError(w, "Private profile — follow to see more", http.StatusForbidden)
 		return
 	}
+	fmt.Println("Followrequeste", followRequest)
 
-	fmt.Println("Follow", followRequest.Status)
-	response := ProfileInfoResponse{
-		User:         user,
-		FollowStatus: followRequest.Status,
+	incomingRequest := &models.FollowRequest{
+		FromUserID: user.ID,
+		ToUserID:   requesterID,
 	}
+	isRequestToMe := false
+
+	if err := rt.DL.Follows.GetFollowStatus(incomingRequest); err == nil {
+		fmt.Println("Incoming Request Found:", incomingRequest)
+
+		if incomingRequest.Status == "pending" {
+			fmt.Println("It is a pending request TO ME")
+			isRequestToMe = true
+		}
+	} else {
+		fmt.Println("No incoming follow request or error:", err)
+	}
+
+	response := ProfileInfoResponse{
+		User:          user,
+		FollowStatus:  followRequest.Status,
+		IsRequestToMe: isRequestToMe,
+	}
+
 	if err := tools.EncodeJSON(w, http.StatusOK, response); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -216,7 +236,6 @@ func (rt *Root) ProfileInfo(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 		fmt.Println("err", err)
-
 		return
 	}
 
@@ -510,6 +529,7 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Println("Following")
+	fmt.Println("Payload:", payload)
 	requesterID := rt.DL.GetRequesterID(w, r)
 
 	followRequest := &models.FollowRequest{FromUserID: requesterID, ToUserID: payload.TargetId}
@@ -555,6 +575,7 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 					"path":  r.URL.Path,
 				},
 			})
+			fmt.Println("Unfollow Error:", err)
 			tools.RespondError(w, "Failed to unfollow user", http.StatusInternalServerError)
 			return
 		}
@@ -641,7 +662,7 @@ func (rt *Root) AcceptDeclineFollowRequest(w http.ResponseWriter, r *http.Reques
 		ToUserID:   requesterID,
 		Status:     payload.Action,
 	}
-
+	fmt.Println("FollowRequest:", followRequest)
 	if err := rt.DL.Follows.UpdateStatus(followRequest); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -655,6 +676,7 @@ func (rt *Root) AcceptDeclineFollowRequest(w http.ResponseWriter, r *http.Reques
 				"path":   r.URL.Path,
 			},
 		})
+		fmt.Println("UpdateStatus Error:", err)
 		tools.RespondError(w, "Failed to update follow request", http.StatusInternalServerError)
 		return
 	}
