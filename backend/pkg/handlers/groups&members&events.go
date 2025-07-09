@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"social-network/pkg/models"
 	"social-network/pkg/tools"
@@ -14,6 +15,7 @@ func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 	groupsMux = http.NewServeMux()
 
 	groupsMux.HandleFunc("POST /group/new", rt.NewGroup)
+	groupsMux.HandleFunc("GET /group/{id}", rt.GetGroup)
 	groupsMux.HandleFunc("POST /group/invite", rt.InviteToJoinGroup)
 	groupsMux.HandleFunc("POST /group/request", rt.RequestToJoinGroup)
 	groupsMux.HandleFunc("POST /group/accept-decline", rt.AcceptDeclineGroup)
@@ -32,7 +34,72 @@ func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 	return groupsMux
 }
 
-func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) { 
+// GetGroup retrieves a group by its ID
+func (rt *Root) GetGroup(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("GetGroup called")
+	groupID, err := strconv.Atoi(r.PathValue("id"))
+	if groupID <= 0 || err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Group ID not provided in request",
+			Metadata: map[string]any{
+				"ip":   r.RemoteAddr,
+				"path": r.URL.Path,
+			},
+		})
+		tools.RespondError(w, "Group ID is required", http.StatusBadRequest)
+		return
+	}
+	group := &models.Group{
+		ID: groupID,
+	}
+
+	err = rt.DL.Groups.GetGroupByID(group)
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to retrieve group from DB",
+			Metadata: map[string]any{
+				"group_id": groupID,
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"err":      err.Error(),
+			},
+		})
+		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// if group == nil {    // this will never be nil
+	// 	rt.DL.Logger.Log(models.LogEntry{
+	// 		Level:   "INFO",
+	// 		Message: "Group not found",
+	// 		Metadata: map[string]any{
+	// 			"group_id": groupID,
+	// 			"ip":       r.RemoteAddr,
+	// 			"path":     r.URL.Path,
+	// 		},
+	// 	})
+	// 	http.NotFound(w, r)
+	// 	return
+	// }
+
+	if err := tools.EncodeJSON(w, http.StatusOK, group); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to send group response",
+			Metadata: map[string]any{
+				"group_id": groupID,
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"err":      err.Error(),
+			},
+		})
+	}
+
+}
+
+func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 	var group *models.Group
 	if err := tools.DecodeJSON(r, &group); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -228,7 +295,6 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member inserted with pending join request status"})
-
 
 	// TODO Notify group creator
 	tools.EncodeJSON(w, http.StatusCreated, member.Status)

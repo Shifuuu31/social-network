@@ -4,49 +4,47 @@
       <img :src="group.image || '/default-group.jpg'" :alt="group.name" />
       <div class="group-privacy">
         <span :class="['privacy-badge', group.isPublic ? 'public' : 'private']">
-          {{ group.isPublic ? 'Public' : 'Privé' }}
+          {{ group.isPublic ? 'Public' : 'Private' }}
         </span>
       </div>
     </div>
-    
+
     <div class="group-content">
       <h3 class="group-name">{{ group.name }}</h3>
       <p class="group-description">{{ group.description }}</p>
-      
+
       <div class="group-stats">
         <span class="member-count">
           <span class="icon">👥</span>
-          {{ group.memberCount }} {{ group.memberCount === 1 ? 'membre' : 'membres' }}
+          {{ group.memberCount }} {{ group.memberCount === 1 ? 'member' : 'members' }}
         </span>
       </div>
-      
+
       <div class="group-actions">
-        <button 
-          class="btn btn-secondary btn-view"
-          @click="viewGroup"
-        >
+        <button class="btn btn-secondary btn-view" @click="viewGroup">
           <span class="icon">👁</span>
-          Voir
+          View
         </button>
         
-        <button 
-          v-if="!group.isMember"
-          class="btn btn-primary btn-join"
-          @click="handleJoin"
-          :disabled="isJoining"
-        >
+
+        <!-- Not a member -->
+        <button v-if="!group.isMember " class="btn btn-primary btn-join" @click="handleJoin"
+          :disabled="isJoining">
           <span class="icon">+</span>
-          {{ isJoining ? 'Rejoindre...' : 'Rejoindre' }}
+          {{ isJoining ? 'Joining...' : 'Join' }}
         </button>
-        
-        <button 
-          v-else
-          class="btn btn-primary btn-joined"
-          @click="handleLeave"
-          :disabled="isLeaving"
-        >
+
+        <!-- Pending request -->
+        <button v-else-if="group.isMember === 'requested' || group.isMember === 'invited'" class="btn btn-secondary btn-join" disabled>
+          <span class="icon">⏳</span>
+          waiting for approval
+        </button>
+
+        <!-- Already a member -->
+        <button v-else-if="group.isMember === 'member'" class="btn btn-primary btn-joined" @click="handleLeave"
+          :disabled="isLeaving">
           <span class="icon">✓</span>
-          {{ isLeaving ? 'Quitter...' : 'Membre' }}
+          {{ isLeaving ? 'Leaving...' : 'Member' }}
         </button>
       </div>
     </div>
@@ -54,6 +52,7 @@
 </template>
 
 <script setup>
+// TODO i need to check the visual design of the join button
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGroupsStore } from '@/stores/groups'

@@ -16,10 +16,10 @@
 
         <div class="filter-buttons">
           <button :class="['filter-btn', { active: activeFilter === 'all' }]" @click="setFilter('all')">
-            Tous les groupes
+            explore new groups
           </button>
           <button :class="['filter-btn', { active: activeFilter === 'joined' }]" @click="setFilter('joined')">
-            Mes groupes
+            My groups
           </button>
         </div>
       </div>
@@ -77,9 +77,10 @@ const filteredGroups = computed(() => {
 })
 
 // Watch for filter changes, but don't run immediately
-watch(activeFilter, (newFilter) => {
-  const filterType = newFilter === 'joined' ? 'user' : 'all'
-  groupsStore.fetchGroups(filterType)
+watch(activeFilter, () => {
+  // const filterType = newFilter === 'joined' ? 'user' : 'all'
+  // groupsStore.fetchGroups(filterType)
+  loadGroups()
 })
 
 const setFilter = (filter) => {

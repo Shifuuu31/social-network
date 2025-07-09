@@ -3,12 +3,12 @@
   <div class="groups-page">
     <div class="page-header">
       <div class="header-content">
-        <h1 class="page-title">Groupes</h1>
-        <p class="page-subtitle">Découvrez et rejoignez des communautés</p>
+        <h1 class="page-title">Groups</h1>
+        <p class="page-subtitle">Discover and join communities</p>
       </div>
       <button class="btn btn-create" @click="showCreateGroup = true">
         <i class="icon-plus"></i>
-        Créer un groupe
+        create a group
       </button>
     </div>
 
@@ -41,26 +41,26 @@
     <div class="groups-container">
       <div v-if="isLoading" class="loading-state">
         <div class="spinner"></div>
-        <p>Chargement des groupes...</p>
+        <p>Loading groups...</p>
       </div>
 
       <div v-else-if="error" class="error-state">
         <div class="error-icon">⚠️</div>
-        <h3>Erreur de chargement</h3>
+        <h3>Loading error</h3>
         <p>{{ error }}</p>
         <button class="btn btn-secondary" @click="loadGroups">
-          Réessayer
+          Retry
         </button>
       </div>
 
       <div v-else-if="filteredGroups.length === 0" class="empty-state">
         <div class="empty-icon">📭</div>
-        <h3>Aucun groupe trouvé</h3>
+        <h3>No groups found</h3>
         <p v-if="searchQuery">
-          Aucun groupe ne correspond à votre recherche "{{ searchQuery }}"
+          No groups match your search "{{ searchQuery }}"
         </p>
         <p v-else>
-          Il n'y a pas encore de groupes dans cette catégorie.
+          There are no groups in this category yet.
         </p>
       </div>
 

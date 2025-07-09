@@ -18,11 +18,13 @@ func (rt *Root) Router() (uh *http.ServeMux) {
 		usersHandler  = rt.NewUsersHandler()
 		groupsHandler = rt.NewGroupsHandler()
 		filesHandler  = rt.NewServeFilesHandler()
+		postsHandler  = rt.SetupPostRoutes()
 	)
 
 	mainMux := http.NewServeMux()
 
 	// Mount sub-muxes under prefixes
+	mainMux.Handle("/posts/", http.StripPrefix("/posts", postsHandler))
 	mainMux.Handle("/", http.StripPrefix("/ ", wsHanler))
 	mainMux.Handle("/auth/", http.StripPrefix("/auth", authMux))
 	mainMux.Handle("/users/", http.StripPrefix("/users", usersHandler))

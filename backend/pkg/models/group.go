@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -14,7 +15,7 @@ type Group struct {
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	ImgUUID     string    `json:"image_uuid"`
-	IsMember    bool      `json:"is_member"`   // Indicates if the user is a member of the group
+	IsMember    string    `json:"is_member"` // Indicates if the user is a member of the group
 	MemberCount int       `json:"member_count"`
 	CreatedAt   time.Time `json:"created_at"`
 }
@@ -135,15 +136,15 @@ func (gm *GroupModel) SearchGroups(search *SearchPayload) ([]*Group, error) {
 
 func (gm *GroupModel) GetGroupByID(group *Group) error {
 	query := `
-		SELECT g.id, g.creator_id, g.title, g.description, g.created_at,
+		SELECT g.id, g.creator_id, g.title, g.description,  g.image_uuid, g.created_at,
 		       COUNT(m.id) AS member_count
 		FROM groups g
 		LEFT JOIN group_members m ON g.id = m.group_id AND m.status = 'member'
-		WHERE g.id = ? AND g.creator_id = ?
+		WHERE g.id = ?
 		GROUP BY g.id
 	`
 
-	if err := gm.DB.QueryRow(query, group.ID, group.CreatorID).Scan(
+	if err := gm.DB.QueryRow(query, group.ID).Scan(
 		&group.ID, &group.CreatorID, &group.Title, &group.Description, &group.ImgUUID, &group.CreatedAt, &group.MemberCount,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -179,10 +180,18 @@ type GroupsPayload struct {
 
 func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 	var (
-		query string
-		args  []any
+		query  string
+		args   []any
+		userID int
+		err    error
 	)
 
+	if Groups.Type == "user" {
+		userID, err = strconv.Atoi(Groups.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("convert user_id to int: %w", err)
+		}
+	}
 	switch Groups.Type {
 	case "user":
 		if Groups.Start == -1 {
@@ -191,7 +200,7 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 			}
 		}
 		query = `
-			SELECT g.id, g.creator_id, g.title, g.description, g.image_uuid, g.created_at,
+			SELECT g.id, g.creator_id, g.title, g.description, g.image_uuid, g.created_at , 
        COUNT(m.id) AS member_count
 			FROM groups g
 			LEFT JOIN group_members m ON g.id = m.group_id AND m.status = 'member'
@@ -238,12 +247,14 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 			return nil, fmt.Errorf("scan group: %w", err)
 		}
 		// Check if the user is a member of the group
-		var isMember int
-		err = gm.DB.QueryRow(`SELECT COUNT(*) FROM group_members WHERE group_id = ? AND user_id = ?`, g.ID, g.ID).Scan(&isMember)
-		if err != nil {
-			return nil, fmt.Errorf("check group membership: %w", err)
+		if Groups.Type == "user" {
+			var isMember string
+			err = gm.DB.QueryRow(`SELECT status FROM group_members WHERE group_id = ? AND user_id = ?`, g.ID, userID).Scan(&isMember)
+			if err != nil {
+				return nil, fmt.Errorf("check group membership: %w", err)
+			}
+			g.IsMember = isMember
 		}
-		g.IsMember = isMember > 0
 		groups = append(groups, &g)
 	}
 	return groups, nil

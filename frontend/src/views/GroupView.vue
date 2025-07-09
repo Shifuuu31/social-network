@@ -1,233 +1,187 @@
 <template>
-  <div class="group-view" v-if="currentGroup">
+  <div class="group-view" v-if="groupsStore.currentGroup">
+    <!-- Header -->
     <div class="group-header">
       <div class="group-header-bg">
-        <img :src="currentGroup.image" :alt="currentGroup.name" />
+        <img :src="groupsStore.currentGroup.image" :alt="groupsStore.currentGroup.name" />
       </div>
       <div class="group-header-content">
         <div class="container">
           <div class="group-info">
-            <h1 class="group-name">{{ currentGroup.name }}</h1>
-            <p class="group-description">{{ currentGroup.description }}</p>
+            <h1 class="group-name">{{ groupsStore.currentGroup.name }}</h1>
+            <p class="group-description">{{ groupsStore.currentGroup.description }}</p>
             <div class="group-meta">
               <span class="member-count">
                 <span class="icon">👥</span>
-                {{ currentGroup.memberCount }} membres
+                {{ groupsStore.currentGroup.memberCount }} members
               </span>
-              
             </div>
-          </div>
-          <div class="group-actions">
-            <button 
-              v-if="!currentGroup.isMember"
-              class="btn btn-primary"
-              @click="handleJoinGroup"
-              :disabled="isJoining"
-            >
-              <span class="icon">+</span>
-              {{ isJoining ? 'Rejoindre...' : 'Rejoindre le groupe' }}
-            </button>
-            <button 
-              v-else
-              class="btn btn-secondary"
-              @click="handleLeaveGroup"
-              :disabled="isLeaving"
-            >
-              <span class="icon">✓</span>
-              {{ isLeaving ? 'Quitter...' : 'Membre' }}
-            </button>
-            <button class="btn btn-outline" @click="toggleInviteModal">
-              <span class="icon">📧</span>
-              Inviter
-            </button>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- Main Content Area -->
     <div class="group-content">
       <div class="container">
-        <div class="content-tabs">
-          <button 
-            :class="['tab-btn', { active: activeTab === 'posts' }]"
-            @click="setActiveTab('posts')"
-          >
-            Publications
-          </button>
-          <button 
-            :class="['tab-btn', { active: activeTab === 'events' }]"
-            @click="setActiveTab('events')"
-          >
-            Événements
-          </button>
-        </div>
-
-        <div class="tab-content">
-          <!-- Posts Tab -->
-          <div v-if="activeTab === 'posts'" class="posts-section">
-            <div class="create-post" v-if="currentGroup.isMember">
-              <div class="create-post-header">
-                <h3>Créer une publication</h3>
+        <div class="content-layout">
+          <!-- Sidebar -->
+          <div class="sidebar">
+            <div class="sidebar-section">
+              <h3>invite and leave buttons</h3>
+              <div class="sidebar-actions">
+                <button v-if="!groupsStore.currentGroup.isMember" class="btn btn-primary sidebar-btn"
+                  @click="handleJoinGroup" :disabled="isJoining">
+                  <span class="icon">+</span>
+                  {{ isJoining ? 'Joining...' : 'Join Group' }}
+                </button>
+                <button v-else class="btn btn-secondary sidebar-btn" @click="handleLeaveGroup" :disabled="isLeaving">
+                  <span class="icon">✓</span>
+                  {{ isLeaving ? 'Leaving...' : 'Member' }}
+                </button>
+                <button class="btn btn-outline sidebar-btn" @click="toggleInviteModal">
+                  <span class="icon">📧</span>
+                  Invite
+                </button>
               </div>
-              <form @submit.prevent="handleCreatePost" class="create-post-form">
-                <input 
-                  type="text" 
-                  v-model="newPost.title"
-                  placeholder="Titre de votre publication..."
-                  class="form-input"
-                  required
-                />
-                <textarea 
-                  v-model="newPost.content"
-                  placeholder="Partagez quelque chose avec le groupe..."
-                  class="form-textarea"
-                  rows="4"
-                  required
-                ></textarea>
-                <div class="form-actions">
-                  <button type="submit" class="btn btn-primary" :disabled="isCreatingPost">
-                    {{ isCreatingPost ? 'Publication...' : 'Publier' }}
-                  </button>
-                </div>
-              </form>
             </div>
 
-            <div class="posts-list">
-              <div v-if="isLoadingPosts" class="loading">
-                <div class="spinner"></div>
-                <p>Chargement des publications...</p>
-              </div>
-              <div v-else-if="groupPosts.length === 0" class="empty-state">
-                <div class="empty-icon">📝</div>
-                <h3>Aucune publication</h3>
-                <p v-if="currentGroup.isMember">Soyez le premier à publier quelque chose !</p>
-                <p v-else>Rejoignez le groupe pour voir et publier du contenu.</p>
-              </div>
-              <div v-else class="posts-grid">
-                <div v-for="post in groupPosts" :key="post.id" class="post-card">
-                  <div class="post-header">
-                    <img :src="post.authorAvatar" :alt="post.author" class="author-avatar" />
-                    <div class="post-meta">
-                      <h4 class="author-name">{{ post.author }}</h4>
-                      <span class="post-date">{{ formatDate(post.createdAt) }}</span>
-                    </div>
-                  </div>
-                  <div class="post-content">
-                    <h3 class="post-title">{{ post.title }}</h3>
-                    <p class="post-text">{{ post.content }}</p>
-                  </div>
-                  <div class="post-actions">
-                    
-                    <button class="post-action">
-                      <span class="icon">💬</span>
-                      {{ post.comments }}
-                    </button>
-                  </div>
-                </div>
+            <div class="sidebar-section">
+              <h3>sidebar where you toggle posts and events</h3>
+              <div class="sidebar-nav">
+                <button :class="['nav-btn', { active: activeTab === 'posts' }]" @click="setActiveTab('posts')">
+                  <span class="icon">📝</span>
+                  Posts
+                </button>
+                <button :class="['nav-btn', { active: activeTab === 'events' }]" @click="setActiveTab('events')">
+                  <span class="icon">📅</span>
+                  Events
+                </button>
               </div>
             </div>
           </div>
 
-          <!-- Events Tab -->
-          <div v-if="activeTab === 'events'" class="events-section">
-            <div class="create-event" v-if="currentGroup.isMember">
-              <div class="create-event-header">
-                <h3>Créer un événement</h3>
-              </div>
-              <form @submit.prevent="handleCreateEvent" class="create-event-form">
-                <input 
-                  type="text" 
-                  v-model="newEvent.title"
-                  placeholder="Titre de l'événement..."
-                  class="form-input"
-                  required
-                />
-                <textarea 
-                  v-model="newEvent.description"
-                  placeholder="Description de l'événement..."
-                  class="form-textarea"
-                  rows="3"
-                  required
-                ></textarea>
-                <div class="form-row">
-                  <input 
-                    type="datetime-local" 
-                    v-model="newEvent.date"
-                    class="form-input"
-                    required
-                  />
-                  <input 
-                    type="text" 
-                    v-model="newEvent.location"
-                    placeholder="Lieu de l'événement..."
-                    class="form-input"
-                    required
-                  />
-                </div>
-                <input 
-                  type="number" 
-                  v-model="newEvent.maxAttendees"
-                  placeholder="Nombre maximum de participants..."
-                  class="form-input"
-                  min="1"
-                  required
-                />
-                <div class="form-actions">
-                  <button type="submit" class="btn btn-primary" :disabled="isCreatingEvent">
-                    {{ isCreatingEvent ? 'Création...' : 'Créer l\'événement' }}
-                  </button>
-                </div>
-              </form>
+          <!-- Main Content -->
+          <div class="main-content">
+            <div class="content-header">
+              <h2>{{ activeTab === 'posts' ? 'Posts' : 'Events' }}</h2>
             </div>
 
-            <div class="events-list">
-              <div v-if="isLoadingEvents" class="loading">
-                <div class="spinner"></div>
-                <p>Chargement des événements...</p>
-              </div>
-              <div v-else-if="groupEvents.length === 0" class="empty-state">
-                <div class="empty-icon">📅</div>
-                <h3>Aucun événement</h3>
-                <p v-if="currentGroup.isMember">Créez le premier événement du groupe !</p>
-                <p v-else>Rejoignez le groupe pour voir et créer des événements.</p>
-              </div>
-              <div v-else class="events-grid">
-                <div v-for="event in groupEvents" :key="event.id" class="event-card">
-                  <div class="event-image" v-if="event.image">
-                    <img :src="event.image" :alt="event.title" />
+            <div class="tab-content">
+              <!-- Posts Tab -->
+              <div v-if="activeTab === 'posts'" class="posts-section">
+                <div class="create-post" v-if="groupsStore.currentGroup.isMember">
+                  <div class="create-post-header">
+                    <h3>create a post</h3>
                   </div>
-                  <div class="event-content">
-                    <h3 class="event-title">{{ event.title }}</h3>
-                    <p class="event-description">{{ event.description }}</p>
-                    <div class="event-details">
-                      <div class="event-detail">
-                        <span class="icon">📅</span>
-                        <span>{{ formatEventDate(event.date) }}</span>
+                  <form @submit.prevent="handleCreatePost" class="create-post-form">
+                    <input type="text" v-model="newPost.title" placeholder="Title of your post..." class="form-input"
+                      required />
+                    <textarea v-model="newPost.content" placeholder="Share something with the group..."
+                      class="form-textarea" rows="4" required></textarea>
+                    <div class="form-actions">
+                      <button type="submit" class="btn btn-primary" :disabled="isCreatingPost">
+                        {{ isCreatingPost ? 'Publishing...' : 'Publish' }}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                <div class="posts-list">
+                  <div v-if="isLoadingPosts" class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading posts...</p>
+                  </div>
+                  <div v-else-if="groupsStore.groupPosts.length === 0" class="empty-state">
+                    <div class="empty-icon">📝</div>
+                    <h3>No posts yet</h3>
+                    <p v-if="groupsStore.currentGroup.isMember">Be the first to share something!</p>
+                    <p v-else>Join the group to see and share content.</p>
+                  </div>
+                  <div v-else class="posts-grid">
+                    <div v-for="post in groupsStore.groupPosts" :key="post.id" class="post-card">
+                      <div class="post-header">
+                        <img :src="post.authorAvatar" :alt="post.author" class="author-avatar" />
+                        <div class="post-meta">
+                          <h4 class="author-name">{{ post.author }}</h4>
+                          <span class="post-date">{{ formatDate(post.createdAt) }}</span>
+                        </div>
                       </div>
-                      <div class="event-detail">
-                        <span class="icon">📍</span>
-                        <span>{{ event.location }}</span>
+                      <div class="post-content">
+                        <h3 class="post-title">{{ post.title }}</h3>
+                        <p class="post-text">{{ post.content }}</p>
                       </div>
-                      <div class="event-detail">
-                        <span class="icon">👥</span>
-                        <span>{{ event.attendees }}/{{ event.maxAttendees }} participants</span>
+                      <div class="post-actions">
+                        <button class="post-action">
+                          <span class="icon">💬</span>
+                          {{ post.comments }}
+                        </button>
                       </div>
                     </div>
-                    <div class="event-actions">
-                      <button 
-                        v-if="!event.isAttending && currentGroup.isMember"
-                        class="btn btn-primary btn-sm"
-                        @click="handleJoinEvent(event.id)"
-                      >
-                        Participer
+                  </div>
+                </div>
+              </div>
+
+              <!-- Events Tab -->
+              <div v-else-if="activeTab === 'events'" class="events-section">
+                <div class="create-event" v-if="groupsStore.currentGroup.isMember">
+                  <div class="create-event-header">
+                    <h3>create an event</h3>
+                  </div>
+                  <form @submit.prevent="handleCreateEvent" class="create-event-form">
+                    <input type="text" v-model="newEvent.title" placeholder="Event title..." class="form-input"
+                      required />
+                    <textarea v-model="newEvent.description" placeholder="Event description..." class="form-textarea"
+                      rows="3" required></textarea>
+                    <div class="form-row">
+                      <input type="datetime-local" v-model="newEvent.date" class="form-input" required />
+                      <input type="text" v-model="newEvent.location" placeholder="Location" class="form-input" />
+                    </div>
+                    <div class="form-actions">
+                      <button type="submit" class="btn btn-primary" :disabled="isCreatingEvent">
+                        {{ isCreatingEvent ? 'Creating...' : 'Create Event' }}
                       </button>
-                      <button 
-                        v-else-if="event.isAttending"
-                        class="btn btn-secondary btn-sm"
-                        @click="handleLeaveEvent(event.id)"
-                      >
-                        Je participe
-                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                <div class="events-list">
+                  <div v-if="isLoadingEvents" class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading events...</p>
+                  </div>
+                  <div v-else-if="groupsStore.groupEvents.length === 0" class="empty-state">
+                    <div class="empty-icon">📅</div>
+                    <h3>No events yet</h3>
+                    <p v-if="groupsStore.currentGroup.isMember">Create the first event!</p>
+                    <p v-else>Join the group to see and create events.</p>
+                  </div>
+                  <div v-else class="events-grid">
+                    <div v-for="event in groupsStore.groupEvents" :key="event.id" class="event-card">
+                      <div class="event-header">
+                        <div class="event-date">
+                          <span class="day">{{ formatEventDay(event.date) }}</span>
+                          <span class="month">{{ formatEventMonth(event.date) }}</span>
+                        </div>
+                        <div class="event-meta">
+                          <h4 class="event-title">{{ event.title }}</h4>
+                          <p class="event-time">{{ formatEventTime(event.date) }}</p>
+                          <p class="event-location" v-if="event.location">📍 {{ event.location }}</p>
+                        </div>
+                      </div>
+                      <div class="event-content">
+                        <p class="event-description">{{ event.description }}</p>
+                      </div>
+                      <div class="event-actions">
+                        <button class="event-action">
+                          <span class="icon">👥</span>
+                          {{ event.attendees || 0 }} attending
+                        </button>
+                        <button class="event-action btn-attend">
+                          <span class="icon">✓</span>
+                          Attend
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -246,27 +200,31 @@
           <button class="close-btn" @click="toggleInviteModal">×</button>
         </div>
         <div class="modal-body">
-          <p>Partagez ce lien pour inviter des personnes à rejoindre {{ currentGroup.name }} :</p>
+          <p>Partagez ce lien pour inviter des personnes à rejoindre {{ groupsStore.currentGroup.name }} :</p>
           <div class="invite-link">
-            <input 
-              type="text" 
-              :value="inviteLink" 
-              readonly 
-              class="invite-input"
-              ref="inviteLinkInput"
-            />
-            <button class="btn btn-primary" @click="copyInviteLink">
-              Copier
-            </button>
+            <input type="text" :value="inviteLink" readonly class="invite-input" ref="inviteLinkInput" />
           </div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- Loading state for the entire component -->
+  <div v-else-if="groupsStore.isLoading" class="loading">
+    <div class="spinner"></div>
+    <p>Loading group...</p>
+  </div>
+
+  <!-- Error state -->
+  <div v-else-if="groupsStore.error" class="error-state">
+    <h3>Error loading group</h3>
+    <p>{{ groupsStore.error }}</p>
+    <button class="btn btn-primary" @click="loadGroup">Retry</button>
+  </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGroupsStore } from '@/stores/groups'
 
@@ -292,11 +250,8 @@ const newEvent = reactive({
   title: '',
   description: '',
   date: '',
-  location: '',
-  maxAttendees: 50
+  location: ''
 })
-
-const { currentGroup, groupPosts, groupEvents } = groupsStore
 
 const inviteLink = computed(() => {
   return `${window.location.origin}/groups/${route.params.id}?invite=true`
@@ -304,103 +259,122 @@ const inviteLink = computed(() => {
 
 const setActiveTab = (tab) => {
   activeTab.value = tab
-  if (tab === 'posts' && groupPosts.length === 0) {
+  if (tab === 'posts' && groupsStore.groupPosts.length === 0) {
     loadPosts()
-  } else if (tab === 'events' && groupEvents.length === 0) {
+  } else if (tab === 'events' && groupsStore.groupEvents.length === 0) {
     loadEvents()
   }
 }
 
 const loadGroup = async () => {
-  const groupId = parseInt(route.params.id)
-  await groupsStore.fetchGroup(groupId)
+  try {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.fetchGroup(groupId)
+  } catch (error) {
+    console.error('Failed to load group:', error)
+  }
 }
 
 const loadPosts = async () => {
+  if (isLoadingPosts.value) return
+
   isLoadingPosts.value = true
-  await groupsStore.fetchGroupPosts(route.params.id)
-  isLoadingPosts.value = false
+  try {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.fetchGroupPosts(groupId)
+  } catch (error) {
+    console.error('Failed to load posts:', error)
+  } finally {
+    isLoadingPosts.value = false
+  }
 }
 
 const loadEvents = async () => {
+  if (isLoadingEvents.value) return
+
   isLoadingEvents.value = true
-  await groupsStore.fetchGroupEvents(route.params.id)
-  isLoadingEvents.value = false
+  try {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.fetchGroupEvents(groupId)
+  } catch (error) {
+    console.error('Failed to load events:', error)
+  } finally {
+    isLoadingEvents.value = false
+  }
 }
 
 const handleJoinGroup = async () => {
+  if (isJoining.value) return
+
   isJoining.value = true
   try {
-    console.log('Joining group:', route.params.id);
-    await groupsStore.requestJoinGroup(parseInt(route.params.id))
+    const groupId = parseInt(route.params.id)
+    await groupsStore.requestJoinGroup(groupId)
+  } catch (error) {
+    console.error('Failed to join group:', error)
   } finally {
     isJoining.value = false
   }
 }
 
 const handleLeaveGroup = async () => {
+  if (isLeaving.value) return
+
   isLeaving.value = true
   try {
-    await groupsStore.leaveGroup(parseInt(route.params.id))
+    const groupId = parseInt(route.params.id)
+    await groupsStore.leaveGroup(groupId)
+  } catch (error) {
+    console.error('Failed to leave group:', error)
   } finally {
     isLeaving.value = false
   }
 }
 
 const handleCreatePost = async () => {
+  if (isCreatingPost.value) return
+
   isCreatingPost.value = true
   try {
-    await groupsStore.createPost(route.params.id, {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.createPost(groupId, {
       title: newPost.title,
       content: newPost.content
     })
     newPost.title = ''
     newPost.content = ''
+  } catch (error) {
+    console.error('Failed to create post:', error)
   } finally {
     isCreatingPost.value = false
   }
 }
 
 const handleCreateEvent = async () => {
+  if (isCreatingEvent.value) return
+
   isCreatingEvent.value = true
   try {
-    await groupsStore.createEvent(route.params.id, {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.createEvent(groupId, {
       title: newEvent.title,
       description: newEvent.description,
       date: newEvent.date,
-      location: newEvent.location,
-      maxAttendees: parseInt(newEvent.maxAttendees)
+      location: newEvent.location
     })
     newEvent.title = ''
     newEvent.description = ''
     newEvent.date = ''
     newEvent.location = ''
-    newEvent.maxAttendees = 50
+  } catch (error) {
+    console.error('Failed to create event:', error)
   } finally {
     isCreatingEvent.value = false
   }
 }
 
-const handleJoinEvent = (eventId) => {
-  // console.log('Joining event:', eventId)
-  // Implement event joining logic
-}
-
-const handleLeaveEvent = (eventId) => {
-  // console.log('Leaving event:', eventId)
-  // Implement event leaving logic
-}
-
 const toggleInviteModal = () => {
   showInviteModal.value = !showInviteModal.value
-}
-
-const copyInviteLink = () => {
-  if (inviteLinkInput.value) {
-    inviteLinkInput.value.select()
-    document.execCommand('copy')
-    // Show success message
-  }
 }
 
 const formatDate = (dateString) => {
@@ -414,21 +388,38 @@ const formatDate = (dateString) => {
   })
 }
 
-const formatEventDate = (dateString) => {
+const formatEventDay = (dateString) => {
   const date = new Date(dateString)
-  return date.toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  return date.getDate()
 }
+
+const formatEventMonth = (dateString) => {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('fr-FR', { month: 'short' })
+}
+
+const formatEventTime = (dateString) => {
+  const date = new Date(dateString)
+  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
+// Watch for route changes to reload data
+watch(
+  () => route.params.id,
+  async (newId) => {
+    if (newId) {
+      await loadGroup()
+      await loadPosts()
+      await loadEvents()
+    }
+  },
+  { immediate: false }
+)
 
 onMounted(async () => {
   await loadGroup()
   await loadPosts()
+  // await loadEvents()
 })
 </script>
 
@@ -439,7 +430,7 @@ onMounted(async () => {
 
 .group-header {
   position: relative;
-  height: 300px;
+  height: 250px;
   overflow: hidden;
 }
 
@@ -466,29 +457,25 @@ onMounted(async () => {
   display: flex;
   align-items: end;
   padding: 40px 20px;
-  background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
 }
 
 .container {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 40px;
 }
 
 .group-info {
-  flex: 1;
+  text-align: center;
 }
 
 .group-name {
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: 700;
   color: #fff;
   margin-bottom: 10px;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .group-description {
@@ -500,6 +487,7 @@ onMounted(async () => {
 
 .group-meta {
   display: flex;
+  justify-content: center;
   gap: 15px;
   align-items: center;
   flex-wrap: wrap;
@@ -512,70 +500,99 @@ onMounted(async () => {
   color: #ccc;
 }
 
-.privacy-badge {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.privacy-badge.public {
-  background: rgba(34, 197, 94, 0.2);
-  color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.3);
-}
-
-.privacy-badge.private {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.group-actions {
-  display: flex;
-  gap: 12px;
-}
-
 .group-content {
   padding: 40px 20px;
 }
 
-.content-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 30px;
-  border-bottom: 2px solid #333;
+.content-layout {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 40px;
 }
 
-.tab-btn {
-  padding: 12px 24px;
-  background: none;
+.sidebar {
+  background: #1a1a1a;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #333;
+  height: fit-content;
+  position: sticky;
+  top: 20px;
+}
+
+.sidebar-section {
+  margin-bottom: 30px;
+}
+
+.sidebar-section:last-child {
+  margin-bottom: 0;
+}
+
+.sidebar-section h3 {
+  color: #fff;
+  font-size: 0.9rem;
+  margin-bottom: 15px;
+  text-transform: lowercase;
+  font-weight: 500;
+}
+
+.sidebar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-btn {
+  width: 100%;
+  justify-content: flex-start;
+  font-size: 0.85rem;
+  padding: 10px 16px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: transparent;
   border: none;
   color: #ccc;
   cursor: pointer;
-  font-weight: 500;
+  border-radius: 8px;
   transition: all 0.2s ease;
-  position: relative;
+  font-size: 0.9rem;
+  text-align: left;
 }
 
-.tab-btn:hover {
+.nav-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
 
-.tab-btn.active {
+.nav-btn.active {
+  background: rgba(139, 92, 246, 0.2);
   color: #8b5cf6;
 }
 
-.tab-btn.active::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #8b5cf6;
+.main-content {
+  flex: 1;
+}
+
+.content-header {
+  margin-bottom: 30px;
+}
+
+.content-header h2 {
+  color: #fff;
+  font-size: 2rem;
+  margin: 0;
+  font-weight: 600;
 }
 
 .create-post,
@@ -607,7 +624,8 @@ onMounted(async () => {
 }
 
 .form-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
 
@@ -725,49 +743,97 @@ onMounted(async () => {
   color: #fff;
 }
 
-.event-image {
+.event-header {
+  display: flex;
+  gap: 16px;
   margin-bottom: 15px;
-  border-radius: 8px;
-  overflow: hidden;
 }
 
-.event-image img {
-  width: 100%;
-  height: 150px;
-  object-fit: cover;
+.event-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(139, 92, 246, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 60px;
+}
+
+.event-date .day {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #8b5cf6;
+}
+
+.event-date .month {
+  font-size: 0.8rem;
+  color: #8b5cf6;
+  text-transform: uppercase;
+}
+
+.event-meta {
+  flex: 1;
 }
 
 .event-title {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 600;
   color: #fff;
-  margin: 0 0 8px 0;
+  margin: 0 0 4px 0;
+}
+
+.event-time {
+  font-size: 0.9rem;
+  color: #ccc;
+  margin: 0 0 4px 0;
+}
+
+.event-location {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0;
 }
 
 .event-description {
   color: #ccc;
-  margin-bottom: 15px;
   line-height: 1.5;
-}
-
-.event-details {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 15px;
-}
-
-.event-detail {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #ccc;
-  font-size: 0.9rem;
+  margin: 0 0 15px 0;
 }
 
 .event-actions {
   display: flex;
-  justify-content: flex-end;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.event-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: color 0.2s ease;
+}
+
+.event-action:hover {
+  color: #fff;
+}
+
+.btn-attend {
+  background: rgba(139, 92, 246, 0.2);
+  color: #8b5cf6;
+  padding: 8px 16px;
+  border-radius: 6px;
+}
+
+.btn-attend:hover {
+  background: rgba(139, 92, 246, 0.3);
+  color: #fff;
 }
 
 .btn {
@@ -780,7 +846,7 @@ onMounted(async () => {
   text-decoration: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   justify-content: center;
   font-size: 0.9rem;
 }
@@ -788,11 +854,6 @@ onMounted(async () => {
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-.btn-sm {
-  padding: 8px 16px;
-  font-size: 0.85rem;
 }
 
 .btn-primary {
@@ -842,8 +903,13 @@ onMounted(async () => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .empty-state {
@@ -864,6 +930,21 @@ onMounted(async () => {
 
 .empty-state p {
   color: #ccc;
+}
+
+.error-state {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.error-state h3 {
+  color: #ef4444;
+  margin-bottom: 10px;
+}
+
+.error-state p {
+  color: #ccc;
+  margin-bottom: 20px;
 }
 
 .modal-overlay {
@@ -944,25 +1025,37 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .container {
-    flex-direction: column;
-    align-items: flex-start;
+  .content-layout {
+    grid-template-columns: 1fr;
     gap: 20px;
   }
-  
+
+  .sidebar {
+    position: static;
+    order: 2;
+  }
+
+  .main-content {
+    order: 1;
+  }
+
   .group-name {
     font-size: 2rem;
   }
-  
-  .group-actions {
-    width: 100%;
-    justify-content: center;
+
+  .sidebar-actions {
+    flex-direction: row;
+    gap: 8px;
   }
-  
+
+  .sidebar-btn {
+    flex: 1;
+  }
+
   .form-row {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
-  
+
   .invite-link {
     flex-direction: column;
   }
