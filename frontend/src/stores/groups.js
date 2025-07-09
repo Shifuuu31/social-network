@@ -59,13 +59,14 @@ export const useGroupsStore = defineStore('groups', () => {
       groupId: apiEvent.group_id,
       title: apiEvent.title,
       description: apiEvent.description,
-      date: apiEvent.date_time,
-      location: apiEvent.location,
-      attendees: apiEvent.attendees_count || 0,
-      maxAttendees: apiEvent.max_attendees || 0,
-      image: apiEvent.image_uuid ? `${API_BASE}/images/${apiEvent.image_uuid}` : '/default-event.jpg',
-      organizer: apiEvent.organizer_name,
-      isAttending: apiEvent.is_attending || false
+      date: apiEvent.event_time,
+      location: null, // Not available in current backend model
+      attendees: apiEvent.vote_count || 0,
+      maxAttendees: null, // Not available in current backend model
+      image: null, // Not available in current backend model
+      organizer: null, // Not available in current backend model
+      isAttending: false, // Would need to be fetched separately
+      createdAt: apiEvent.created_at
     }
   }
 
@@ -195,7 +196,11 @@ export const useGroupsStore = defineStore('groups', () => {
     error.value = null
 
     try {
-      const response = await fetch(`${API_BASE}/groups/group/${groupId}/events`)
+      const response = await fetch(`${API_BASE}/groups/group/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ group_id: groupId, start: 1, n_items: 20})
+      })
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -296,9 +301,7 @@ export const useGroupsStore = defineStore('groups', () => {
           group_id: groupId,
           title: eventData.title,
           description: eventData.description,
-          date_time: eventData.date,
-          location: eventData.location,
-          max_attendees: eventData.maxAttendees
+          event_time: eventData.date
         })
       })
 
@@ -429,6 +432,45 @@ export const useGroupsStore = defineStore('groups', () => {
     error.value = null
   }
 
+  const attendEvent = async (eventId, voteType = 'going') => {
+    error.value = null
+
+    try {
+      const response = await fetch(`${API_BASE}/groups/group/event/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: eventId,
+          user_id: 1, // TODO: Replace with actual user ID
+          vote: voteType
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || 'Failed to vote on event')
+      }
+
+      const data = await response.json()
+
+      // Update the event in the local state
+      const eventIndex = groupEvents.value.findIndex(event => event.id === eventId)
+      if (eventIndex !== -1) {
+        groupEvents.value[eventIndex] = {
+          ...groupEvents.value[eventIndex],
+          attendees: groupEvents.value[eventIndex].attendees + (voteType === 'going' ? 1 : -1),
+          isAttending: voteType === 'going'
+        }
+      }
+
+      return data
+    } catch (err) {
+      error.value = err.message
+      console.error('Error voting on event:', err)
+      throw err
+    }
+  }
+
   return {
     // State
     groups,
@@ -453,6 +495,7 @@ export const useGroupsStore = defineStore('groups', () => {
     createEvent,
     requestJoinGroup,
     leaveGroup,
+    attendEvent,
     clearError
   }
 })

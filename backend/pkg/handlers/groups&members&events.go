@@ -16,6 +16,7 @@ func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 
 	groupsMux.HandleFunc("POST /group/new", rt.NewGroup)
 	groupsMux.HandleFunc("GET /group/{id}", rt.GetGroup)
+	groupsMux.HandleFunc("POST /group/events", rt.GetGroupEvents)
 	groupsMux.HandleFunc("POST /group/invite", rt.InviteToJoinGroup)
 	groupsMux.HandleFunc("POST /group/request", rt.RequestToJoinGroup)
 	groupsMux.HandleFunc("POST /group/accept-decline", rt.AcceptDeclineGroup)
@@ -592,6 +593,88 @@ func (rt *Root) EventVote(w http.ResponseWriter, r *http.Request) {
 				"ip":   r.RemoteAddr,
 				"path": r.URL.Path,
 				"err":  err.Error(),
+			},
+		})
+	}
+}
+
+// GetGroupEvents retrieves events for a specific group
+func (rt *Root) GetGroupEvents(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("GetGroupEvents called")
+	// groupID, err := strconv.Atoi(r.PathValue("id"))
+	payload := &models.EventsPayload{}
+	if err := tools.DecodeJSON(r, &payload); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to decode new vote JSON",
+			Metadata: map[string]any{
+				"ip":   r.RemoteAddr,
+				"path": r.URL.Path,
+				"err":  err.Error(),
+			},
+		})
+		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if payload.GroupID <= 0 {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Group ID not provided in request",
+			Metadata: map[string]any{
+				"ip":   r.RemoteAddr,
+				"path": r.URL.Path,
+			},
+		})
+		tools.RespondError(w, "Group ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Create payload for fetching events
+	// payload := &models.EventsPayload{
+	// 	GroupID:    strconv.Itoa(groupID),
+	// 	Start:      -1, // Get latest events
+	// 	NumOfItems: 20,
+	// }
+
+	
+
+	events, err := rt.DL.Events.GetEventsByGroup(payload)
+	fmt.Println("Retrieved events:", events)
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to retrieve events from DB",
+			Metadata: map[string]any{
+				"group_id": payload.GroupID,
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"err":      err.Error(),
+			},
+		})
+		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "INFO",
+		Message: "Events retrieved successfully",
+		Metadata: map[string]any{
+			"group_id": payload.GroupID,
+			"count":    len(events),
+			"ip":       r.RemoteAddr,
+			"path":     r.URL.Path,
+		},
+	})
+
+	if err := tools.EncodeJSON(w, http.StatusOK, events); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to send events response",
+			Metadata: map[string]any{
+				"group_id": payload.GroupID,
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"err":      err.Error(),
 			},
 		})
 	}

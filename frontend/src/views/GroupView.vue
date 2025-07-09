@@ -177,7 +177,7 @@
                           <span class="icon">👥</span>
                           {{ event.attendees || 0 }} attending
                         </button>
-                        <button class="event-action btn-attend">
+                        <button class="event-action btn-attend" @click="handleAttendEvent(event.id)">
                           <span class="icon">✓</span>
                           Attend
                         </button>
@@ -375,6 +375,14 @@ const handleCreateEvent = async () => {
 
 const toggleInviteModal = () => {
   showInviteModal.value = !showInviteModal.value
+}
+
+const handleAttendEvent = async (eventId) => {
+  try {
+    await groupsStore.attendEvent(eventId, 'going')
+  } catch (error) {
+    console.error('Failed to attend event:', error)
+  }
 }
 
 const formatDate = (dateString) => {

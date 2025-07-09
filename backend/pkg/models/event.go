@@ -112,18 +112,26 @@ func (em *EventModel) DeleteEvent(eventID int) error {
 }
 
 type EventsPayload struct {
-	GroupID    string `json:"group_id"`
-	Start      int    `json:"star"`
-	NumOfItems int    `json:"n_items"`
+	GroupID    int `json:"group_id"`
+	Start      int `json:"start"`
+	NumOfItems int `json:"n_items"`
 }
 
 // GetEventsByGroup returns paginated events for a group.
 func (em *EventModel) GetEventsByGroup(payload *EventsPayload) ([]*Event, error) {
+	var maxid sql.NullInt32
 	if payload.Start == -1 {
-		if err := em.DB.QueryRow(`SELECT MAX(id) FROM events WHERE group_id = ?`, payload.GroupID).Scan(&payload.Start); err != nil {
+		if err := em.DB.QueryRow(`SELECT MAX(id) FROM events WHERE group_id = ?`, payload.GroupID).Scan(&maxid); err != nil {
+			fmt.Println("Error getting max event id:", err)
 			return nil, fmt.Errorf("get max event id: %w", err)
 		}
+
+		payload.Start = int(maxid.Int32)
+		if payload.Start == 0 {
+			payload.Start = 2147483647 // max int32 value
+		}
 	}
+	fmt.Println("Fetching events for group:", payload.GroupID, "starting from ID:", payload.Start, "limit:", payload.NumOfItems)
 
 	query := `
 		SELECT e.id, e.group_id, e.title, e.description, e.event_time, e.created_at,
@@ -131,7 +139,7 @@ func (em *EventModel) GetEventsByGroup(payload *EventsPayload) ([]*Event, error)
 		FROM events e
 		LEFT JOIN event_votes ev ON e.id = ev.event_id
 		WHERE e.group_id = ? AND e.id <= ?
-		GROUP BY e.id false,
+		GROUP BY e.id
 		ORDER BY e.id DESC
 		LIMIT ?
 	`
