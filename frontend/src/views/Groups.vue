@@ -92,13 +92,13 @@ const loadGroups = async () => {
   await groupsStore.fetchGroups(filterType)
 }
 
-const handleGroupJoined = (groupId) => {
-  // console.log(`Joined group ${groupId}`)
-}
+// const handleGroupJoined = (groupId) => {
+//   // console.log(`Joined group ${groupId}`)
+// }
 
-const handleGroupLeft = (groupId) => {
-  // console.log(`Left group ${groupId}`)
-}
+// const handleGroupLeft = (groupId) => {
+//   // console.log(`Left group ${groupId}`)
+// }
 
 onMounted(() => {
   loadGroups()

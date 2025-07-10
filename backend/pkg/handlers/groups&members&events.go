@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -19,7 +20,7 @@ func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 	groupsMux.HandleFunc("POST /group/events", rt.GetGroupEvents)
 	groupsMux.HandleFunc("POST /group/invite", rt.InviteToJoinGroup)
 	groupsMux.HandleFunc("POST /group/request", rt.RequestToJoinGroup)
-	groupsMux.HandleFunc("POST /group/accept-decline", rt.AcceptDeclineGroup) //TODO: ws
+	groupsMux.HandleFunc("POST /group/accept-decline", rt.AcceptDeclineGroup) // TODO: ws
 	groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups)
 	groupsMux.HandleFunc("POST /group/event", rt.NewEvent)
 	groupsMux.HandleFunc("POST /group/event/vote", rt.EventVote)
@@ -125,7 +126,6 @@ func (rt *Root) GetGroup(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 	}
-
 }
 
 func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
@@ -166,7 +166,10 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group input validated"})
 
 	// generate a unique uuid
-	group.ImgUUID = uuid.NewString()
+	group.ImgUUID = sql.NullString{
+		String: uuid.NewString(),
+		Valid:  true,
+	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "img uuid generated successfully"})
 
 	// insert group into db
