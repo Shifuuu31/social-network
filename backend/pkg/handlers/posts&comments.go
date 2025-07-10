@@ -204,7 +204,10 @@ func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	// imagePath="asd/sad/sd"
-	fmt.Println(post.OwnerId, post.GroupId, post.Content, imagePath, post.Privacy)
+	if post.Privacy == "almost_private" {
+		post.Privacy = "followers"
+	}
+	fmt.Println("gggggggggggggggggggergregergergerggg",post.OwnerId, post.GroupId, post.Content, imagePath, post.Privacy)
 	// Insert post
 
 	result, err := tx.Exec(`
@@ -212,7 +215,7 @@ func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 		VALUES (?,?,?,?,?, ?)`,
 		post.OwnerId, post.GroupId, post.Content, imagePath, post.Privacy, time.Now())
 	if err != nil {
-		log.Printf("Error inserting post: %v", err)
+		log.Printf("Error inserting post cause: %v", err)
 		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{
 			"error": "Failed to create post",
 		})

@@ -120,10 +120,10 @@ func (pfl *PostFilter) Validate() error {
 	return nil
 }
 
- func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
+func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 	var query string
 	var rows *sql.Rows
-	
+
 	// Debug: Print the filter details
 	fmt.Printf("=== DEBUG GetPosts ===\n")
 	fmt.Printf("Filter Type: %s\n", filter.Type)
@@ -147,8 +147,8 @@ func (pfl *PostFilter) Validate() error {
             WHERE posts.group_id = ? AND posts.privacy = '' AND posts.id > ?
             ORDER BY posts.id ASC
             LIMIT ?`
-		
-		fmt.Printf("Executing GROUP query with params: groupId=%d, start=%d, limit=%d\n", 
+
+		fmt.Printf("Executing GROUP query with params: groupId=%d, start=%d, limit=%d\n",
 			filter.Id, filter.Start, filter.NPost)
 		rows, err = pm.DB.Query(query, filter.Id, filter.Start, filter.NPost)
 
@@ -177,8 +177,8 @@ func (pfl *PostFilter) Validate() error {
               AND posts.id > ?
             ORDER BY posts.id DESC
             LIMIT ?`
-		
-		fmt.Printf("Executing PRIVACY query with params: userId=%d, userId=%d, start=%d, limit=%d\n", 
+
+		fmt.Printf("Executing PRIVACY query with params: userId=%d, userId=%d, start=%d, limit=%d\n",
 			filter.Id, filter.Id, filter.Start, filter.NPost)
 		rows, err = pm.DB.Query(query, filter.Id, filter.Id, filter.Start, filter.NPost)
 
@@ -195,7 +195,7 @@ func (pfl *PostFilter) Validate() error {
                 GROUP BY post_id
             ) comment_counts ON CAST(posts.id as TEXT) = comment_counts.post_id
             WHERE posts.id = ?`
-		
+
 		fmt.Printf("Executing SINGLE query with params: postId=%d\n", filter.Id)
 		rows, err = pm.DB.Query(query, filter.Id)
 
@@ -221,36 +221,69 @@ func (pfl *PostFilter) Validate() error {
 			WHERE posts.privacy = 'public'
 			ORDER BY posts.created_at DESC
 			LIMIT ? OFFSET ?`
-		
-		fmt.Printf("Executing PUBLIC query with params: limit=%d, offset=%d\n", 
+
+		fmt.Printf("Executing PUBLIC query with params: limit=%d, offset=%d\n",
 			filter.NPost, filter.Start)
 		fmt.Printf("Full query: %s\n", query)
 		rows, err = pm.DB.Query(query, filter.NPost, filter.Start)
-		
+
 		// Additional debug: Check row count before processing
 		if err == nil {
 			fmt.Printf("Query executed without error, starting to process rows...\n")
 		}
-	
+
+	case "followers":
+		fmt.Printf("saaaaaaaaaaaaaaaaaaaaabr ")
+		query = `
+			SELECT 
+				posts.id, 
+				posts.user_id, 
+				users.nickname, 
+				posts.group_id,
+				posts.content,
+ 				posts.privacy, 
+				posts.created_at,
+				COALESCE(comment_counts.reply_count, 0) as replies
+			FROM posts
+			JOIN users ON posts.user_id = users.id
+			LEFT JOIN (
+				SELECT post_id, COUNT(*) as reply_count
+				FROM comments
+				GROUP BY post_id
+			) comment_counts ON posts.id = comment_counts.post_id
+			LEFT JOIN follows 
+				ON follows.followee_id = posts.user_id 
+				AND follows.follower_id = ? 
+				AND follows.status = 'accepted'
+			WHERE
+			  posts.privacy = 'public'
+			  OR (posts.privacy = 'followers' AND (follows.follower_id IS NOT NULL OR posts.user_id = ?))
+			ORDER BY posts.created_at DESC
+			LIMIT ?
+		`
+		fmt.Printf("Executing FEED/FOLLOWERS query with params: userId=%d, userId=%d, limit=%d\n",
+			filter.Id, filter.Id, filter.NPost)
+		rows, err = pm.DB.Query(query, filter.Id, filter.Id, filter.NPost)
+
 	default:
 		fmt.Printf("ERROR: Unknown filter type: %s\n", filter.Type)
 		return nil, fmt.Errorf("unknown filter type: %s", filter.Type)
 	}
-	
+
 	// Debug: Check for query errors
 	if err != nil {
 		fmt.Printf("ERROR: Query execution failed: %v\n", err)
 		fmt.Printf("Query was: %s\n", query)
 		return nil, err
 	}
-	
+
 	fmt.Printf("Query executed successfully\n")
 	defer rows.Close()
 
 	postCount := 0
 	for rows.Next() {
 		var post Post
-		
+
 		err := rows.Scan(
 			&post.Id,
 			&post.OwnerId,
@@ -262,16 +295,16 @@ func (pfl *PostFilter) Validate() error {
 			&post.CreatedAt,
 			&post.Replies,
 		)
-		
+
 		if err != nil {
 			fmt.Printf("ERROR: Failed to scan row %d: %v\n", postCount, err)
 			return nil, err
 		}
-		
+
 		postCount++
-		fmt.Printf("Post %d: ID=%d, Owner=%s, Content=%.50s...\n", 
+		fmt.Printf("Post %d: ID=%d, Owner=%s, Content=%.50s...\n",
 			postCount, post.Id, post.Owner, post.Content)
-		
+
 		posts = append(posts, post)
 	}
 
@@ -287,7 +320,6 @@ func (pfl *PostFilter) Validate() error {
 
 	return posts, nil
 }
- 
 
 func ParsePostFromForm(r *http.Request, post *Post) int {
 	var err error
