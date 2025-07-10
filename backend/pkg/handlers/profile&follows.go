@@ -12,6 +12,7 @@ func (rt *Root) NewUsersHandler() (usersMux *http.ServeMux) {
 	usersMux = http.NewServeMux()
 
 	usersMux.HandleFunc("POST /profile/info", rt.ProfileInfo)
+	usersMux.HandleFunc("GET /profile/users", rt.Users)
 	usersMux.HandleFunc("POST /profile/activity", rt.ProfileActivity)
 	usersMux.HandleFunc("POST /profile/followers", rt.ProfileFollowers)
 	usersMux.HandleFunc("POST /profile/following", rt.ProfileFollowing)
@@ -21,7 +22,51 @@ func (rt *Root) NewUsersHandler() (usersMux *http.ServeMux) {
 
 	return usersMux
 }
+func (rt *Root) Users(w http.ResponseWriter, r *http.Request) {
+	// requesterID := rt.DL.GetRequesterID(w, r)
+	requesterID := 1
 
+	users, err := rt.DL.Users.GetAllUsers()
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to fetch all users",
+			Metadata: map[string]any{
+				"requester_id": requesterID,
+				"ip":           r.RemoteAddr,
+				"path":         r.URL.Path,
+				"error":        err.Error(),
+			},
+		})
+		tools.RespondError(w, "Failed to fetch users", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tools.EncodeJSON(w, http.StatusOK, users); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to send users response",
+			Metadata: map[string]any{
+				"requester_id": requesterID,
+				"ip":           r.RemoteAddr,
+				"path":         r.URL.Path,
+				"error":        err.Error(),
+			},
+		})
+		return
+	}
+
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "INFO",
+		Message: "Users list sent successfully",
+		Metadata: map[string]any{
+			"requester_id": requesterID,
+			"user_count":   len(users),
+			"ip":           r.RemoteAddr,
+			"path":         r.URL.Path,
+		},
+	})
+}
 func (rt *Root) ProfileAccess(w http.ResponseWriter, r *http.Request, targetUser *models.User) bool {
 	requesterID := rt.DL.GetRequesterID(w, r)
 

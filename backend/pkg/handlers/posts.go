@@ -208,8 +208,8 @@ func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 	// Insert post
 
 	result, err := tx.Exec(`
-		INSERT INTO posts (user_id, group_id, content, image_url,privacy,created_at)
-		VALUES (?,?,?,?,?, ?)`,
+		INSERT INTO posts (user_id, group_id, content, image_uuid,privacy,created_at)
+		VALUES (?,?,?,?,?,?)`,
 		post.OwnerId, post.GroupId, post.Content, imagePath, post.Privacy, time.Now())
 	if err != nil {
 		log.Printf("Error inserting post: %v", err)

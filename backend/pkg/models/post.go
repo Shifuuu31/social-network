@@ -46,6 +46,7 @@ func (post *Post) Validate() error {
 		"public":         true,
 		"almost_private": true,
 		"private":        true,
+		"group":         true,
 	}
 	if !validPrivacyLevels[post.Privacy] {
 		return errors.New("invalid privacy value; must be 'public', 'almost_private', or 'private'")

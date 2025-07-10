@@ -126,7 +126,7 @@ func (um *UserModel) ValidateCredentials(user *User) error {
 	}
 	// Compare hashed password with input
 	if err := bcrypt.CompareHashAndPassword(user.PasswordHash, []byte(user.Password)); err != nil {
-		return fmt.Errorf("Invalid password: %w", err)
+		return fmt.Errorf("invalid password: %w", err)
 	}
 
 	return nil
@@ -225,4 +225,40 @@ func (um *UserModel) GetUserByID(user *User) error {
 		return fmt.Errorf("get user by id: %w", err)
 	}
 	return nil
+}
+
+// Add this method to your Users data layer struct
+func (u *UserModel) GetAllUsers() ([]*User, error) {
+	query := `
+		SELECT id, first_name, last_name, image_uuid
+		FROM users
+		ORDER BY first_name ASC
+	`
+
+	rows, err := u.DB.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*User
+	for rows.Next() {
+		user := &User{}
+		err := rows.Scan(
+			&user.ID,
+			&user.FirstName,
+			&user.LastName,
+			&user.ImgUUID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan user: %w", err)
+		}
+		users = append(users, user)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating users: %w", err)
+	}
+
+	return users, nil
 }

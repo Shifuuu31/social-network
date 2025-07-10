@@ -178,7 +178,7 @@ export const useGroupsStore = defineStore('groups', () => {
       const transformedPosts = Array.isArray(data) ? data.map(transformPostData) : []
 
       // Clear previous posts and set new ones
-      groupPosts.value = transformedPosts
+      groupPosts.value = transformedPosts.reverse()
       
       return transformedPosts
     } catch (err) {
@@ -261,11 +261,14 @@ export const useGroupsStore = defineStore('groups', () => {
     error.value = null
 
     try {
-      const response = await fetch(`${API_BASE}/groups/group/${groupId}/post`, {
+      const response = await fetch(`${API_BASE}/posts/new`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: postData.title,
+          privacy: "group",
+          group_id: groupId,
+          owner_id: 1, // TODO Replace with actual user ID from context or store
+          // title: postData.title,
           content: postData.content
         })
       })
@@ -536,6 +539,34 @@ export const useGroupsStore = defineStore('groups', () => {
     }
   }
 
+  
+
+  const inviteUserToGroup = async (groupId, userId) => {
+    error.value = null
+    try {
+      const response = await fetch(`${API_BASE}/groups/group/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          group_id: groupId,
+          user_id: userId,
+          status: 'invited',
+          prev_status: 'none'
+        })
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || 'Failed to invite user')
+      }
+      // Optionally update local state if needed
+      return true
+    } catch (err) {
+      error.value = err.message
+      console.error('Error inviting user to group:', err)
+      throw err
+    }
+  }
+
   return {
     // State
     groups,
@@ -561,6 +592,7 @@ export const useGroupsStore = defineStore('groups', () => {
     requestJoinGroup,
     leaveGroup,
     attendEvent,
-    clearError
+    clearError,
+    inviteUserToGroup
   }
 })

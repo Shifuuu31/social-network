@@ -223,18 +223,52 @@
     <!-- Invite Modal -->
     <div v-if="showInviteModal" class="modal-overlay" @click="toggleInviteModal">
       <div class="modal-content" @click.stop>
-        <div class="modal-header">
+        <!-- <div class="modal-header">
           <h3>Inviter des personnes</h3>
           <button class="close-btn" @click="toggleInviteModal">×</button>
-        </div>
+        </div> -->
         <div class="modal-body">
-          <p>Partagez ce lien pour inviter des personnes à rejoindre {{ groupsStore.currentGroup.name }} :</p>
-          <div class="invite-link">
-            <input type="text" :value="inviteLink" readonly class="invite-input" ref="inviteLinkInput" />
+          <input v-model="userSearch" @input="fetchUsers" placeholder="Search users by name or nickname..."
+            class="form-input" />
+          <div v-if="isLoadingUsers" class="loading">
+            <div class="spinner"></div>Loading users...
           </div>
+          <div v-else-if="usersList.length === 0" class="empty-state">No users found.</div>
+          <ul v-else class="user-list">
+            <li v-for="user in usersList" :key="user.id" class="user-list-item">
+              <span>{{ user.nickname }} ({{ user.first_name }} {{ user.last_name }})</span>
+              <button class="btn btn-primary btn-sm" @click="inviteUser(+user.id)"
+                :disabled="invitedUserIds.includes(user.id)">
+                {{ invitedUserIds.includes(user.id) ? 'Invited' : 'Invite' }}
+              </button>
+            </li>
+          </ul>
         </div>
       </div>
     </div>
+
+    <!-- Invite Users Modal -->
+    <!-- <div v-if="showInviteUsersModal" class="modal-overlay" @click="toggleInviteUsersModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Invite Users to Group</h3>
+          <button class="close-btn" @click="toggleInviteUsersModal">×</button>
+        </div>
+        <div class="modal-body">
+          <input v-model="userSearch" @input="fetchUsers" placeholder="Search users by name or nickname..." class="form-input" />
+          <div v-if="isLoadingUsers" class="loading"><div class="spinner"></div>Loading users...</div>
+          <div v-else-if="usersList.length === 0" class="empty-state">No users found.</div>
+          <ul v-else class="user-list">
+            <li v-for="user in usersList" :key="user.id" class="user-list-item">
+              <span>{{ user.nickname }} ({{ user.first_name }} {{ user.last_name }})</span>
+              <button class="btn btn-primary btn-sm" @click="inviteUser(user.id)" :disabled="invitedUserIds.includes(user.id)">
+                {{ invitedUserIds.includes(user.id) ? 'Invited' : 'Invite' }}
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div> -->
   </div>
 
   <!-- Loading state for the entire component -->
@@ -251,13 +285,14 @@
   </div>
 </template>
 
-<script setup>
+<!-- <script setup>
 import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGroupsStore } from '@/stores/groups'
 
 const route = useRoute()
 const groupsStore = useGroupsStore()
+// useGroupsStore.
 
 const activeTab = ref('posts')
 const isJoining = ref(false)
@@ -267,7 +302,12 @@ const isCreatingEvent = ref(false)
 const isLoadingPosts = ref(false)
 const isLoadingEvents = ref(false)
 const showInviteModal = ref(false)
-const inviteLinkInput = ref(null)
+// const inviteLinkInput = ref(null)
+const showInviteUsersModal = ref(false)
+const userSearch = ref("")
+const usersList = ref([])
+const isLoadingUsers = ref(false)
+const invitedUserIds = ref([])
 
 const newPost = reactive({
   title: '',
@@ -331,6 +371,15 @@ const loadEvents = async () => {
   }
 }
 
+
+const handleAttendEvent = async (eventId, voteType) => {
+  try {
+    await groupsStore.attendEvent(eventId, voteType)
+  } catch (error) {
+    console.error('Failed to attend event:', error)
+  }
+}
+
 const handleJoinGroup = async () => {
   if (isJoining.value) return
 
@@ -345,19 +394,19 @@ const handleJoinGroup = async () => {
   }
 }
 
-const handleLeaveGroup = async () => {
-  if (isLeaving.value) return
+// const handleLeaveGroup = async () => {
+//   if (isLeaving.value) return
 
-  isLeaving.value = true
-  try {
-    const groupId = parseInt(route.params.id)
-    await groupsStore.leaveGroup(groupId)
-  } catch (error) {
-    console.error('Failed to leave group:', error)
-  } finally {
-    isLeaving.value = false
-  }
-}
+//   isLeaving.value = true
+//   try {
+//     const groupId = parseInt(route.params.id)
+//     await groupsStore.leaveGroup(groupId)
+//   } catch (error) {
+//     console.error('Failed to leave group:', error)
+//   } finally {
+//     isLeaving.value = false
+//   }
+// }
 
 const handleAcceptInvite = async () => {
   if (isJoining.value) return
@@ -423,11 +472,42 @@ const toggleInviteModal = () => {
   showInviteModal.value = !showInviteModal.value
 }
 
-const handleAttendEvent = async (eventId, voteType) => {
+const toggleInviteUsersModal = () => {
+  showInviteUsersModal.value = !showInviteUsersModal.value
+  if (showInviteUsersModal.value) {
+    userSearch.value = ""
+    usersList.value = []
+    invitedUserIds.value = []
+    console.log('khwi')
+  }
+  fetchUsers()
+}
+
+async function fetchUsers() {
+  isLoadingUsers.value = true
   try {
-    await groupsStore.attendEvent(eventId, voteType)
-  } catch (error) {
-    console.error('Failed to attend event:', error)
+    // You may want to implement a real search API; for now, fetch all users or by search
+    const response = await fetch(`/profile/user`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
+    })
+    if (!response.ok) throw new Error('Failed to fetch users')
+    usersList.value = await response.json()
+  } catch (e) {
+    usersList.value = []
+  } finally {
+    isLoadingUsers.value = false
+  }
+}
+
+const inviteUser = async (userId) => {
+  try {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.inviteUserToGroup(groupId, userId)
+    invitedUserIds.value.push(userId)
+  } catch (e) {
+    // Optionally show error
   }
 }
 
@@ -478,8 +558,288 @@ onMounted(async () => {
     await loadEvents()
   }
 })
-</script>
+</script> -->
 
+
+<script setup>
+import { ref, reactive, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { useGroupsStore } from '@/stores/groups'
+// import { debounce } from 'lodash-es'
+
+const route = useRoute()
+const groupsStore = useGroupsStore()
+
+// State
+const activeTab = ref('posts')
+const isJoining = ref(false)
+const isCreatingPost = ref(false)
+const isCreatingEvent = ref(false)
+const isLoadingPosts = ref(false)
+const isLoadingEvents = ref(false)
+const showInviteModal = ref(false)
+const userSearch = ref('')
+const usersList = ref([])
+const isLoadingUsers = ref(false)
+const invitedUserIds = ref([])
+
+// Form data
+const newPost = reactive({
+  title: '',
+  content: ''
+})
+
+const newEvent = reactive({
+  title: '',
+  description: '',
+  date: '',
+})
+
+// Debounced user search
+// const debouncedFetchUsers = debounce(fetchUsers, 300)
+
+// Methods
+const setActiveTab = (tab) => {
+  activeTab.value = tab
+  if (tab === 'posts' && groupsStore.groupPosts.length === 0) {
+    loadPosts()
+  } else if (tab === 'events' && groupsStore.groupEvents.length === 0) {
+    loadEvents()
+  }
+}
+
+const loadGroup = async () => {
+  try {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.fetchGroup(groupId)
+  } catch (error) {
+    console.error('Failed to load group:', error)
+  }
+}
+
+const loadPosts = async () => {
+  if (isLoadingPosts.value) return
+
+  isLoadingPosts.value = true
+  try {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.fetchGroupPosts(groupId)
+  } catch (error) {
+    console.error('Failed to load posts:', error)
+  } finally {
+    isLoadingPosts.value = false
+  }
+}
+
+const loadEvents = async () => {
+  if (isLoadingEvents.value) return
+
+  isLoadingEvents.value = true
+  try {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.fetchGroupEvents(groupId)
+  } catch (error) {
+    console.error('Failed to load events:', error)
+  } finally {
+    isLoadingEvents.value = false
+  }
+}
+
+const handleAttendEvent = async (eventId, voteType) => {
+  try {
+    await groupsStore.attendEvent(eventId, voteType)
+  } catch (error) {
+    console.error('Failed to attend event:', error)
+  }
+}
+
+const handleJoinGroup = async () => {
+  if (isJoining.value) return
+
+  isJoining.value = true
+  try {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.requestJoinGroup(groupId)
+  } catch (error) {
+    console.error('Failed to join group:', error)
+  } finally {
+    isJoining.value = false
+  }
+}
+
+const handleAcceptInvite = async () => {
+  if (isJoining.value) return
+
+  isJoining.value = true
+  try {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.acceptGroupInvite(groupId)
+    await loadGroup()
+  } catch (error) {
+    console.error('Failed to accept invite:', error)
+  } finally {
+    isJoining.value = false
+  }
+}
+
+const handleCreatePost = async () => {
+  if (isCreatingPost.value) return
+
+  isCreatingPost.value = true
+  try {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.createPost(groupId, {
+      title: newPost.title,
+      content: newPost.content
+    })
+    newPost.title = ''
+    newPost.content = ''
+  } catch (error) {
+    console.error('Failed to create post:', error)
+  } finally {
+    isCreatingPost.value = false
+  }
+}
+
+const handleCreateEvent = async () => {
+  if (isCreatingEvent.value) return
+
+  isCreatingEvent.value = true
+  try {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.createEvent(groupId, {
+      title: newEvent.title,
+      description: newEvent.description,
+      date: newEvent.date,
+    })
+    newEvent.title = ''
+    newEvent.description = ''
+    newEvent.date = ''
+  } catch (error) {
+    console.error('Failed to create event:', error)
+  } finally {
+    isCreatingEvent.value = false
+  }
+}
+
+const toggleInviteModal = () => {
+  showInviteModal.value = !showInviteModal.value
+  if (showInviteModal.value) {
+    userSearch.value = ''
+    usersList.value = []
+    invitedUserIds.value = []
+    fetchAllUsers() // Add this new function
+  }
+}
+
+// Add this new function
+const fetchAllUsers = async () => {
+  isLoadingUsers.value = true
+  try {
+    const response = await fetch(`/api/users/profile/users`, { 
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      // credentials: 'include'
+    })
+    if (!response.ok) throw new Error('Failed to fetch users')
+    usersList.value = await response.json()
+  } catch (e) {
+    console.error('Error fetching users:', e)
+    usersList.value = []
+  } finally {
+    isLoadingUsers.value = false
+  }
+}
+
+async function fetchUsers() {
+  if (!userSearch.value.trim()) {
+    usersList.value = []
+    return
+  }
+
+  isLoadingUsers.value = true
+  try {
+    const response = await fetch(`/api/users/search?q=${encodeURIComponent(userSearch.value)}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
+    })
+
+    if (!response.ok) throw new Error('Failed to fetch users')
+
+    const data = await response.json()
+    usersList.value = data.users || data // Handle different response formats
+  } catch (e) {
+    console.error('Error fetching users:', e)
+    usersList.value = []
+  } finally {
+    isLoadingUsers.value = false
+  }
+}
+
+const inviteUser = async (userId) => {
+  try {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.inviteUserToGroup(groupId, userId)
+    invitedUserIds.value.push(userId)
+  } catch (e) {
+    console.error('Error inviting user:', e)
+  }
+}
+
+// Formatting helpers
+const formatDate = (dateString) => {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('default', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+const formatEventDay = (dateString) => {
+  const date = new Date(dateString)
+  return date.getDate()
+}
+
+const formatEventMonth = (dateString) => {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('fr-FR', { month: 'short' })
+}
+
+const formatEventTime = (dateString) => {
+  const date = new Date(dateString)
+  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
+// Watchers
+watch(
+  () => route.params.id,
+  async (newId) => {
+    if (newId) {
+      await loadGroup()
+      await loadPosts()
+      await loadEvents()
+    }
+  },
+  { immediate: false }
+)
+
+watch(userSearch, () => {
+  fetchUsers()
+})
+
+// Lifecycle hooks
+onMounted(async () => {
+  await loadGroup()
+  await loadPosts()
+  if (activeTab.value === 'events') {
+    await loadEvents()
+  }
+})
+</script>
 <style scoped>
 .group-view {
   min-height: 100vh;
@@ -1135,6 +1495,25 @@ onMounted(async () => {
 
 .icon {
   font-size: 1rem;
+}
+
+.user-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.user-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #333;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.85rem;
 }
 
 @media (max-width: 768px) {
