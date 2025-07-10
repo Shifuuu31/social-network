@@ -1,4 +1,6 @@
 // api.js
+import { useAuth } from '../composables/useAuth.js';
+
 const API_BASE_URL = '/post';
 const HEADERS = {
   JSON: { 'Content-Type': 'application/json' }
@@ -11,6 +13,14 @@ const HEADERS = {
  */
 export async function createPost(postData) {
   console.log("Creating post with data:", postData);
+
+  // Fetch current user before creating post
+  const { fetchCurrentUser, user } = useAuth();
+  const userFetched = await fetchCurrentUser();
+  
+  if (!userFetched) {
+    throw new Error('Failed to fetch current user. Please ensure you are logged in.');
+  }
 
   const url = `${API_BASE_URL}/new`;
   let response;
@@ -27,8 +37,7 @@ export async function createPost(postData) {
     } else {
       // Handle regular JSON payload
       const bodyPayload = {
-        // ownerId: postData.ownerId,
-      owner_id:1,
+        owner_id: user.value.id, // Use current user's ID
         group_id: postData.groupId || undefined,
         content: postData.content,
         privacy: postData.privacy,
@@ -62,18 +71,19 @@ export async function createPost(postData) {
  * @returns {FormData}
  */
 function buildFormData(postData) {
+  const { user } = useAuth();
   const formData = new FormData();
-  formData.append('ownerId', postData.ownerId);
+  formData.append('owner_id', user.value.id); // Use current user's ID
   
   if (postData.groupId !== null && postData.groupId !== undefined) {
-    formData.append('groupId', postData.groupId);
+    formData.append('group_id', postData.groupId);
   }
 
   formData.append('content', postData.content);
   formData.append('privacy', postData.privacy);
 
   // if (postData.privacy === 'private' && Array.isArray(postData.chosenUsersIds)) {
-  //   postData.chosenUsersIds.forEach(id => formData.append('chosenUsersIds', id));
+  //   postData.chosenUsersIds.forEach(id => formData.append('chosen_users_ids', id));
   // }
 
   if (postData.imageFile) {

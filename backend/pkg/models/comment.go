@@ -13,6 +13,7 @@ type Comment struct {
 	Id        int    `json:"id"`
 	Post_id   int    `json:"post_id"`
 	OwnerId   int    `json:"owner_id"`
+	Owner     string `json:"owner"`
 	Content   string `json:"content"`
 	Image     string `json:"image"`
 	CreatedAt string `json:"created_at"`
@@ -30,24 +31,32 @@ type CommentFilter struct {
 func (app *CommentModel) GetComments(postId int) ([]Comment, error) {
 	comments := []Comment{}
 	comment := Comment{}
-	rows, err := app.DB.Query("SELECT * FROM comments where post_id = ?", postId)
-	//  rows.Scan(&comment.Id, &comment.OwnerId, &comment.Post_id, &comment.Content, &comment.Image, &comment.Created_at)
+	
+	// Join with users table to get the owner's name
+	query := `
+		SELECT c.id, c.user_id, c.post_id, c.content, c.image_url, c.created_at, 
+		       COALESCE(NULLIF(u.nickname, ''), u.first_name || ' ' || u.last_name) as owner
+		FROM comments c
+		LEFT JOIN users u ON c.user_id = u.id
+		WHERE c.post_id = ?
+		ORDER BY c.created_at ASC
+	`
+	
+	rows, err := app.DB.Query(query, postId)
 	if err != nil {
 		log.Printf("Error fetching comments for post %d: %v", postId, err)
 		return nil, fmt.Errorf("failed to fetch comments for post %d: %w", postId, err)
 	}
 	defer rows.Close()
-	i := 0
+	
 	for rows.Next() {
-
-		if err := rows.Scan(&comment.Id, &comment.OwnerId, &comment.Post_id, &comment.Content, &comment.Image, &comment.CreatedAt); err != nil {
+		if err := rows.Scan(&comment.Id, &comment.OwnerId, &comment.Post_id, &comment.Content, &comment.Image, &comment.CreatedAt, &comment.Owner); err != nil {
 			log.Printf("Error scanning comment: %v", err)
 			continue
 		}
-		i++
 		comments = append(comments, comment)
-		// fmt.Println(comment)
 	}
+	
 	if err := rows.Err(); err != nil {
 		log.Printf("Error iterating over comments: %v", err)
 		return nil, fmt.Errorf("error iterating over comments: %w", err)

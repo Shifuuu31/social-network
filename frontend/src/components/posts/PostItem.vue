@@ -3,13 +3,13 @@
     <div class="post-header">
       <div class="post-author">
         <img
-          :src="post.author?.avatar || '/default-avatar.png'"
-          :alt="post.author?.name || 'User'"
+          :src="'/default-avatar.png'"
+          :alt="post.owner || 'User'"
           class="avatar"
         >
         <div class="author-info">
-          <h4 class="author-name">{{ post.author?.name || 'Anonymous' }}</h4>
-          <span class="post-time">{{ formatDate(post.createdAt) }}</span>
+          <h4 class="author-name">{{ post.owner || 'Anonymous' }}</h4>
+          <span class="post-time">{{ formatDate(post.created_at) }}</span>
         </div>
       </div>
     </div>
@@ -106,13 +106,17 @@
         >
           <img
             :src="comment.author?.avatar || '/default-avatar.png'"
-            :alt="comment.author?.name || 'User'"
+            :alt="comment.owner || 'User'"
             class="comment-avatar"
           >
           <div class="comment-content">
             <div class="comment-header">
-              <span class="comment-author">{{ comment.author?.name || 'Anonymous' }}</span>
-              <span class="comment-time">{{ formatDate(comment.createdAt) }}</span>
+              <span class="comment-author">{{ comment.owner || 'Anonymous' }}</span>
+              <span class="comment-time">{{ formatDate(comment.created_at) }}</span>
+            </div>
+            <!-- DEBUG: Show the full comment object -->
+            <div style="font-size: 10px; color: #999; margin-top: 5px;">
+              DEBUG: {{ JSON.stringify(comment) }}
             </div>
             <p class="comment-text">{{ comment.content }}</p>
             <img 
@@ -203,6 +207,7 @@ async function toggleComments() {
   try {
     // Fixed: Match your backend route structure
     const response = await fetch(`/post/${props.post.id}/comments`)
+    console.log("response", response)
     
     if (!response.ok) {
       throw new Error('Failed to load comments')

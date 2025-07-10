@@ -472,6 +472,18 @@ func (app *Root) NewComment(w http.ResponseWriter, r *http.Request) {
 	comment.Image = imagePath
 	comment.CreatedAt = time.Now().Format("2006-01-02 15:04:05")
 
+	// Fetch the owner's name for the response
+	var ownerName string
+	err = app.DL.Comments.DB.QueryRow(`
+		SELECT COALESCE(NULLIF(nickname, ''), first_name || ' ' || last_name) as owner_name
+		FROM users WHERE id = ?
+	`, comment.OwnerId).Scan(&ownerName)
+	if err != nil {
+		log.Printf("Error fetching owner name: %v", err)
+		ownerName = "Unknown User"
+	}
+	comment.Owner = ownerName
+
 	// Return the created comment
 	tools.EncodeJSON(w, http.StatusCreated, map[string]interface{}{
 		"message": "Comment created successfully",
