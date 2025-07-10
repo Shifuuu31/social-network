@@ -30,7 +30,7 @@ export const useGroupsStore = defineStore('groups', () => {
       id: apiGroup.id,
       name: apiGroup.title,
       description: apiGroup.description,
-      image: apiGroup.image_uuid ? `${API_BASE}/images/${apiGroup.image_uuid}` : '/default-group.jpg',
+      image: apiGroup.image_uuid.Valid ? `${API_BASE}/images/${apiGroup.image_uuid.String}` : '/default-group.jpg',
       isPublic: true,
       memberCount: apiGroup.member_count || 0,
       isMember: apiGroup.is_member || '',
@@ -46,7 +46,7 @@ export const useGroupsStore = defineStore('groups', () => {
       title: apiPost.title,
       content: apiPost.content,
       author: apiPost.author_name,
-      authorAvatar: apiPost.author_avatar ? `${API_BASE}/images/${apiPost.author_avatar}` : '/default-avatar.jpg',
+      authorAvatar: apiPost.author_avatar.Valid ? `${API_BASE}/images/${apiPost.author_avatar.String}` : '/default-avatar.jpg',
       createdAt: apiPost.created_at,
       likes: apiPost.likes_count || 0,
       comments: apiPost.comments_count || 0
@@ -78,8 +78,8 @@ export const useGroupsStore = defineStore('groups', () => {
     error.value = null
 
     const temp = filter === 'user'
-      ? JSON.stringify({ user_id: '1', start: -1, n_items: 20, type: filter })
-      : JSON.stringify({ start: -1, n_items: 20, type: filter })
+      ? JSON.stringify({ user_id: '1', n_items: 20, type: filter })
+      : JSON.stringify({  n_items: 20, type: filter })
     
     try {
       const response = await fetch(`${API_BASE}/groups/group/browse`, {
@@ -167,7 +167,7 @@ export const useGroupsStore = defineStore('groups', () => {
       const response = await fetch(`${API_BASE}/posts/feed`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: groupId, type: 'group', start: 1, n_post: 20 })
+        body: JSON.stringify({ id: groupId, type: 'group', start: {Int32:1, Valid:true}, n_post: 20 })
       })
 
       if (!response.ok) {
@@ -198,7 +198,7 @@ export const useGroupsStore = defineStore('groups', () => {
       const response = await fetch(`${API_BASE}/groups/group/events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ group_id: groupId, start: -1, n_items: 20})
+        body: JSON.stringify({ group_id: groupId, n_items: 20})
       })
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -227,7 +227,7 @@ export const useGroupsStore = defineStore('groups', () => {
       const apiGroupData = {
         title: groupData.name,
         description: groupData.description,
-        image_uuid: groupData.image || '',
+        image_uuid: {String:groupData.image}|| {Valid:false},
       }
 
       const response = await fetch(`${API_BASE}/groups/group/new`, {

@@ -24,7 +24,7 @@ type User struct {
 	FirstName    string    `json:"first_name"`
 	LastName     string    `json:"last_name"`
 	DateOfBirth  time.Time `json:"date_of_birth"`
-	ImgUUID      string    `json:"image_uuid"`
+	ImgUUID      sql.NullString    `json:"image_uuid"`
 	Nickname     string    `json:"nickname"`
 	AboutMe      string    `json:"about_me"`
 	IsPublic     bool      `json:"is_public"`
@@ -44,7 +44,10 @@ func Validate(r *http.Request) (User, error) {
 		Password:  r.FormValue("password"),
 		FirstName: strings.TrimSpace(r.FormValue("first_name")),
 		LastName:  strings.TrimSpace(r.FormValue("last_name")),
-		ImgUUID:   strings.TrimSpace(r.FormValue("image_uuid")),
+		ImgUUID: sql.NullString{
+			String:   strings.TrimSpace(r.FormValue("image_uuid")),
+			Valid: true,
+		},
 		Nickname:  strings.TrimSpace(r.FormValue("nickname")),
 		AboutMe:   strings.TrimSpace(r.FormValue("about_me")),
 	}
@@ -81,7 +84,7 @@ func Validate(r *http.Request) (User, error) {
 	}
 	user.DateOfBirth = dob
 
-	if err := uuid.Validate(strings.Split(user.ImgUUID, ".")[0]); err != nil {
+	if err := uuid.Validate(strings.Split(user.ImgUUID.String, ".")[0]); err != nil {
 		return User{}, err
 	}
 

@@ -14,7 +14,7 @@ type Group struct {
 	CreatorID   int       `json:"creator_id"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
-	ImgUUID     string    `json:"image_uuid"`
+	ImgUUID     sql.NullString    `json:"image_uuid"`
 	IsMember    string    `json:"is_member"` // Indicates if the user is a member of the group
 	MemberCount int       `json:"member_count"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -172,7 +172,7 @@ func (gm *GroupModel) IsUserCreator(groupID, userID int) error {
 
 type GroupsPayload struct {
 	UserID     string `json:"user_id"`
-	Start      int    `json:"start"`
+	Start      sql.NullInt32  `json:"start"`
 	NumOfItems int    `json:"n_items"`
 	Type       string `json:"type"`
 }
@@ -198,7 +198,7 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 
 	switch Groups.Type {
 	case "user":
-		if Groups.Start == -1 {
+		if !Groups.Start.Valid {
 			if err := gm.DB.QueryRow(`
 				SELECT MAX(g.id) 
 				FROM groups g 
@@ -222,7 +222,7 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 		args = []any{Groups.UserID, Groups.UserID, Groups.Start, Groups.NumOfItems}
 
 	case "all":
-		if Groups.Start == -1 {
+		if !Groups.Start.Valid {
 			if err := gm.DB.QueryRow(`SELECT MAX(id) FROM groups`).Scan(&Groups.Start); err != nil {
 				return nil, fmt.Errorf("get max group id: %w", err)
 			}
