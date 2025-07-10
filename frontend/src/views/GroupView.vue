@@ -28,18 +28,38 @@
           <!-- Sidebar -->
           <div class="sidebar">
             <div class="sidebar-section">
-              <h3>invite and leave buttons</h3>
+              <h3>invite </h3>
               <div class="sidebar-actions">
+                <!-- Not a member -->
                 <button v-if="!groupsStore.currentGroup.isMember" class="btn btn-primary sidebar-btn"
                   @click="handleJoinGroup" :disabled="isJoining">
                   <span class="icon">+</span>
                   {{ isJoining ? 'Joining...' : 'Join Group' }}
                 </button>
-                <button v-else class="btn btn-secondary sidebar-btn" @click="handleLeaveGroup" :disabled="isLeaving">
-                  <span class="icon">✓</span>
-                  {{ isLeaving ? 'Leaving...' : 'Member' }}
+
+                <!-- Requested to join -->
+                <button v-else-if="groupsStore.currentGroup.isMember === 'requested'" class="btn btn-grey sidebar-btn"
+                  disabled>
+                  <span class="icon">⏳</span>
+                  Request Sent
                 </button>
-                <button class="btn btn-outline sidebar-btn" @click="toggleInviteModal">
+
+                <!-- Invited to join -->
+                <button v-else-if="groupsStore.currentGroup.isMember === 'invited'" class="btn btn-grey sidebar-btn"
+                  @click="handleAcceptInvite" :disabled="isJoining">
+                  <span class="icon">📨</span>
+                  {{ isJoining ? 'Accepting...' : 'Accept Invite' }}
+                </button>
+
+                <!-- Full member -->
+                <button v-else-if="groupsStore.currentGroup.isMember === 'member'"
+                  class="btn btn-success sidebar-btn desactivated">
+                  <span class="icon">✓</span>
+                  Member
+                </button>
+
+                <button v-if="groupsStore.currentGroup.isMember === 'member'" class="btn btn-outline sidebar-btn"
+                  @click="toggleInviteModal">
                   <span class="icon">📧</span>
                   Invite
                 </button>
@@ -70,7 +90,7 @@
             <div class="tab-content">
               <!-- Posts Tab -->
               <div v-if="activeTab === 'posts'" class="posts-section">
-                <div class="create-post" v-if="groupsStore.currentGroup.isMember">
+                <div class="create-post" v-if="groupsStore.currentGroup.isMember === 'member'">
                   <div class="create-post-header">
                     <h3>create a post</h3>
                   </div>
@@ -95,7 +115,7 @@
                   <div v-else-if="groupsStore.groupPosts.length === 0" class="empty-state">
                     <div class="empty-icon">📝</div>
                     <h3>No posts yet</h3>
-                    <p v-if="groupsStore.currentGroup.isMember">Be the first to share something!</p>
+                    <p v-if="groupsStore.currentGroup.isMember === 'member'">Be the first to share something!</p>
                     <p v-else>Join the group to see and share content.</p>
                   </div>
                   <div v-else class="posts-grid">
@@ -124,7 +144,7 @@
 
               <!-- Events Tab -->
               <div v-else-if="activeTab === 'events'" class="events-section">
-                <div class="create-event" v-if="groupsStore.currentGroup.isMember">
+                <div class="create-event" v-if="groupsStore.currentGroup.isMember === 'member'">
                   <div class="create-event-header">
                     <h3>create an event</h3>
                   </div>
@@ -135,7 +155,7 @@
                       rows="3" required></textarea>
                     <div class="form-row">
                       <input type="datetime-local" v-model="newEvent.date" class="form-input" required />
-                      <input type="text" v-model="newEvent.location" placeholder="Location" class="form-input" />
+                      <!-- <input type="text" v-model="newEvent.location" placeholder="Location" class="form-input" /> -->
                     </div>
                     <div class="form-actions">
                       <button type="submit" class="btn btn-primary" :disabled="isCreatingEvent">
@@ -153,7 +173,7 @@
                   <div v-else-if="groupsStore.groupEvents.length === 0" class="empty-state">
                     <div class="empty-icon">📅</div>
                     <h3>No events yet</h3>
-                    <p v-if="groupsStore.currentGroup.isMember">Create the first event!</p>
+                    <p v-if="groupsStore.currentGroup.isMember === 'member'">Create the first event!</p>
                     <p v-else>Join the group to see and create events.</p>
                   </div>
                   <div v-else class="events-grid">
@@ -166,7 +186,7 @@
                         <div class="event-meta">
                           <h4 class="event-title">{{ event.title }}</h4>
                           <p class="event-time">{{ formatEventTime(event.date) }}</p>
-                          <p class="event-location" v-if="event.location">📍 {{ event.location }}</p>
+                          <!-- <p class="event-location" v-if="event.location">📍 {{ event.location }}</p> -->
                         </div>
                       </div>
                       <div class="event-content">
@@ -177,10 +197,18 @@
                           <span class="icon">👥</span>
                           {{ event.attendees || 0 }} attending
                         </button>
-                        <button class="event-action btn-attend" @click="handleAttendEvent(event.id)">
-                          <span class="icon">✓</span>
-                          Attend
-                        </button>
+                        <div class="event-buttons">
+                          <button class="event-action btn-attend" @click="handleAttendEvent(event.id, 'going')"
+                            :class="{ active: event.isAttending === 'going' }">
+                            <span class="icon">✓</span>
+                            Going
+                          </button>
+                          <button class="event-action btn-not-attend" @click="handleAttendEvent(event.id, 'not_going')"
+                            :class="{ active: event.isAttending === 'not_going' }">
+                            <span class="icon">✗</span>
+                            Not Going
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -250,12 +278,12 @@ const newEvent = reactive({
   title: '',
   description: '',
   date: '',
-  location: ''
+  // location: ''
 })
 
-const inviteLink = computed(() => {
-  return `${window.location.origin}/groups/${route.params.id}?invite=true`
-})
+// const inviteLink = computed(() => {
+//   return `${window.location.origin}/groups/${route.params.id}?invite=true`
+// })
 
 const setActiveTab = (tab) => {
   activeTab.value = tab
@@ -331,6 +359,22 @@ const handleLeaveGroup = async () => {
   }
 }
 
+const handleAcceptInvite = async () => {
+  if (isJoining.value) return
+
+  isJoining.value = true
+  try {
+    const groupId = parseInt(route.params.id)
+    await groupsStore.acceptGroupInvite(groupId)
+    // Reload group data after accepting invite
+    await loadGroup()
+  } catch (error) {
+    console.error('Failed to accept invite:', error)
+  } finally {
+    isJoining.value = false
+  }
+}
+
 const handleCreatePost = async () => {
   if (isCreatingPost.value) return
 
@@ -360,12 +404,14 @@ const handleCreateEvent = async () => {
       title: newEvent.title,
       description: newEvent.description,
       date: newEvent.date,
-      location: newEvent.location
     })
+
+    // Clear form
     newEvent.title = ''
     newEvent.description = ''
     newEvent.date = ''
-    newEvent.location = ''
+
+    // No need to reload events since createEvent already updates the store
   } catch (error) {
     console.error('Failed to create event:', error)
   } finally {
@@ -377,9 +423,9 @@ const toggleInviteModal = () => {
   showInviteModal.value = !showInviteModal.value
 }
 
-const handleAttendEvent = async (eventId) => {
+const handleAttendEvent = async (eventId, voteType) => {
   try {
-    await groupsStore.attendEvent(eventId, 'going')
+    await groupsStore.attendEvent(eventId, voteType)
   } catch (error) {
     console.error('Failed to attend event:', error)
   }
@@ -427,7 +473,10 @@ watch(
 onMounted(async () => {
   await loadGroup()
   await loadPosts()
-  // await loadEvents()
+  // Load events if we're starting on the events tab
+  if (activeTab.value === 'events') {
+    await loadEvents()
+  }
 })
 </script>
 
@@ -797,11 +846,7 @@ onMounted(async () => {
   margin: 0 0 4px 0;
 }
 
-.event-location {
-  font-size: 0.85rem;
-  color: #666;
-  margin: 0;
-}
+
 
 .event-description {
   color: #ccc;
@@ -844,6 +889,53 @@ onMounted(async () => {
   color: #fff;
 }
 
+.btn-attend.active {
+  background: #8b5cf6;
+  color: #fff;
+}
+
+.btn-not-attend {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  padding: 8px 16px;
+  border-radius: 6px;
+}
+
+.btn-not-attend:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fff;
+}
+
+.btn-not-attend.active {
+  background: #ef4444;
+  color: #fff;
+}
+
+.event-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-accent {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+}
+
+.btn-accent:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  transform: translateY(-1px);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+}
+
 .btn {
   padding: 12px 24px;
   border-radius: 8px;
@@ -883,6 +975,17 @@ onMounted(async () => {
   background: rgba(255, 255, 255, 0.15);
 }
 
+.btn-grey {
+  background: rgba(156, 163, 175, 0.2);
+  color: #9ca3af;
+  border: 1px solid #374151;
+}
+
+.btn-grey:hover:not(:disabled) {
+  background: rgba(156, 163, 175, 0.3);
+  color: #d1d5db;
+}
+
 .btn-outline {
   background: transparent;
   color: #8b5cf6;
@@ -909,6 +1012,8 @@ onMounted(async () => {
   animation: spin 1s linear infinite;
   margin: 0 auto 20px;
 }
+
+
 
 @keyframes spin {
   0% {
@@ -1067,5 +1172,14 @@ onMounted(async () => {
   .invite-link {
     flex-direction: column;
   }
+}
+
+
+
+
+.desactivated {
+  pointer-events: none;
+  opacity: 0.5;
+  cursor: default;
 }
 </style>

@@ -22,8 +22,7 @@ type Group struct {
 
 func (g *Group) Validate() error {
 	if g.CreatorID <= 0 {
-		g.CreatorID = 1
-		// return errors.New("creator_id must be a positive integer") //TODO needs to be checked
+		return errors.New("creator_id must be a positive integer")
 	}
 
 	g.Title = strings.TrimSpace(g.Title)
@@ -186,30 +185,41 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 		err    error
 	)
 
+	// Set userID for membership checking
 	if Groups.Type == "user" {
 		userID, err = strconv.Atoi(Groups.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("convert user_id to int: %w", err)
 		}
+	} else {
+		// For "all" type, use default user ID (TODO: Get from session/auth when available)
+		userID = 1
 	}
+
 	switch Groups.Type {
 	case "user":
 		if Groups.Start == -1 {
-			if err := gm.DB.QueryRow(`SELECT MAX(id) FROM groups WHERE creator_id = ?`, Groups.UserID).Scan(&Groups.Start); err != nil {
+			if err := gm.DB.QueryRow(`
+				SELECT MAX(g.id) 
+				FROM groups g 
+				LEFT JOIN group_members gm ON g.id = gm.group_id 
+				WHERE (g.creator_id = ? OR (gm.user_id = ? AND gm.status = 'member'))
+			`, Groups.UserID, Groups.UserID).Scan(&Groups.Start); err != nil {
 				return nil, fmt.Errorf("get max group id: %w", err)
 			}
 		}
 		query = `
-			SELECT g.id, g.creator_id, g.title, g.description, g.image_uuid, g.created_at , 
-       COUNT(m.id) AS member_count
+			SELECT g.id, g.creator_id, g.title, g.description, g.image_uuid, g.created_at,
+				COUNT(DISTINCT CASE WHEN m.status = 'member' THEN m.id END) AS member_count
 			FROM groups g
 			LEFT JOIN group_members m ON g.id = m.group_id AND m.status = 'member'
-			WHERE g.creator_id = ? AND g.id <= ?
+			LEFT JOIN group_members gm ON g.id = gm.group_id
+			WHERE (g.creator_id = ? OR (gm.user_id = ? AND gm.status = 'member')) AND g.id <= ?
 			GROUP BY g.id
 			ORDER BY g.id DESC
 			LIMIT ?
 		`
-		args = []any{Groups.UserID, Groups.Start, Groups.NumOfItems}
+		args = []any{Groups.UserID, Groups.UserID, Groups.Start, Groups.NumOfItems}
 
 	case "all":
 		if Groups.Start == -1 {
@@ -224,9 +234,10 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 		FROM groups g
 		LEFT JOIN group_members m 
 		ON g.id = m.group_id AND m.status = 'member'
-		WHERE g.id BETWEEN ? AND ?
+		WHERE g.id <= ?
 		GROUP BY g.id
-		ORDER BY g.id DESC;
+		ORDER BY g.id DESC
+		LIMIT ?
 		`
 		args = []any{Groups.Start, Groups.NumOfItems}
 
@@ -246,14 +257,17 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 		if err := rows.Scan(&g.ID, &g.CreatorID, &g.Title, &g.Description, &g.ImgUUID, &g.CreatedAt, &g.MemberCount); err != nil {
 			return nil, fmt.Errorf("scan group: %w", err)
 		}
-		// Check if the user is a member of the group
-		if Groups.Type == "user" {
+
+		// Check if the user is a member of the group (for both "user" and "all" types)
+		if Groups.Type == "user" || Groups.Type == "all" {
 			var isMember string
 			err = gm.DB.QueryRow(`SELECT status FROM group_members WHERE group_id = ? AND user_id = ?`, g.ID, userID).Scan(&isMember)
 			if err != nil {
-				return nil, fmt.Errorf("check group membership: %w", err)
+				// User is not a member - this is not an error
+				g.IsMember = ""
+			} else {
+				g.IsMember = isMember
 			}
-			g.IsMember = isMember
 		}
 		groups = append(groups, &g)
 	}

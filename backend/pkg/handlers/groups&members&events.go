@@ -20,7 +20,7 @@ func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 	groupsMux.HandleFunc("POST /group/invite", rt.InviteToJoinGroup)
 	groupsMux.HandleFunc("POST /group/request", rt.RequestToJoinGroup)
 	groupsMux.HandleFunc("POST /group/accept-decline", rt.AcceptDeclineGroup)
-	groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups) // TODO why are we using POST for browsing?
+	groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups)
 	groupsMux.HandleFunc("POST /group/event", rt.NewEvent)
 	groupsMux.HandleFunc("POST /group/event/vote", rt.EventVote)
 
@@ -71,6 +71,34 @@ func (rt *Root) GetGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if the current user is a member of this group
+	// requesterID := rt.DL.GetRequesterID(w, r) // TODO enable this when we have auth
+	// if requesterID <= 0 {
+	// 	rt.DL.Logger.Log(models.LogEntry{
+	// 		Level:   "ERROR",
+	// 		Message: "Unauthorized: requester ID not found",
+	// 		Metadata: map[string]any{
+	// 			"ip":   r.RemoteAddr,
+	// 			"path": r.URL.Path,
+	// 		},
+	// 	})
+	// 	tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
+	// 	return
+
+	// }
+
+	member := &models.GroupMember{
+		GroupID: groupID,
+		UserID:  1, // TODO enable this when we have auth
+	}
+	err = rt.DL.Members.GetMember(member)
+	if err != nil {
+		// User is not a member - this is not an error
+		group.IsMember = ""
+	} else {
+		group.IsMember = member.Status
+	}
+
 	// if group == nil {    // this will never be nil
 	// 	rt.DL.Logger.Log(models.LogEntry{
 	// 		Level:   "INFO",
@@ -116,7 +144,10 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "New group JSON decoded"})
-	// group.CreatorID = rt.DL.GetRequesterID(w, r)
+
+	// Set the creator ID from the authenticated user (for now using hardcoded 1)
+	group.CreatorID = 1 // TODO: Uncomment when auth is ready: rt.DL.GetRequesterID(w, r)
+
 	// verify group creation input
 	if err := group.Validate(); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -138,7 +169,7 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 	group.ImgUUID = uuid.NewString()
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "img uuid generated successfully"})
 
-	// insert user into db
+	// insert group into db
 	if err := rt.DL.Groups.Insert(group); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -154,6 +185,31 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group inserted into DB"})
+
+	// Add creator as a member of the group
+	creator := &models.GroupMember{
+		GroupID:    group.ID,
+		UserID:     group.CreatorID,
+		Status:     "member",
+		PrevStatus: "none", // Creator starts with no previous status
+	}
+	if err := rt.DL.Members.Upsert(creator); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to add creator as group member",
+			Metadata: map[string]any{
+				"group_id": group.ID,
+				"user_id":  group.CreatorID,
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"err":      err.Error(),
+			},
+		})
+		// Note: We don't return here as the group was successfully created
+		// This is just a membership addition that failed
+	} else {
+		rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Creator added as group member"})
+	}
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
@@ -405,7 +461,6 @@ func (rt *Root) BrowseGroups(w http.ResponseWriter, r *http.Request) {
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Get groups JSON decoded"})
 
 	groups, err := rt.DL.Groups.GetGroups(payload)
-	fmt.Println(groups)
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -601,12 +656,11 @@ func (rt *Root) EventVote(w http.ResponseWriter, r *http.Request) {
 // GetGroupEvents retrieves events for a specific group
 func (rt *Root) GetGroupEvents(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("GetGroupEvents called")
-	// groupID, err := strconv.Atoi(r.PathValue("id"))
 	payload := &models.EventsPayload{}
 	if err := tools.DecodeJSON(r, &payload); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
-			Message: "Failed to decode new vote JSON",
+			Message: "Failed to decode events payload JSON",
 			Metadata: map[string]any{
 				"ip":   r.RemoteAddr,
 				"path": r.URL.Path,
@@ -629,14 +683,8 @@ func (rt *Root) GetGroupEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create payload for fetching events
-	// payload := &models.EventsPayload{
-	// 	GroupID:    strconv.Itoa(groupID),
-	// 	Start:      -1, // Get latest events
-	// 	NumOfItems: 20,
-	// }
-
-	
+	// Set user ID for vote status (TODO: Get from auth when available)
+	payload.UserID = 1
 
 	events, err := rt.DL.Events.GetEventsByGroup(payload)
 	fmt.Println("Retrieved events:", events)

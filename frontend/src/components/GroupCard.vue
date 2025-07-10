@@ -29,6 +29,7 @@
           Voir
         </button>
         
+        <!-- Not a member -->
         <button 
           v-if="!group.isMember"
           class="btn btn-primary btn-join"
@@ -39,14 +40,34 @@
           {{ isJoining ? 'Rejoindre...' : 'Rejoindre' }}
         </button>
         
+        <!-- Requested to join -->
         <button 
-          v-else
-          class="btn btn-primary btn-joined"
-          @click="handleLeave"
-          :disabled="isLeaving"
+          v-else-if="group.isMember === 'requested'"
+          class="btn btn-grey btn-requested"
+          disabled
+        >
+          <span class="icon">⏳</span>
+          Demande envoyée
+        </button>
+        
+        <!-- Invited to join -->
+        <button 
+          v-else-if="group.isMember === 'invited'"
+          class="btn btn-grey btn-invited"
+          @click="handleAcceptInvite"
+          :disabled="isJoining"
+        >
+          <span class="icon">📨</span>
+          {{ isJoining ? 'Accepter...' : 'Accepter l\'invitation' }}
+        </button>
+        
+        <!-- Full member -->
+        <button 
+          v-else-if="group.isMember === 'member'"
+          class="btn btn-success btn-joined desactivated"
         >
           <span class="icon">✓</span>
-          {{ isLeaving ? 'Quitter...' : 'Membre' }}
+          Membre
         </button>
       </div>
     </div>
@@ -127,6 +148,20 @@ const handleJoin = async () => {
   } catch (error) {
     console.error('Failed to join group:', error)
     alert(`Failed to join group: ${error.message}`)
+  } finally {
+    isJoining.value = false
+  }
+}
+
+const handleAcceptInvite = async () => {
+  isJoining.value = true
+  try {
+    await groupsStore.acceptGroupInvite(props.group.id)
+    emit('group-joined', props.group.id)
+    alert('Invitation accepted successfully!')
+  } catch (error) {
+    console.error('Failed to accept invitation:', error)
+    alert(`Failed to accept invitation: ${error.message}`)
   } finally {
     isJoining.value = false
   }
@@ -282,6 +317,26 @@ const handleLeave = async () => {
   transform: translateY(-1px);
 }
 
+.btn-grey {
+  background: rgba(107, 114, 128, 0.3);
+  color: #9ca3af;
+  border: 1px solid rgba(107, 114, 128, 0.4);
+}
+
+.btn-grey:hover:not(:disabled) {
+  background: rgba(107, 114, 128, 0.4);
+  color: #d1d5db;
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
 .btn-joined {
   background: linear-gradient(135deg, #22c55e, #16a34a);
 }
@@ -292,5 +347,12 @@ const handleLeave = async () => {
 
 .icon {
   font-size: 0.9rem;
+}
+
+
+.desactivated {
+  pointer-events: none;
+  opacity: 0.5;
+  cursor: default;
 }
 </style>

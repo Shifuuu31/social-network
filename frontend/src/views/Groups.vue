@@ -64,7 +64,7 @@ const activeFilter = ref('all')
 const filteredGroups = computed(() => {
   let filtered = groupsStore.groups
 
-  // Filter by search query
+  // Filter by search query only (membership filtering is handled by backend)
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(group =>

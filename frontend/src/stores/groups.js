@@ -65,7 +65,7 @@ export const useGroupsStore = defineStore('groups', () => {
       maxAttendees: null, // Not available in current backend model
       image: null, // Not available in current backend model
       organizer: null, // Not available in current backend model
-      isAttending: false, // Would need to be fetched separately
+      isAttending: apiEvent.user_vote || '', // Get from backend user_vote field
       createdAt: apiEvent.created_at
     }
   }
@@ -78,8 +78,8 @@ export const useGroupsStore = defineStore('groups', () => {
     error.value = null
 
     const temp = filter === 'user'
-      ? JSON.stringify({ user_id: '1', start: 1, n_items: 20, type: filter })
-      : JSON.stringify({ start: 1, n_items: 20, type: filter })
+      ? JSON.stringify({ user_id: '1', start: -1, n_items: 20, type: filter })
+      : JSON.stringify({ start: -1, n_items: 20, type: filter })
     
     try {
       const response = await fetch(`${API_BASE}/groups/group/browse`, {
@@ -199,7 +199,7 @@ export const useGroupsStore = defineStore('groups', () => {
       const response = await fetch(`${API_BASE}/groups/group/events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ group_id: groupId, start: 1, n_items: 20})
+        body: JSON.stringify({ group_id: groupId, start: -1, n_items: 20})
       })
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -301,7 +301,7 @@ export const useGroupsStore = defineStore('groups', () => {
           group_id: groupId,
           title: eventData.title,
           description: eventData.description,
-          event_time: eventData.date
+          event_time: new Date(eventData.date).toISOString()
         })
       })
 
@@ -428,6 +428,61 @@ export const useGroupsStore = defineStore('groups', () => {
     }
   }
 
+  const acceptGroupInvite = async (groupId) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const response = await fetch(`${API_BASE}/groups/group/accept-decline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          group_id: groupId,
+          user_id: 1, // TODO: Replace with actual user ID
+          status: 'member',
+          prev_status: 'invited'
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || 'Failed to accept invitation')
+      }
+
+      const data = await response.json()
+
+      // Update local state
+      const updatedGroups = groups.value.map(group => {
+        if (group.id === groupId) {
+          return {
+            ...group,
+            isMember: 'member',
+            memberCount: group.memberCount + 1
+          }
+        }
+        return group
+      })
+
+      groups.value = updatedGroups
+
+      if (currentGroup.value?.id === groupId) {
+        currentGroup.value = {
+          ...currentGroup.value,
+          isMember: 'member',
+          memberCount: currentGroup.value.memberCount + 1
+        }
+      }
+
+      return data
+    } catch (err) {
+      error.value = err.message
+      console.error('Error accepting group invitation:', err)
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   const clearError = () => {
     error.value = null
   }
@@ -456,10 +511,20 @@ export const useGroupsStore = defineStore('groups', () => {
       // Update the event in the local state
       const eventIndex = groupEvents.value.findIndex(event => event.id === eventId)
       if (eventIndex !== -1) {
+        const currentEvent = groupEvents.value[eventIndex]
+        let newAttendees = currentEvent.attendees || 0
+        
+        // Adjust attendees count based on previous and new vote
+        if (currentEvent.isAttending === 'going' && voteType !== 'going') {
+          newAttendees = Math.max(0, newAttendees - 1)
+        } else if (currentEvent.isAttending !== 'going' && voteType === 'going') {
+          newAttendees += 1
+        }
+        
         groupEvents.value[eventIndex] = {
-          ...groupEvents.value[eventIndex],
-          attendees: groupEvents.value[eventIndex].attendees + (voteType === 'going' ? 1 : -1),
-          isAttending: voteType === 'going'
+          ...currentEvent,
+          attendees: newAttendees,
+          isAttending: voteType
         }
       }
 
