@@ -177,7 +177,6 @@ export const useGroupsStore = defineStore('groups', () => {
       const data = await response.json()
       const transformedPosts = Array.isArray(data) ? data.map(transformPostData) : []
 
-      // Clear previous posts and set new ones
       groupPosts.value = transformedPosts.reverse()
       
       return transformedPosts

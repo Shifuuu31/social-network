@@ -67,7 +67,7 @@
             </div>
 
             <div class="sidebar-section">
-              <h3>sidebar where you toggle posts and events</h3>
+              <!-- <h3>sidebar where you toggle posts and events</h3> -->
               <div class="sidebar-nav">
                 <button :class="['nav-btn', { active: activeTab === 'posts' }]" @click="setActiveTab('posts')">
                   <span class="icon">📝</span>
