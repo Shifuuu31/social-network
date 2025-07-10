@@ -238,7 +238,7 @@
             <li v-for="user in usersList" :key="user.id" class="user-list-item">
               <span>{{ user.nickname }} ({{ user.first_name }} {{ user.last_name }})</span>
               <button class="btn btn-primary btn-sm" @click="inviteUser(+user.id)"
-                :disabled="invitedUserIds.includes(user.id)">
+                :disabled="invitedUserIds.includes(user.id) || groupsStore.currentGroup.isMember === 'member'">
                 {{ invitedUserIds.includes(user.id) ? 'Invited' : 'Invite' }}
               </button>
             </li>
