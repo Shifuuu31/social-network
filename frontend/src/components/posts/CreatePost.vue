@@ -34,6 +34,20 @@
         </div>
       </div>
       
+      <div class="form-group">
+        <label for="privacy" class="form-label">Privacy</label>
+        <select 
+          id="privacy" 
+          v-model="privacy" 
+          class="form-input"
+          :disabled="loading"
+        >
+          <option value="public">🌍 Public - Everyone can see this post</option>
+          <option value="almost_private">👥 Almost Private - Only followers can see this post</option>
+          <option value="private">🔒 Private - Only your close friends can see this post</option>
+        </select>
+      </div>
+      
       <div class="form-actions">
         <button 
           type="button" 
@@ -77,6 +91,7 @@ const emit = defineEmits(['post-created'])
 // Form data
 const title = ref('')
 const content = ref('')
+const privacy = ref('public')
 const loading = ref(false)
 const error = ref(null)
 const successMessage = ref('')
@@ -93,11 +108,6 @@ async function submitPost() {
   error.value = null
   successMessage.value = ''
 
-
-
-
-
-  
   if (!title.value.trim() || !content.value.trim()) {
     error.value = 'Please fill in all fields.'
     return
@@ -111,17 +121,13 @@ async function submitPost() {
   loading.value = true
   
   try {
-
-
-
-
     const postData = {
-      image_url :"ana/ghadi/ldar",
+      image_url: "ana/ghadi/ldar",
       ownerId: 1,
       content: content.value.trim(),
-      privacy: 'public', // Or let user choose it
+      privacy: privacy.value,
       groupId: null,     // Optional
-      // chosenUsersIds: [], // Only used if privacy === 'private'
+      // chosenUsersIds will be fetched from user's close friends in backend
     }
 
     const response = await createPost(postData)
@@ -149,6 +155,7 @@ async function submitPost() {
 function clearForm() {
   title.value = ''
   content.value = ''
+  privacy.value = 'public'
   error.value = null
 }
 </script>
@@ -298,6 +305,8 @@ function clearForm() {
   color: #b91c1c;
   border: 1.5px solid #ef4444;
 }
+
+
 
 .loading-spinner {
   display: inline-block;

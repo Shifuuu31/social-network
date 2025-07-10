@@ -17,6 +17,13 @@
         <font-awesome-icon icon="fa-solid fa-users" class="icon" />
       </router-link>
 
+
+
+      <router-link to="/profile" class="icon-container" aria-label="Profile">
+        <font-awesome-icon icon="fa-solid fa-user" class="icon" />
+        <span class="badge green">1</span>
+      </router-link>
+  
       <!-- Friends Icon -->
       <router-link to="/friends" class="icon-container" aria-label="Friends">
         <font-awesome-icon icon="fa-solid fa-user-friends" class="icon" />
@@ -34,13 +41,7 @@
         <span class="badge green">2</span>
       </router-link>
       <!-- Profile Icon -->
-
-
-      <router-link to="/profile" class="icon-container" aria-label="Profile">
-        <font-awesome-icon icon="fa-solid fa-user" class="icon" />
-        <span class="badge green">1</span>
-      </router-link>
-  
+ 
 
     </div>
   </header>
