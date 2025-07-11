@@ -122,14 +122,14 @@ type EventsPayload struct {
 
 // GetEventsByGroup returns paginated events for a group.
 func (em *EventModel) GetEventsByGroup(payload *EventsPayload) ([]*Event, error) {
-	var maxid sql.NullInt32
+	var maxid int
 	if payload.Start == -1 {
 		if err := em.DB.QueryRow(`SELECT MAX(id) FROM events WHERE group_id = ?`, payload.GroupID).Scan(&maxid); err != nil {
 			fmt.Println("Error getting max event id:", err)
 			return nil, fmt.Errorf("get max event id: %w", err)
 		}
 
-		payload.Start = int(maxid.Int32)
+		payload.Start = maxid
 		if payload.Start == 0 {
 			payload.Start = 2147483647 // max int32 value
 		}

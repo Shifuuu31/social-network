@@ -10,17 +10,17 @@ import (
 )
 
 type Post struct {
-	Replies        int            `json:"replies"`
-	Owner          string         `json:"owner"`
-	Id             int            `json:"id"`
-	OwnerId        int            `json:"owner_id"`
-	GroupId        int            `json:"group_id"`
-	Content        string         `json:"content"`
-	ImageUUID      sql.NullString `json:"image_uuid"`
-	Privacy        string         `json:"privacy"` // [public', 'almost_private', 'private']
-	CreatedAt      string         `json:"created_at"`
-	ChosenUsersIds []int          `json:"chosen_users_ids"`
-	Image_url      string         `json:"image_url"`
+	Replies        int    `json:"replies"`
+	Owner          string `json:"owner"`
+	Id             int    `json:"id"`
+	OwnerId        int    `json:"owner_id"`
+	GroupId        int    `json:"group_id"`
+	Content        string `json:"content"`
+	ImageUUID      string `json:"image_uuid"`
+	Privacy        string `json:"privacy"` // [public', 'almost_private', 'private']
+	CreatedAt      string `json:"created_at"`
+	ChosenUsersIds []int  `json:"chosen_users_ids"`
+	Image_url      string `json:"image_url"`
 	// Title string `json:"title"`
 }
 

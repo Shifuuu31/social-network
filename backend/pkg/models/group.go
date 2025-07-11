@@ -14,7 +14,7 @@ type Group struct {
 	CreatorID   int       `json:"creator_id"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
-	ImgUUID     sql.NullString    `json:"image_uuid"`
+	ImgUUID     string    `json:"image_uuid"`
 	IsMember    string    `json:"is_member"` // Indicates if the user is a member of the group
 	MemberCount int       `json:"member_count"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -172,7 +172,7 @@ func (gm *GroupModel) IsUserCreator(groupID, userID int) error {
 
 type GroupsPayload struct {
 	UserID     string `json:"user_id"`
-	Start      sql.NullInt32  `json:"start"`
+	Start      int    `json:"start"`
 	NumOfItems int    `json:"n_items"`
 	Type       string `json:"type"`
 }
@@ -192,22 +192,27 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 			return nil, fmt.Errorf("convert user_id to int: %w", err)
 		}
 	} else {
-		// For "all" type, use default user ID (TODO: Get from session/auth when available)
+		// For "all" type, use default user ID (// TODO: Get from session/auth when available)
 		userID = 1
 	}
 
 	switch Groups.Type {
 	case "user":
-		if !Groups.Start.Valid {
-			if err := gm.DB.QueryRow(`
-				SELECT MAX(g.id) 
-				FROM groups g 
-				LEFT JOIN group_members gm ON g.id = gm.group_id 
-				WHERE (g.creator_id = ? OR (gm.user_id = ? AND gm.status = 'member'))
-			`, Groups.UserID, Groups.UserID).Scan(&Groups.Start); err != nil {
-				return nil, fmt.Errorf("get max group id: %w", err)
-			}
+		var maxID sql.NullInt64
+		if err := gm.DB.QueryRow(`
+	SELECT MAX(g.id) 
+	FROM groups g 
+	LEFT JOIN group_members gm ON g.id = gm.group_id 
+	WHERE (g.creator_id = ? OR (gm.user_id = ? AND gm.status = 'member'))
+`, Groups.UserID, Groups.UserID).Scan(&maxID); err != nil {
+			return []*Group{}, fmt.Errorf("get max group id: %w", err)
 		}
+		if maxID.Valid {
+			Groups.Start = int(maxID.Int64)
+		} else {
+			Groups.Start = 0 // or -1, or whatever default makes sense in your logic
+		}
+
 		query = `
 			SELECT g.id, g.creator_id, g.title, g.description, g.image_uuid, g.created_at,
 				COUNT(DISTINCT CASE WHEN m.status = 'member' THEN m.id END) AS member_count
@@ -222,11 +227,17 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 		args = []any{Groups.UserID, Groups.UserID, Groups.Start, Groups.NumOfItems}
 
 	case "all":
-		if !Groups.Start.Valid {
-			if err := gm.DB.QueryRow(`SELECT MAX(id) FROM groups`).Scan(&Groups.Start); err != nil {
-				return nil, fmt.Errorf("get max group id: %w", err)
-			}
+		var maxID sql.NullInt64
+		if err := gm.DB.QueryRow(`SELECT MAX(id) FROM groups`).Scan(&maxID); err != nil {
+			fmt.Println("Error getting max group id:", err)
+			return []*Group{}, fmt.Errorf("get max group id: %w", err)
 		}
+		if maxID.Valid {
+			Groups.Start = int(maxID.Int64)
+		} else {
+			Groups.Start = 0
+		}
+
 		query = `
 		SELECT 
 		g.id, g.creator_id, g.title, g.description, g.image_uuid, g.created_at,
@@ -242,12 +253,12 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 		args = []any{Groups.Start, Groups.NumOfItems}
 
 	default:
-		return nil, fmt.Errorf("invalid group type: %s", Groups.Type)
+		return []*Group{}, fmt.Errorf("invalid group type: %s", Groups.Type)
 	}
 
 	rows, err := gm.DB.Query(query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("get groups (%s): %w", Groups.Type, err)
+		return []*Group{}, fmt.Errorf("get groups (%s): %w", Groups.Type, err)
 	}
 	defer rows.Close()
 

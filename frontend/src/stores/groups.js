@@ -78,9 +78,9 @@ export const useGroupsStore = defineStore('groups', () => {
     error.value = null
 
     const temp = filter === 'user'
-      ? JSON.stringify({ user_id: '1', n_items: 20, type: filter })
-      : JSON.stringify({  n_items: 20, type: filter })
-    
+      ? JSON.stringify({ user_id: '1', start: -1, n_items: 20, type: filter })
+      : JSON.stringify({ start: -1, n_items: 20, type: filter })
+
     try {
       const response = await fetch(`${API_BASE}/groups/group/browse`, {
         method: 'POST',
@@ -109,7 +109,7 @@ export const useGroupsStore = defineStore('groups', () => {
       groups.value = transformedGroups
 
     } catch (err) {
-      error.value = err.message
+      // error.value = err.message
       groups.value = []
     } finally {
       isLoading.value = false
@@ -167,7 +167,7 @@ export const useGroupsStore = defineStore('groups', () => {
       const response = await fetch(`${API_BASE}/posts/feed`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: groupId, type: 'group', start: {Int32:1, Valid:true}, n_post: 20 })
+        body: JSON.stringify({ id: groupId, type: 'group', start: -1, n_post: 20 })
       })
 
       if (!response.ok) {

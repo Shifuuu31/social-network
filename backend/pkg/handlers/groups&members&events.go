@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -166,10 +165,8 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group input validated"})
 
 	// generate a unique uuid
-	group.ImgUUID = sql.NullString{
-		String: uuid.NewString(),
-		Valid:  true,
-	}
+	group.ImgUUID = uuid.NewString()
+
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "img uuid generated successfully"})
 
 	// insert group into db
