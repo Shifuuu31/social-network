@@ -237,8 +237,7 @@
           <ul v-else class="user-list">
             <li v-for="user in usersList" :key="user.id" class="user-list-item">
               <span>{{ user.nickname }} ({{ user.first_name }} {{ user.last_name }})</span>
-              <button class="btn btn-primary btn-sm" @click="inviteUser(+user.id)"
-                :disabled="groupsStore.currentGroup.isMember === 'member'">
+              <button class="btn btn-primary btn-sm" @click="inviteUser(+user.id)">
                 {{ invitedUserIds.includes(user.id) ? 'Invited' : 'Invite' }}
               </button>
             </li>
@@ -470,36 +469,15 @@ const handleCreateEvent = async () => {
 
 const toggleInviteModal = () => {
   showInviteModal.value = !showInviteModal.value
-}
-
-const toggleInviteUsersModal = () => {
-  showInviteUsersModal.value = !showInviteUsersModal.value
-  if (showInviteUsersModal.value) {
-    userSearch.value = ""
+  if (showInviteModal.value) {
+    userSearch.value = ''
     usersList.value = []
     invitedUserIds.value = []
-    console.log('khwi')
+    fetchAllUsers() // Load available users when modal opens
   }
-  fetchUsers()
 }
 
-async function fetchUsers() {
-  isLoadingUsers.value = true
-  try {
-    // You may want to implement a real search API; for now, fetch all users or by search
-    const response = await fetch(`/profile/user`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include'
-    })
-    if (!response.ok) throw new Error('Failed to fetch users')
-    usersList.value = await response.json()
-  } catch (e) {
-    usersList.value = []
-  } finally {
-    isLoadingUsers.value = false
-  }
-}
+// Old fetchUsers function removed - using the new filtered version below
 
 const inviteUser = async (userId) => {
   try {
@@ -736,39 +714,41 @@ const toggleInviteModal = () => {
 const fetchAllUsers = async () => {
   isLoadingUsers.value = true
   try {
-    const response = await fetch(`/api/users/profile/users`, { 
+    const groupId = parseInt(route.params.id)
+    const response = await fetch(`/api/groups/group/${groupId}/available-users`, { 
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       // credentials: 'include'
     })
-    if (!response.ok) throw new Error('Failed to fetch users')
-    usersList.value = await response.json() //TODO need to get membership status of the users
+    if (!response.ok) throw new Error('Failed to fetch available users')
+    usersList.value = await response.json()
   } catch (e) {
-    console.error('Error fetching users:', e)
+    console.error('Error fetching available users:', e)
     usersList.value = []
   } finally {
     isLoadingUsers.value = false
   }
 }
 
-async function fetchUsers() {
-  if (!userSearch.value.trim()) {
-    usersList.value = []
-    return
-  }
+const fetchUsers = async () => {
+  // if (!userSearch.value.trim()) {
+  //   usersList.value = []
+  //   return
+  // }
 
   isLoadingUsers.value = true
   try {
-    const response = await fetch(`/api/users/search?q=${encodeURIComponent(userSearch.value)}`, {
+    const groupId = parseInt(route.params.id)
+    const response = await fetch(`/api/groups/group/${groupId}/search-users?q=${encodeURIComponent(userSearch.value)}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include'
+      // credentials: 'include'
     })
 
     if (!response.ok) throw new Error('Failed to fetch users')
 
     const data = await response.json()
-    usersList.value = data.users || data // TODO i need to fetch the membership status too
+    usersList.value = data || [] // Use the filtered users from the group-specific endpoint
   } catch (e) {
     console.error('Error fetching users:', e)
     usersList.value = []

@@ -77,15 +77,19 @@ export const useGroupsStore = defineStore('groups', () => {
     isLoading.value = true
     error.value = null
 
-    const temp = filter === 'user'
-      ? JSON.stringify({ user_id: '1', start: -1, n_items: 20, type: filter })
-      : JSON.stringify({ start: -1, n_items: 20, type: filter })
+    // Always pass user_id for proper filtering (TODO: Get from auth when available)
+    const requestBody = JSON.stringify({ 
+      user_id: '1', 
+      start: -1, 
+      n_items: 20, 
+      type: filter === 'user' ? 'user' : 'all' 
+    })
 
     try {
       const response = await fetch(`${API_BASE}/groups/group/browse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: temp
+        body: requestBody
       })
 
       if (!response.ok) {

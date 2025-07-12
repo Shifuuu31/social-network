@@ -2,13 +2,13 @@
   <div class="groups-page">
     <div class="container">
       <div class="page-header">
-        <h1 class="page-title">Découvrir les groupes</h1>
-        <p class="page-subtitle">Trouvez des communautés qui partagent vos passions</p>
+        <h1 class="page-title">Groups</h1>
+        <p class="page-subtitle">Find communities that share your interests</p>
       </div>
 
       <div class="groups-filters">
         <div class="search-bar">
-          <input type="text" placeholder="Rechercher un groupe..." v-model="searchQuery" class="search-input" />
+          <input type="text" placeholder="Search groups..." v-model="searchQuery" class="search-input" />
           <button class="search-btn">
             <span class="icon">🔍</span>
           </button>
@@ -16,22 +16,24 @@
 
         <div class="filter-buttons">
           <button :class="['filter-btn', { active: activeFilter === 'all' }]" @click="setFilter('all')">
-            explore new groups
+            <span class="icon">🔍</span>
+            Explore
           </button>
           <button :class="['filter-btn', { active: activeFilter === 'joined' }]" @click="setFilter('joined')">
-            My groups
+            <span class="icon">👥</span>
+            My Groups
           </button>
         </div>
       </div>
 
       <div v-if="groupsStore.isLoading" class="loading">
         <div class="spinner"></div>
-        <p>Chargement des groupes...</p>
+        <p>Loading groups...</p>
       </div>
 
       <div v-else-if="groupsStore.error" class="error">
         <p>{{ groupsStore.error }}</p>
-        <button @click="loadGroups" class="btn btn-primary">Réessayer</button>
+        <button @click="loadGroups" class="btn btn-primary">Retry</button>
       </div>
 
       <div v-else class="groups-grid">
@@ -41,10 +43,15 @@
 
       <div v-if="filteredGroups.length === 0 && !groupsStore.isLoading" class="empty-state">
         <div class="empty-icon">📭</div>
-        <h3>Aucun groupe trouvé</h3>
-        <p>Essayez de modifier vos critères de recherche ou créez votre propre groupe.</p>
+        <h3>No groups found</h3>
+        <p v-if="activeFilter === 'joined'">
+          You haven't interacted with any groups yet. Explore some groups to get started!
+        </p>
+        <p v-else>
+          No new groups to explore. Try changing your search criteria or check back later.
+        </p>
         <router-link to="/groups/create" class="btn btn-primary">
-          Créer un groupe
+          Create a Group
         </router-link>
       </div>
     </div>
