@@ -27,10 +27,10 @@
           </div>
 
           <div class="form-section">
-            <h3 class="section-title">Image du groupe</h3>
+            <h3 class="section-title">Group Image</h3>
 
             <div class="form-group">
-              <div class="image-upload" @click="triggerFileInput">
+              <div class="image-upload"> 
                 <div class="image-preview" v-if="imagePreview">
                   <img :src="imagePreview" alt="Aperçu" />
                   <button type="button" class="remove-image" @click.stop="removeImage">
@@ -83,10 +83,6 @@ const formData = reactive({
 const canSubmit = computed(() => {
   return formData.name.trim().length > 5 && formData.description.trim().length > 10 //TODO
 })
-
-const triggerFileInput = () => {
-  imageInput.value?.click()
-}
 
 const handleImageUpload = (event) => {
   const file = event.target.files[0]

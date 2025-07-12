@@ -386,7 +386,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 
 	// Create notification for the invited user
 	// Get group information for the notification message
-	groupInfo := &models.Group{ID: member.GroupID}
+	groupInfo = &models.Group{ID: member.GroupID}
 	if err := rt.DL.Groups.GetGroupByID(groupInfo); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "WARN",
@@ -399,7 +399,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 		groupInfo.Title = "a group" // fallback
 	}
 
-	notification := &models.Notification{
+	notification = &models.Notification{
 		UserID:  member.UserID,
 		Type:    "group_invite",
 		Message: fmt.Sprintf("You've been invited to join the group '%s'.", groupInfo.Title),
@@ -553,7 +553,7 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 
 	// Create notification for the group creator about the join request
 	// Get group information for the notification message
-	groupInfo := &models.Group{ID: member.GroupID}
+	groupInfo = &models.Group{ID: member.GroupID}
 	if err := rt.DL.Groups.GetGroupByID(groupInfo); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "WARN",
@@ -568,8 +568,8 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the user who requested to join for a more personalized message
-	requestUser := &models.User{ID: member.UserID}
-	userDisplayName := "Someone"
+	requestUser = &models.User{ID: member.UserID}
+	userDisplayName = "Someone"
 	if err := rt.DL.Users.GetUserByID(requestUser); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "WARN",
@@ -583,7 +583,7 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 		userDisplayName = requestUser.FirstName + " " + requestUser.LastName
 	}
 
-	notification := &models.Notification{
+	notification = &models.Notification{
 		UserID:  groupInfo.CreatorID,
 		Type:    "group_join_request",
 		Message: fmt.Sprintf("%s requested to join your group '%s'.", userDisplayName, groupInfo.Title),
@@ -998,7 +998,7 @@ func (rt *Root) NewEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	// Send notifications to all group members about the new event
 	// Get group information for the notification message
-	groupInfo := &models.Group{ID: event.GroupId}
+	groupInfo = &models.Group{ID: event.GroupId}
 	if err := rt.DL.Groups.GetGroupByID(groupInfo); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "WARN",
@@ -1012,7 +1012,7 @@ func (rt *Root) NewEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get all group members to notify them
-	groupMembers, err := rt.DL.Members.GetGroupMembers(event.GroupId)
+	groupMembers, err = rt.DL.Members.GetGroupMembers(event.GroupId)
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",

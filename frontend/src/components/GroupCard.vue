@@ -86,13 +86,13 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['group-joined', 'group-left'])
+const emit = defineEmits(['group-joined'])
 
 const router = useRouter()
 const groupsStore = useGroupsStore()
 
 const isJoining = ref(false)
-const isLeaving = ref(false)
+// const isLeaving = ref(false)
 const imageError = ref(false)
 
 // Computed property for group image with fallback

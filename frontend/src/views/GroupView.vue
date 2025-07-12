@@ -238,7 +238,7 @@
             <li v-for="user in usersList" :key="user.id" class="user-list-item">
               <span>{{ user.nickname }} ({{ user.first_name }} {{ user.last_name }})</span>
               <button class="btn btn-primary btn-sm" @click="inviteUser(+user.id)"
-                :disabled="invitedUserIds.includes(user.id) || groupsStore.currentGroup.isMember === 'member'">
+                :disabled="groupsStore.currentGroup.isMember === 'member'">
                 {{ invitedUserIds.includes(user.id) ? 'Invited' : 'Invite' }}
               </button>
             </li>
@@ -742,7 +742,7 @@ const fetchAllUsers = async () => {
       // credentials: 'include'
     })
     if (!response.ok) throw new Error('Failed to fetch users')
-    usersList.value = await response.json()
+    usersList.value = await response.json() //TODO need to get membership status of the users
   } catch (e) {
     console.error('Error fetching users:', e)
     usersList.value = []
@@ -768,7 +768,7 @@ async function fetchUsers() {
     if (!response.ok) throw new Error('Failed to fetch users')
 
     const data = await response.json()
-    usersList.value = data.users || data // Handle different response formats
+    usersList.value = data.users || data // TODO i need to fetch the membership status too
   } catch (e) {
     console.error('Error fetching users:', e)
     usersList.value = []
