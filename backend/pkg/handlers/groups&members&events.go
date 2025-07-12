@@ -235,7 +235,7 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 
 		// Send a welcome message to the creator
 		if conn != nil {
-			welcomeMsg := map[string]interface{}{
+			welcomeMsg := map[string]any{
 				"type":      "group_chat_created",
 				"group_id":  group.ID,
 				"message":   "Group chat has been created! You can now start chatting with group members.",

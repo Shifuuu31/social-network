@@ -167,17 +167,17 @@ const handleAcceptInvite = async () => {
   }
 }
 
-const handleLeave = async () => {
-  isLeaving.value = true
-  try {
-    await groupsStore.leaveGroup(props.group.id)
-    emit('group-left', props.group.id)
-  } catch (error) {
-    console.error('Failed to leave group:', error)
-  } finally {
-    isLeaving.value = false
-  }
-}
+// const handleLeave = async () => {
+//   isLeaving.value = true
+//   try {
+//     await groupsStore.leaveGroup(props.group.id)
+//     emit('group-left', props.group.id)
+//   } catch (error) {
+//     console.error('Failed to leave group:', error)
+//   } finally {
+//     isLeaving.value = false
+//   }
+// }
 </script>
 
 <style scoped>
