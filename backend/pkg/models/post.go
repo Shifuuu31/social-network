@@ -103,10 +103,11 @@ func (pfl *PostFilter) Validate() error {
 
 	if pfl.Type != "" {
 		validTypes := map[string]bool{
-			"feed":   true,
-			"user":   true,
-			"group":  true,
-			"public": true,
+			"feed":      true,
+			"user":      true,
+			"group":     true,
+			"public":    true,
+			"followers": true,
 		}
 		if !validTypes[pfl.Type] {
 			return errors.New("type must be one of: feed, user, group, public")
@@ -124,160 +125,56 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 	var query string
 	var rows *sql.Rows
 
-	// Debug: Print the filter details
-	fmt.Printf("=== DEBUG GetPosts ===\n")
-	fmt.Printf("Filter Type: %s\n", filter.Type)
-	fmt.Printf("Filter ID: %d\n", filter.Id)
-	fmt.Printf("Filter Start: %d\n", filter.Start)
-	fmt.Printf("Filter NPost: %d\n", filter.NPost)
+	fmt.Println("filter.Type: momo", filter.Type)
+	fmt.Println("filter.Id: momo", filter.Id)
 
-	switch filter.Type {
-	case "group":
-		query = `
-            SELECT posts.id, posts.user_id, users.nickname, posts.group_id, 
-                   posts.content, posts.image, posts.privacy, posts.created_at,
-                   COALESCE(comment_counts.reply_count, 0) as replies
-            FROM posts
-            JOIN users ON posts.user_id = users.id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) as reply_count
-                FROM comments
-                GROUP BY post_id
-            ) comment_counts ON CAST(posts.id as TEXT) = comment_counts.post_id
-            WHERE posts.group_id = ? AND posts.privacy = '' AND posts.id > ?
-            ORDER BY posts.id ASC
-            LIMIT ?`
+	// UNIFIED QUERY: Handle all privacy types in one query
+	// This query will show posts based on each post's individual privacy setting
+	query = `
+		SELECT 
+			posts.id, 
+			posts.user_id, 
+			users.nickname, 
+			posts.group_id,
+			posts.content,
+			posts.privacy, 
+			posts.created_at,
+			COALESCE(comment_counts.reply_count, 0) as replies
+		FROM posts
+		JOIN users ON posts.user_id = users.id
+		LEFT JOIN (
+			SELECT post_id, COUNT(*) as reply_count
+			FROM comments
+			GROUP BY post_id
+		) comment_counts ON posts.id = comment_counts.post_id
+		LEFT JOIN follow_request 
+			ON follow_request.from_user_id = ? 
+			AND follow_request.to_user_id = posts.user_id 
+			AND follow_request.status = 'accepted'
+		LEFT JOIN post_privacy_selected
+			ON post_privacy_selected.post_id = posts.id 
+			AND post_privacy_selected.user_id = ?
+		WHERE
+			-- Show user's own posts (regardless of privacy)
+			posts.user_id = ?
+			-- OR show public posts (visible to everyone)
+			OR posts.privacy = 'public'
+			-- OR show followers-only posts if user is a follower
+			OR (posts.privacy = 'followers' AND follow_request.from_user_id IS NOT NULL)
+			-- OR show private posts if user is specifically selected
+			OR (posts.privacy = 'private' AND post_privacy_selected.user_id IS NOT NULL)
+		ORDER BY posts.created_at DESC
+		LIMIT ? OFFSET ?
+	`
 
-		fmt.Printf("Executing GROUP query with params: groupId=%d, start=%d, limit=%d\n",
-			filter.Id, filter.Start, filter.NPost)
-		rows, err = pm.DB.Query(query, filter.Id, filter.Start, filter.NPost)
+	rows, err = pm.DB.Query(query, filter.Id, filter.Id, filter.Id, filter.NPost, filter.Start)
 
-	case "privacy":
-		query = `
-            SELECT posts.id, posts.user_id, users.nickname, posts.group_id, 
-                   posts.content, posts.image, posts.privacy, posts.created_at,
-                   COALESCE(comment_counts.reply_count, 0) as replies
-            FROM posts
-            JOIN users ON posts.user_id = users.id
-            LEFT JOIN follows 
-                ON follows.followee_id = posts.user_id AND follows.follower_id = ? AND follows.status = 'accepted'
-            LEFT JOIN post_privacy
-                ON post_privacy.post_id = posts.id AND post_privacy.chosen_id = ?
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) as reply_count
-                FROM comments
-                GROUP BY post_id
-            ) comment_counts ON CAST(posts.id as TEXT) = comment_counts.post_id
-            WHERE NOT (posts.group_id IS NOT NULL AND posts.privacy = '')
-              AND (
-                posts.privacy IN ('public')
-                OR (posts.privacy = 'almost_private' AND follows.follower_id IS NOT NULL)
-                OR (posts.privacy = 'private' AND post_privacy.chosen_id IS NOT NULL)
-              )
-              AND posts.id > ?
-            ORDER BY posts.id DESC
-            LIMIT ?`
-
-		fmt.Printf("Executing PRIVACY query with params: userId=%d, userId=%d, start=%d, limit=%d\n",
-			filter.Id, filter.Id, filter.Start, filter.NPost)
-		rows, err = pm.DB.Query(query, filter.Id, filter.Id, filter.Start, filter.NPost)
-
-	case "single":
-		query = `
-            SELECT posts.id, posts.user_id, users.nickname, posts.group_id, 
-                   posts.content, posts.image, posts.privacy, posts.created_at,
-                   COALESCE(comment_counts.reply_count, 0) as replies
-            FROM posts
-            JOIN users ON posts.user_id = users.id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) as reply_count
-                FROM comments
-                GROUP BY post_id
-            ) comment_counts ON CAST(posts.id as TEXT) = comment_counts.post_id
-            WHERE posts.id = ?`
-
-		fmt.Printf("Executing SINGLE query with params: postId=%d\n", filter.Id)
-		rows, err = pm.DB.Query(query, filter.Id)
-
-	case "public":
-		// FIXED: Use OFFSET instead of WHERE posts.id > ?
-		query = `
-			SELECT 
-				posts.id, 
-				posts.user_id, 
-				users.nickname, 
-				posts.group_id,
-				posts.content,
- 				posts.privacy, 
-				posts.created_at,
-				COALESCE(comment_counts.reply_count, 0) as replies
-			FROM posts
-			JOIN users ON posts.user_id = users.id
-			LEFT JOIN (
-				SELECT post_id, COUNT(*) as reply_count
-				FROM comments
-				GROUP BY post_id
-			) comment_counts ON posts.id = comment_counts.post_id
-			WHERE posts.privacy = 'public'
-			ORDER BY posts.created_at DESC
-			LIMIT ? OFFSET ?`
-
-		fmt.Printf("Executing PUBLIC query with params: limit=%d, offset=%d\n",
-			filter.NPost, filter.Start)
-		fmt.Printf("Full query: %s\n", query)
-		rows, err = pm.DB.Query(query, filter.NPost, filter.Start)
-
-		// Additional debug: Check row count before processing
-		if err == nil {
-			fmt.Printf("Query executed without error, starting to process rows...\n")
-		}
-
-	case "followers":
-		fmt.Printf("saaaaaaaaaaaaaaaaaaaaabr ")
-		query = `
-			SELECT 
-				posts.id, 
-				posts.user_id, 
-				users.nickname, 
-				posts.group_id,
-				posts.content,
- 				posts.privacy, 
-				posts.created_at,
-				COALESCE(comment_counts.reply_count, 0) as replies
-			FROM posts
-			JOIN users ON posts.user_id = users.id
-			LEFT JOIN (
-				SELECT post_id, COUNT(*) as reply_count
-				FROM comments
-				GROUP BY post_id
-			) comment_counts ON posts.id = comment_counts.post_id
-			LEFT JOIN follows 
-				ON follows.followee_id = posts.user_id 
-				AND follows.follower_id = ? 
-				AND follows.status = 'accepted'
-			WHERE
-			  posts.privacy = 'public'
-			  OR (posts.privacy = 'followers' AND (follows.follower_id IS NOT NULL OR posts.user_id = ?))
-			ORDER BY posts.created_at DESC
-			LIMIT ?
-		`
-		fmt.Printf("Executing FEED/FOLLOWERS query with params: userId=%d, userId=%d, limit=%d\n",
-			filter.Id, filter.Id, filter.NPost)
-		rows, err = pm.DB.Query(query, filter.Id, filter.Id, filter.NPost)
-
-	default:
-		fmt.Printf("ERROR: Unknown filter type: %s\n", filter.Type)
-		return nil, fmt.Errorf("unknown filter type: %s", filter.Type)
-	}
-
-	// Debug: Check for query errors
 	if err != nil {
 		fmt.Printf("ERROR: Query execution failed: %v\n", err)
 		fmt.Printf("Query was: %s\n", query)
 		return nil, err
 	}
 
-	fmt.Printf("Query executed successfully\n")
 	defer rows.Close()
 
 	postCount := 0
@@ -290,7 +187,6 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 			&post.Owner,
 			&post.GroupId,
 			&post.Content,
-			// &post.Image,    // FIXED: Uncommented this
 			&post.Privacy,
 			&post.CreatedAt,
 			&post.Replies,
@@ -302,21 +198,13 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 		}
 
 		postCount++
-		fmt.Printf("Post %d: ID=%d, Owner=%s, Content=%.50s...\n",
-			postCount, post.Id, post.Owner, post.Content)
-
 		posts = append(posts, post)
 	}
 
-	// Check for iteration errors
 	if err := rows.Err(); err != nil {
 		fmt.Printf("ERROR: Row iteration error: %v\n", err)
 		return nil, err
 	}
-
-	fmt.Printf("=== DEBUG COMPLETE ===\n")
-	fmt.Printf("Total posts retrieved: %d\n", len(posts))
-	fmt.Printf("=======================\n")
 
 	return posts, nil
 }

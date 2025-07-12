@@ -26,7 +26,7 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("s")
 
 	if err := tools.DecodeJSON(r, &user); err != nil {
- 		rt.DL.Logger.Log(models.LogEntry{
+		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to decode signup JSON",
 			Metadata: map[string]interface{}{

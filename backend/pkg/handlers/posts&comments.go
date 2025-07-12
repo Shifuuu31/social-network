@@ -78,7 +78,14 @@ func (app *Root) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUserId := app.DL.GetRequesterID(w, r)
+
+	// Set the filter ID to the current user's ID
+	filter.Id = currentUserId
+
+	// filter.Type = "followers"
 	// Validate filter using tools function
+	fmt.Println("filter:", filter)
 	if err := filter.Validate(); err != nil {
 		fmt.Println("GetFeedPosts filter validation error:", err, "filter:", filter)
 		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
@@ -88,8 +95,8 @@ func (app *Root) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	posts, err := app.DL.Posts.GetPosts(filter)
-	fmt.Println("waaaaaaaaaaaaaaaaaaaaaaaazi", posts)
-	fmt.Println("GetFeedPosts filter:", filter, "Posts:", posts)
+	// fmt.Println("waaaaaaaaaaaaaaaaaaaaaaaazi", posts)
+	// fmt.Println("GetFeedPosts filter:", filter, "Posts:", posts)
 
 	if err != nil {
 		log.Printf("Error fetching posts: %v", err)
@@ -150,7 +157,7 @@ func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 		tools.RespondError(w, "Invalid post data", http.StatusBadRequest)
 		return
 	}
-	fmt.Println(post.Content, post.Image_url, "xccxc")
+	// fmt.Println(post.Content, post.Image_url, "xccxc")
 	// Handle file upload only if it's multipart form data
 	var imagePath string
 	if hasFile {
@@ -207,7 +214,7 @@ func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 	if post.Privacy == "almost_private" {
 		post.Privacy = "followers"
 	}
-	fmt.Println("gggggggggggggggggggergregergergerggg",post.OwnerId, post.GroupId, post.Content, imagePath, post.Privacy)
+	fmt.Println("gggggggggggggggggggergregergergerggg", post.OwnerId, post.GroupId, post.Content, imagePath, post.Privacy)
 	// Insert post
 
 	result, err := tx.Exec(`
