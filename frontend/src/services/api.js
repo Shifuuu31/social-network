@@ -8,7 +8,7 @@ const HEADERS = {
 
 /**
  * Creates a new post by sending either JSON or form data to the backend.
- * @param {Object} postData - Post data including ownerId, content, imageFile, etc.
+ * @param {Object|FormData} postData - Post data including ownerId, content, imageFile, etc.
  * @returns {Promise<Object>} - Resolves with the server response (e.g., { message, post_id })
  */
 export async function createPost(postData) {
@@ -26,19 +26,20 @@ export async function createPost(postData) {
   let response;
 
   try {
-    if (postData.imageFile) {
-      // Handle image upload with FormData
-      const formData = buildFormData(postData);
+    if (postData instanceof FormData) {
+      // Handle FormData (for image uploads)
+      // The owner_id should already be set in the FormData from the component
       
       response = await fetch(url, {
         method: 'POST',
-        body: formData,
+        body: postData,
+        // Don't set Content-Type header - let browser set it with boundary
       });
     } else {
       // Handle regular JSON payload
       const bodyPayload = {
-        owner_id: user.value.id, // Use current user's ID
-        group_id: postData.groupId || undefined,
+        ownerId: user.value.id, // Use current user's ID
+        groupId: postData.groupId || null,
         content: postData.content,
         privacy: postData.privacy,
         // chosenUsersIds: postData.privacy === 'private' ? postData.chosenUsersIds : [],
@@ -66,51 +67,11 @@ export async function createPost(postData) {
 }
 
 /**
- * Builds FormData object from postData for file uploads
- * @param {Object} postData
- * @returns {FormData}
- */
-function buildFormData(postData) {
-  const { user } = useAuth();
-  const formData = new FormData();
-  formData.append('owner_id', user.value.id); // Use current user's ID
-  
-  if (postData.groupId !== null && postData.groupId !== undefined) {
-    formData.append('group_id', postData.groupId);
-  }
-
-  formData.append('content', postData.content);
-  formData.append('privacy', postData.privacy);
-
-  // if (postData.privacy === 'private' && Array.isArray(postData.chosenUsersIds)) {
-  //   postData.chosenUsersIds.forEach(id => formData.append('chosen_users_ids', id));
-  // }
-
-  if (postData.imageFile) {
-    formData.append('image', postData.imageFile);
-  }
-
-  return formData;
-}
-
-
-
-
-
-
-
-///////////////
-
-
- /**
  * Fetches posts from the feed based on filter criteria.
  * @param {Object} [filter] - Optional filter object (userId is required)
  * @returns {Promise<Object>} Resolves with list of posts
  */
- 
-
-
- export async function getPosts(filter = {}) {
+export async function getPosts(filter = {}) {
   const url = `${API_BASE_URL}/feed`;
 
   // Normalize input to match Go backend expectations

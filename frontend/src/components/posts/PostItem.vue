@@ -16,12 +16,14 @@
 
     <div class="post-content">
       <p v-if="post.content">{{ post.content }}</p>
-      <img
-        v-if="post.image"
-        :src="post.image"
-        :alt="post.content || 'Post image'"
-        class="post-image"
-      >
+      <div v-if="post.image_url" class="post-image-container">
+        <img
+          :src="getImageUrl(post.image_url)"
+          :alt="post.content || 'Post image'"
+          class="post-image"
+          @error="handleImageError"
+        >
+      </div>
     </div>
 
     <div class="post-actions">
@@ -119,12 +121,14 @@
               DEBUG: {{ JSON.stringify(comment) }}
             </div>
             <p class="comment-text">{{ comment.content }}</p>
-            <img 
-              v-if="comment.image" 
-              :src="comment.image" 
-              alt="Comment image"
-              class="comment-image"
-            >
+            <div v-if="comment.image_url" class="comment-image-container">
+              <img 
+                :src="getImageUrl(comment.image_url)" 
+                alt="Comment image"
+                class="comment-image"
+                @error="handleImageError"
+              >
+            </div>
           </div>
         </div>
 
@@ -357,6 +361,28 @@ function handleEnterKey(event) {
   }
 }
 
+// Image handling functions
+function getImageUrl(imagePath) {
+  if (!imagePath) return ''
+  
+  // If it's already a full URL, return as is
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath
+  }
+  
+  // Extract filename from path (e.g., "uploads/filename.jpg" -> "filename.jpg")
+  const filename = imagePath.split('/').pop()
+  
+  // Construct the full URL to the backend server
+  return `http://localhost:8080/images/${filename}`
+}
+
+function handleImageError(event) {
+  console.error('Failed to load image:', event.target.src)
+  // You can set a fallback image here
+  event.target.style.display = 'none'
+}
+
  
 </script>
 
@@ -454,13 +480,29 @@ function handleEnterKey(event) {
   word-break: break-word;
 }
 
-.post-image {
+.post-image-container {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   width: 100%;
   max-height: 340px;
+  overflow: hidden;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(37,99,235,0.10);
+}
+
+.post-image {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   border-radius: 14px;
-  margin-top: 12px;
   box-shadow: 0 2px 12px rgba(37,99,235,0.10);
+}
+
+.post-image:hover {
+  transform: scale(1.05);
+  transition: transform 0.3s ease-in-out;
 }
 
 .post-actions {
@@ -683,12 +725,23 @@ function handleEnterKey(event) {
   margin: 2px 0 0 0;
 }
 
+.comment-image-container {
+  margin-top: 4px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-height: 80px;
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(37,99,235,0.10);
+}
+
 .comment-image {
-  width: 80px;
-  height: 80px;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   border-radius: 8px;
-  margin-top: 4px;
   box-shadow: 0 1px 4px rgba(37,99,235,0.10);
 }
 

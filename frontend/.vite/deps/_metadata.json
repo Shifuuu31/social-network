@@ -1,8 +1,46 @@
 {
-  "hash": "1fca3625",
-  "configHash": "0ea57283",
+  "hash": "fa4d88eb",
+  "configHash": "d335925d",
   "lockfileHash": "3c3aafd5",
-  "browserHash": "e90ba80c",
-  "optimized": {},
-  "chunks": {}
+  "browserHash": "faf11b43",
+  "optimized": {
+    "vue": {
+      "src": "../../node_modules/vue/dist/vue.runtime.esm-bundler.js",
+      "file": "vue.js",
+      "fileHash": "f3460b8d",
+      "needsInterop": false
+    },
+    "@fortawesome/fontawesome-svg-core": {
+      "src": "../../../node_modules/@fortawesome/fontawesome-svg-core/index.mjs",
+      "file": "@fortawesome_fontawesome-svg-core.js",
+      "fileHash": "943ed1b4",
+      "needsInterop": false
+    },
+    "@fortawesome/vue-fontawesome": {
+      "src": "../../../node_modules/@fortawesome/vue-fontawesome/index.es.js",
+      "file": "@fortawesome_vue-fontawesome.js",
+      "fileHash": "1ed77fe0",
+      "needsInterop": false
+    },
+    "@fortawesome/free-solid-svg-icons": {
+      "src": "../../../node_modules/@fortawesome/free-solid-svg-icons/index.mjs",
+      "file": "@fortawesome_free-solid-svg-icons.js",
+      "fileHash": "ed55089d",
+      "needsInterop": false
+    },
+    "vue-router": {
+      "src": "../../node_modules/vue-router/dist/vue-router.mjs",
+      "file": "vue-router.js",
+      "fileHash": "c7fb8d64",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-FIWK3IM4": {
+      "file": "chunk-FIWK3IM4.js"
+    },
+    "chunk-IDACCYAP": {
+      "file": "chunk-IDACCYAP.js"
+    }
+  }
 }

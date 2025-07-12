@@ -34,6 +34,41 @@
         </div>
       </div>
       
+      <!-- Image Upload Section -->
+      <div class="form-group">
+        <label class="form-label">Image (Optional)</label>
+        <div class="image-upload-container">
+          <input 
+            ref="fileInput"
+            type="file" 
+            @change="handleImageSelect"
+            accept="image/jpeg,image/jpg,image/png,image/gif"
+            class="file-input"
+            :disabled="loading"
+          />
+          
+          <div class="upload-area" @click="triggerFileInput">
+            <div v-if="!selectedImage" class="upload-placeholder">
+              <div class="upload-icon">📷</div>
+              <p>Click to add an image</p>
+              <span class="upload-hint">Supports JPEG, PNG, GIF (max 5MB)</span>
+            </div>
+            
+            <div v-else class="image-preview">
+              <img :src="selectedImage" alt="Preview" class="preview-image" />
+              <button 
+                type="button" 
+                @click="removeImage" 
+                class="remove-image-btn"
+                :disabled="loading"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <div class="form-group">
         <label for="privacy" class="form-label">Privacy</label>
         <select 
@@ -84,9 +119,13 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { createPost } from '@/services/api.js'
+import { useAuth } from '@/composables/useAuth.js'
 
 // Define emits
 const emit = defineEmits(['post-created'])
+
+// Get auth context
+const { user } = useAuth()
 
 // Form data
 const title = ref('')
@@ -96,6 +135,11 @@ const loading = ref(false)
 const error = ref(null)
 const successMessage = ref('')
 
+// Image handling
+const fileInput = ref(null)
+const selectedImage = ref(null)
+const selectedFile = ref(null)
+
 // Computed properties
 const canSubmit = computed(() => {
   return title.value.trim().length > 0 && 
@@ -104,6 +148,48 @@ const canSubmit = computed(() => {
 })
 
 // Methods
+function triggerFileInput() {
+  if (!loading.value) {
+    fileInput.value.click()
+  }
+}
+
+function handleImageSelect(event) {
+  const file = event.target.files[0]
+  if (!file) return
+
+  // Validate file type
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+  if (!allowedTypes.includes(file.type)) {
+    error.value = 'Please select a valid image file (JPEG, PNG, or GIF).'
+    return
+  }
+
+  // Validate file size (5MB)
+  const maxSize = 5 * 1024 * 1024 // 5MB
+  if (file.size > maxSize) {
+    error.value = 'Image file is too large. Please select an image under 5MB.'
+    return
+  }
+
+  // Create preview
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    selectedImage.value = e.target.result
+    selectedFile.value = file
+    error.value = null
+  }
+  reader.readAsDataURL(file)
+}
+
+function removeImage() {
+  selectedImage.value = null
+  selectedFile.value = null
+  if (fileInput.value) {
+    fileInput.value.value = ''
+  }
+}
+
 async function submitPost() {
   error.value = null
   successMessage.value = ''
@@ -117,27 +203,36 @@ async function submitPost() {
     error.value = 'Content must be 500 characters or less.'
     return
   }
+
+  // Check if user is authenticated
+  if (!user.value || !user.value.id) {
+    error.value = 'Please log in to create a post.'
+    return
+  }
   
   loading.value = true
   
   try {
-    const postData = {
-      image_url: "ana/ghadi/ldar",
-      ownerId: 1,
-      content: content.value.trim(),
-      privacy: privacy.value,
-      groupId: null,     // Optional
-      // chosenUsersIds will be fetched from user's close friends in backend
+    // Create FormData for multipart upload
+    const formData = new FormData()
+    formData.append('content', content.value.trim())
+    formData.append('privacy', privacy.value)
+    formData.append('owner_id', user.value.id.toString()) // Use actual user ID
+    formData.append('group_id', '') // Optional
+    
+    // Add image if selected
+    if (selectedFile.value) {
+      formData.append('image', selectedFile.value)
     }
 
-    const response = await createPost(postData)
+    const response = await createPost(formData)
     
-     clearForm()
+    clearForm()
     
     // Show success message
     successMessage.value = 'Post created successfully!'
     
-     emit('post-created', response)
+    emit('post-created', response)
     
     // Clear success message after 3 seconds
     setTimeout(() => {
@@ -156,6 +251,11 @@ function clearForm() {
   title.value = ''
   content.value = ''
   privacy.value = 'public'
+  selectedImage.value = null
+  selectedFile.value = null
+  if (fileInput.value) {
+    fileInput.value.value = ''
+  }
   error.value = null
 }
 </script>
@@ -236,16 +336,110 @@ function clearForm() {
   opacity: 0.7;
 }
 
+/* Image Upload Styles */
+.image-upload-container {
+  position: relative;
+}
+
+.file-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.upload-area {
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #f9fafb;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-area:hover {
+  border-color: var(--primary);
+  background: #f0f4ff;
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.upload-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.upload-placeholder p {
+  margin: 0;
+  font-weight: 600;
+  color: var(--primary-dark);
+  font-size: 1rem;
+}
+
+.upload-hint {
+  font-size: 0.85rem;
+  color: #6b7280;
+  opacity: 0.8;
+}
+
+.image-preview {
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.preview-image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.remove-image-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+  transition: all 0.2s ease;
+}
+
+.remove-image-btn:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 16px; /* More space between buttons */
+  gap: 16px;
   margin-top: 12px;
 }
 
- 
-
- 
 .btn {
   display: inline-flex;
   align-items: center;
@@ -273,7 +467,6 @@ function clearForm() {
   transform: translateY(-2px) scale(1.03);
   box-shadow: 0 8px 28px rgba(124, 58, 237, 0.4);
 }
- 
 
 .btn-secondary {
   background: #e5e7eb;
@@ -306,8 +499,6 @@ function clearForm() {
   border: 1.5px solid #ef4444;
 }
 
-
-
 .loading-spinner {
   display: inline-block;
   width: 1em;
@@ -326,6 +517,15 @@ function clearForm() {
 @media (max-width: 768px) {
   .create-post-form {
     padding: 18px 8px 12px 8px;
+  }
+  
+  .upload-area {
+    padding: 16px;
+    min-height: 100px;
+  }
+  
+  .preview-image {
+    height: 150px;
   }
 }
 </style>
