@@ -98,9 +98,9 @@ func (pfl *PostFilter) Validate() error {
 		return errors.New("id cannot be negative")
 	}
 
-	if pfl.Start < 0 {
-		return errors.New("start cannot be negative")
-	}
+	// if pfl.Start < 0 {
+	// 	return errors.New("start cannot be negative")
+	// }
 
 	if pfl.Type != "" {
 		validTypes := map[string]bool{
@@ -131,6 +131,16 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 	fmt.Printf("Filter ID: %d\n", filter.Id)
 	fmt.Printf("Filter Start: %d\n", filter.Start)
 	fmt.Printf("Filter NPost: %d\n", filter.NPost)
+	if filter.Start == -1 {
+		switch filter.Type {
+		case "group":
+			err = pm.DB.QueryRow(`SELECT IFNULL(MAX(id), 0) FROM posts WHERE group_id = ?`, filter.Id).Scan(&filter.Start)
+		case "privacy", "single":
+			err = pm.DB.QueryRow(`SELECT IFNULL(MAX(id), 0) FROM posts`).Scan(&filter.Start)
+		case "public":
+			filter.Start = 0
+		}
+	}
 
 	switch filter.Type {
 	case "group":

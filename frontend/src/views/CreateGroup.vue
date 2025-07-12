@@ -139,6 +139,8 @@ const handleSubmit = async () => {
       isPublic: formData.isPublic,
       image: formData.image ? imagePreview.value : 'default-group.jpg' // Fallback image if no image is uploaded
     }
+    console.log('Creating group with data:', groupData);
+    
 
     const newGroup = await groupsStore.createGroup(groupData)
 

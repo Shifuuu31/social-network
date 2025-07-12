@@ -211,6 +211,50 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 		rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Creator added as group member"})
 	}
 
+	// Initialize group chat room in WebSocket hub
+	rt.Hub.InitializeGroupChat(group.ID)
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "DEBUG",
+		Message: "Group chat initialized in WebSocket hub",
+		Metadata: map[string]any{
+			"group_id": group.ID,
+		},
+	})
+
+	// If the creator has an active WebSocket connection, automatically join them to the group chat
+	if conn, hasConnection := rt.Hub.Clients[group.CreatorID]; hasConnection {
+		rt.Hub.JoinGroup(group.CreatorID, group.ID)
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "DEBUG",
+			Message: "Creator automatically joined group chat",
+			Metadata: map[string]any{
+				"group_id": group.ID,
+				"user_id":  group.CreatorID,
+			},
+		})
+
+		// Send a welcome message to the creator
+		if conn != nil {
+			welcomeMsg := map[string]interface{}{
+				"type":      "group_chat_created",
+				"group_id":  group.ID,
+				"message":   "Group chat has been created! You can now start chatting with group members.",
+				"timestamp": group.CreatedAt,
+			}
+			if err := conn.WriteJSON(welcomeMsg); err != nil {
+				rt.DL.Logger.Log(models.LogEntry{
+					Level:   "WARN",
+					Message: "Failed to send welcome message to group creator",
+					Metadata: map[string]any{
+						"group_id": group.ID,
+						"user_id":  group.CreatorID,
+						"error":    err.Error(),
+					},
+				})
+			}
+		}
+	}
+
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "New group created successfully",
@@ -295,6 +339,51 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member inserted with pending invite status"})
 
+	// Create notification for the invited user
+	// Get group information for the notification message
+	groupInfo := &models.Group{ID: member.GroupID}
+	if err := rt.DL.Groups.GetGroupByID(groupInfo); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "WARN",
+			Message: "Failed to get group info for notification, using generic message",
+			Metadata: map[string]any{
+				"group_id": member.GroupID,
+				"error":    err.Error(),
+			},
+		})
+		groupInfo.Title = "a group" // fallback
+	}
+
+	notification := &models.Notification{
+		UserID:  member.UserID,
+		Type:    "group_invite",
+		Message: fmt.Sprintf("You've been invited to join the group '%s'.", groupInfo.Title),
+		Seen:    false,
+	}
+
+	if err := rt.DL.Notifications.Insert(notification); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to create notification for group invite",
+			Metadata: map[string]any{
+				"user_id":  member.UserID,
+				"group_id": member.GroupID,
+				"error":    err.Error(),
+			},
+		})
+		// Don't fail the whole request if notification creation fails
+	} else {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "INFO",
+			Message: "Notification created for group invite",
+			Metadata: map[string]any{
+				"user_id":         member.UserID,
+				"group_id":        member.GroupID,
+				"notification_id": notification.ID,
+			},
+		})
+	}
+
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "Member invited successfully",
@@ -303,7 +392,6 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 			"path": r.URL.Path,
 		},
 	})
-	// TODO Add notification
 
 	if err := tools.EncodeJSON(w, http.StatusCreated, nil); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -354,7 +442,70 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member inserted with pending join request status"})
 
-	// TODO Notify group creator
+	// Create notification for the group creator about the join request
+	// Get group information for the notification message
+	groupInfo := &models.Group{ID: member.GroupID}
+	if err := rt.DL.Groups.GetGroupByID(groupInfo); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "WARN",
+			Message: "Failed to get group info for notification, using generic message",
+			Metadata: map[string]any{
+				"group_id": member.GroupID,
+				"error":    err.Error(),
+			},
+		})
+		groupInfo.Title = "your group" // fallback
+		groupInfo.CreatorID = 1        // fallback to avoid breaking
+	}
+
+	// Get the user who requested to join for a more personalized message
+	requestUser := &models.User{ID: member.UserID}
+	userDisplayName := "Someone"
+	if err := rt.DL.Users.GetUserByID(requestUser); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "WARN",
+			Message: "Failed to get user info for notification, using generic message",
+			Metadata: map[string]any{
+				"user_id": member.UserID,
+				"error":   err.Error(),
+			},
+		})
+	} else {
+		userDisplayName = requestUser.FirstName + " " + requestUser.LastName
+	}
+
+	notification := &models.Notification{
+		UserID:  groupInfo.CreatorID,
+		Type:    "group_join_request",
+		Message: fmt.Sprintf("%s requested to join your group '%s'.", userDisplayName, groupInfo.Title),
+		Seen:    false,
+	}
+
+	if err := rt.DL.Notifications.Insert(notification); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to create notification for group join request",
+			Metadata: map[string]any{
+				"creator_id":   groupInfo.CreatorID,
+				"group_id":     member.GroupID,
+				"requester_id": member.UserID,
+				"error":        err.Error(),
+			},
+		})
+		// Don't fail the whole request if notification creation fails
+	} else {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "INFO",
+			Message: "Notification created for group join request",
+			Metadata: map[string]any{
+				"creator_id":      groupInfo.CreatorID,
+				"group_id":        member.GroupID,
+				"requester_id":    member.UserID,
+				"notification_id": notification.ID,
+			},
+		})
+	}
+
 	tools.EncodeJSON(w, http.StatusCreated, member.Status)
 }
 
@@ -440,7 +591,59 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member status updated in DB"})
 
-	// Notify group creator
+	// If the member status is now "member", automatically join them to the group chat
+	if member.Status == "member" {
+		// Ensure group chat exists in hub
+		rt.Hub.InitializeGroupChat(member.GroupID)
+
+		// If the new member has an active WebSocket connection, join them to the group chat
+		if conn, hasConnection := rt.Hub.Clients[member.UserID]; hasConnection {
+			rt.Hub.JoinGroup(member.UserID, member.GroupID)
+			rt.DL.Logger.Log(models.LogEntry{
+				Level:   "DEBUG",
+				Message: "New member automatically joined group chat",
+				Metadata: map[string]any{
+					"group_id": member.GroupID,
+					"user_id":  member.UserID,
+				},
+			})
+
+			// Send a welcome message to the new member
+			if conn != nil {
+				welcomeMsg := map[string]interface{}{
+					"type":      "group_joined",
+					"group_id":  member.GroupID,
+					"message":   "Welcome to the group! You can now participate in group chat.",
+					"timestamp": "",
+				}
+				if err := conn.WriteJSON(welcomeMsg); err != nil {
+					rt.DL.Logger.Log(models.LogEntry{
+						Level:   "WARN",
+						Message: "Failed to send welcome message to new group member",
+						Metadata: map[string]any{
+							"group_id": member.GroupID,
+							"user_id":  member.UserID,
+							"error":    err.Error(),
+						},
+					})
+				}
+			}
+		}
+	}
+
+	// TODO Notify group creator
+	if err := tools.EncodeJSON(w, http.StatusOK, member); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to send accept/decline response",
+			Metadata: map[string]any{
+				"member": member,
+				"ip":     r.RemoteAddr,
+				"path":   r.URL.Path,
+				"error":  err.Error(),
+			},
+		})
+	}
 }
 
 func (rt *Root) BrowseGroups(w http.ResponseWriter, r *http.Request) {
@@ -561,7 +764,76 @@ func (rt *Root) NewEvent(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
-	// TODO send notification to group members
+	// Send notifications to all group members about the new event
+	// Get group information for the notification message
+	groupInfo := &models.Group{ID: event.GroupId}
+	if err := rt.DL.Groups.GetGroupByID(groupInfo); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "WARN",
+			Message: "Failed to get group info for event notification, using generic message",
+			Metadata: map[string]any{
+				"group_id": event.GroupId,
+				"error":    err.Error(),
+			},
+		})
+		groupInfo.Title = "a group" // fallback
+	}
+
+	// Get all group members to notify them
+	groupMembers, err := rt.DL.Members.GetGroupMembers(event.GroupId)
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to get group members for event notification",
+			Metadata: map[string]any{
+				"group_id": event.GroupId,
+				"event_id": event.ID,
+				"error":    err.Error(),
+			},
+		})
+	} else {
+		// Create notifications for all group members (except the event creator)
+		eventCreatorID := 1 // TODO: Get from auth when available
+		notificationCount := 0
+
+		for _, member := range groupMembers {
+			// Skip the event creator and only notify actual members
+			if member.UserID != eventCreatorID && member.Status == "member" {
+				notification := &models.Notification{
+					UserID:  member.UserID,
+					Type:    "group_event_created",
+					Message: fmt.Sprintf("A new event '%s' has been created in group '%s'.", event.Title, groupInfo.Title),
+					Seen:    false,
+				}
+
+				if err := rt.DL.Notifications.Insert(notification); err != nil {
+					rt.DL.Logger.Log(models.LogEntry{
+						Level:   "ERROR",
+						Message: "Failed to create event notification for group member",
+						Metadata: map[string]any{
+							"user_id":  member.UserID,
+							"group_id": event.GroupId,
+							"event_id": event.ID,
+							"error":    err.Error(),
+						},
+					})
+				} else {
+					notificationCount++
+				}
+			}
+		}
+
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "INFO",
+			Message: "Event notifications created for group members",
+			Metadata: map[string]any{
+				"group_id":           event.GroupId,
+				"event_id":           event.ID,
+				"notifications_sent": notificationCount,
+				"total_members":      len(groupMembers),
+			},
+		})
+	}
 
 	if err := tools.EncodeJSON(w, http.StatusCreated, event); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{

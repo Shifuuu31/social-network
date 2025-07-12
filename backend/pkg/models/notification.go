@@ -8,8 +8,8 @@ import (
 type Notification struct {
 	ID        int    `json:"id"`
 	UserID    int    `json:"user_id"`
-	Type      string `json:"type"` 
-	Message   string `json:"message"` 
+	Type      string `json:"type"`
+	Message   string `json:"message"`
 	Seen      bool   `json:"seen"`
 	CreatedAt int    `json:"created_at"`
 }
@@ -34,6 +34,26 @@ func (nm *NotificationModel) Upsert(notification *Notification) error {
 	if _, err := nm.DB.Exec(query, notification.ID, notification.UserID, notification.Type, notification.Message, notification.Seen, notification.CreatedAt); err != nil {
 		return fmt.Errorf("upsert notification: %w", err)
 	}
+	return nil
+}
+
+// Insert inserts a new notification into the database
+func (nm *NotificationModel) Insert(notification *Notification) error {
+	query := `
+		INSERT INTO notifications (user_id, type, message, seen)
+		VALUES (?, ?, ?, ?)
+	`
+
+	res, err := nm.DB.Exec(query, notification.UserID, notification.Type, notification.Message, notification.Seen)
+	if err != nil {
+		return fmt.Errorf("insert notification: %w", err)
+	}
+
+	lastID, err := res.LastInsertId()
+	if err == nil {
+		notification.ID = int(lastID)
+	}
+
 	return nil
 }
 

@@ -144,7 +144,7 @@ const handleJoin = async () => {
     await groupsStore.requestJoinGroup(props.group.id)
     emit('group-joined', props.group.id)
     // Show success message
-    alert('Join request sent successfully!')
+    // alert('Join request sent successfully!')
   } catch (error) {
     console.error('Failed to join group:', error)
     alert(`Failed to join group: ${error.message}`)

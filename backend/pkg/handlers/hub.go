@@ -91,10 +91,10 @@ WSLoop:
 				Status:  "error",
 				Message: "failed to send msg",
 			})
-			break WSLoop 
+			break WSLoop
 		}
 
-		msg.SenderID = requesterID 
+		msg.SenderID = requesterID
 		// Insert message into DB, log errors if any
 		if err := rt.DL.Messages.Insert(msg); err != nil {
 			rt.DL.Logger.Log(models.LogEntry{
@@ -228,6 +228,19 @@ func (hub *WSHub) JoinGroup(requesterID, groupID int) {
 	if conn, ok := hub.Clients[requesterID]; ok {
 		hub.Groups[groupID][requesterID] = conn
 		log.Printf("User %d joined group %d", requesterID, groupID)
+	}
+}
+
+// InitializeGroupChat creates a new group chat room in the hub
+func (hub *WSHub) InitializeGroupChat(groupID int) {
+	hub.Lock.Lock()
+	defer hub.Lock.Unlock()
+
+	if hub.Groups[groupID] == nil {
+		hub.Groups[groupID] = make(map[int]*websocket.Conn)
+		log.Printf("Initialized group chat for group %d", groupID)
+	} else {
+		log.Printf("Group chat for group %d already exists", groupID)
 	}
 }
 
