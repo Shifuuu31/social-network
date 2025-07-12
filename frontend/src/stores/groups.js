@@ -46,7 +46,7 @@ export const useGroupsStore = defineStore('groups', () => {
       title: apiPost.title,
       content: apiPost.content,
       author: apiPost.author_name,
-      authorAvatar: apiPost.author_avatar.Valid ? `${API_BASE}/images/${apiPost.author_avatar.String}` : '/default-avatar.jpg',
+      authorAvatar: apiPost.author_avatar ? `${API_BASE}/images/${apiPost.author_avatar.String}` : '/default-avatar.jpg',
       createdAt: apiPost.created_at,
       likes: apiPost.likes_count || 0,
       comments: apiPost.comments_count || 0
@@ -198,7 +198,7 @@ export const useGroupsStore = defineStore('groups', () => {
       const response = await fetch(`${API_BASE}/groups/group/events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ group_id: groupId, n_items: 20})
+        body: JSON.stringify({ group_id: groupId, start: -1, n_items: 20 })
       })
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -227,7 +227,7 @@ export const useGroupsStore = defineStore('groups', () => {
       const apiGroupData = {
         title: groupData.name,
         description: groupData.description,
-        image_uuid: {String:groupData.image}|| {Valid:false},
+        image_uuid: groupData.image,
       }
 
       const response = await fetch(`${API_BASE}/groups/group/new`, {

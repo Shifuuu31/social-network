@@ -42,6 +42,9 @@ func NewApp(db *sql.DB) *handlers.Root {
 			Messages: &models.MessageModel{
 				DB: db,
 			},
+			Notifications: &models.NotificationModel{
+				DB: db,
+			},
 			Images: &models.ImageModel{
 				DB: db,
 			},
