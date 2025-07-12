@@ -137,6 +137,7 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 			users.nickname, 
 			posts.group_id,
 			posts.content,
+			posts.image_url,
 			posts.privacy, 
 			posts.created_at,
 			COALESCE(comment_counts.reply_count, 0) as replies
@@ -187,6 +188,7 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 			&post.Owner,
 			&post.GroupId,
 			&post.Content,
+			&post.Image_url,
 			&post.Privacy,
 			&post.CreatedAt,
 			&post.Replies,
@@ -212,23 +214,41 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 func ParsePostFromForm(r *http.Request, post *Post) int {
 	var err error
 
-	// Parse owner_id
-	if ownerIdStr := r.FormValue("owner_id"); ownerIdStr != "" {
-		if post.OwnerId, err = strconv.Atoi(ownerIdStr); err != nil {
-			return 400
-		}
+	// Parse owner_id (required)
+	ownerIdStr := r.FormValue("owner_id")
+	if ownerIdStr == "" {
+		// Try alternative field name
+		ownerIdStr = r.FormValue("ownerId")
+	}
+	if ownerIdStr == "" {
+		return 400 // owner_id is required
+	}
+	if post.OwnerId, err = strconv.Atoi(ownerIdStr); err != nil {
+		return 400
 	}
 
-	// Parse group_id
-	if groupIdStr := r.FormValue("group_id"); groupIdStr != "" {
+	// Parse group_id (optional)
+	groupIdStr := r.FormValue("group_id")
+	if groupIdStr == "" {
+		// Try alternative field name
+		groupIdStr = r.FormValue("groupId")
+	}
+	if groupIdStr != "" {
 		if post.GroupId, err = strconv.Atoi(groupIdStr); err != nil {
 			return 400
 		}
+	} else {
+		post.GroupId = 0 // Default to 0 (no group)
 	}
 
 	// Parse content and privacy
 	post.Content = r.FormValue("content")
 	post.Privacy = r.FormValue("privacy")
+
+	// Set default privacy if not provided
+	if post.Privacy == "" {
+		post.Privacy = "public"
+	}
 
 	// Parse chosen_users_ids for private posts
 	if chosenUsersStr := r.FormValue("chosen_users_ids"); chosenUsersStr != "" {

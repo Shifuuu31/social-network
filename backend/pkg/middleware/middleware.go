@@ -43,24 +43,27 @@ var skipPaths = []string{
 	"/auth/signup",
 	"/signup",
 	"/signin",
-
 	"/auth/signin",
 }
 
 // Optional: define prefixes to skip (e.g., for /static/*)
 var skipPrefixes = []string{
 	"/public/",
+	"/images/", // Allow image serving without authentication
 }
 
 // RequireAuth checks if a user is authenticated by session
 func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("FROM MIDLWER 111D")
+		fmt.Printf("AccessMiddleware: %s %s\n", r.Method, r.URL.Path)
+
 		if slices.Contains(skipPaths, r.URL.Path) || tools.SliceHasPrefix(skipPrefixes, r.URL.Path) {
-			fmt.Println("1")
+			fmt.Printf("Skipping authentication for: %s\n", r.URL.Path)
 			next.ServeHTTP(w, r)
 			return
 		}
+
+		fmt.Printf("Requiring authentication for: %s\n", r.URL.Path)
 		cookie, err := r.Cookie("session_token")
 		if err != nil || cookie.Value == "" {
 			dl.Logger.Log(models.LogEntry{

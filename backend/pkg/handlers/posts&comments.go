@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"os"
+	"path/filepath"
 	"social-network/pkg/models"
 	"social-network/pkg/tools"
 )
@@ -27,6 +29,8 @@ func (rt *Root) SetupPostRoutes(mux *http.ServeMux) {
 	postMux.HandleFunc("POST /feed", rt.GetFeedPosts)
 	postMux.HandleFunc("POST /new", rt.NewPost)
 	postMux.HandleFunc("GET /followers", rt.GetFollowers) // it already in profile&follow.go
+
+	// Add comment routes
 	postMux.HandleFunc("GET /{post_id}/comments", rt.GetFeedComments)
 	postMux.HandleFunc("POST /{post_id}/comments/new", rt.NewComment)
 
@@ -131,11 +135,18 @@ func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 
 		// Parse post data from form values using tools function
 		if status := models.ParsePostFromForm(r, &post); status != 200 {
+			log.Printf("ParsePostFromForm failed with status: %d", status)
+			log.Printf("Form values: owner_id=%s, content=%s, privacy=%s",
+				r.FormValue("owner_id"), r.FormValue("content"), r.FormValue("privacy"))
 			tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
 				"error": "Invalid form data",
 			})
 			return
 		}
+
+		// Debug: Log the parsed post data
+		log.Printf("Parsed post: OwnerId=%d, Content='%s', Privacy='%s'",
+			post.OwnerId, post.Content, post.Privacy)
 	} else if strings.Contains(contentType, "application/json") {
 		// Handle JSON request
 		if err := tools.DecodeJSON(r, &post); err != nil {
@@ -154,6 +165,9 @@ func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 
 	// Validate post using existing tools function
 	if err := post.Validate(); err != nil {
+		log.Printf("Post validation failed: %v", err)
+		log.Printf("Post data: OwnerId=%d, Content='%s', Privacy='%s', GroupId=%d",
+			post.OwnerId, post.Content, post.Privacy, post.GroupId)
 		tools.RespondError(w, "Invalid post data", http.StatusBadRequest)
 		return
 	}
@@ -320,6 +334,83 @@ func (app *Root) GetFeedComments(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tools.EncodeJSON(w, http.StatusOK, comments)
+}
+
+// ServeImage serves uploaded images
+func (app *Root) ServeImage(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("ServeImage called with path: %s\n", r.URL.Path)
+
+	filename := r.PathValue("filename")
+	if filename == "" {
+		fmt.Printf("No filename provided\n")
+		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "Filename is required",
+		})
+		return
+	}
+
+	fmt.Printf("Serving image: %s\n", filename)
+
+	// Construct the full path to the image
+	imagePath := filepath.Join("uploads", filename)
+	fmt.Printf("Full image path: %s\n", imagePath)
+
+	// Check if file exists
+	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+		fmt.Printf("Image file not found: %s\n", imagePath)
+		tools.EncodeJSON(w, http.StatusNotFound, map[string]string{
+			"error": "Image not found",
+		})
+		return
+	}
+
+	fmt.Printf("Image file found, serving: %s\n", imagePath)
+
+	// Set proper headers for image serving
+	w.Header().Set("Content-Type", "image/jpeg")                // Default to JPEG, could be made dynamic
+	w.Header().Set("Cache-Control", "public, max-age=31536000") // Cache for 1 year
+
+	// Serve the file
+	http.ServeFile(w, r, imagePath)
+}
+
+// ServeImageHandler handles image serving with traditional URL pattern
+func (app *Root) ServeImageHandler(w http.ResponseWriter, r *http.Request) {
+	// Extract filename from URL path
+	// URL will be like /images/filename.jpg
+	path := r.URL.Path
+	filename := path[len("/images/"):] // Remove "/images/" prefix
+
+	if filename == "" {
+		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "Filename is required",
+		})
+		return
+	}
+
+	fmt.Printf("ServeImageHandler called with filename: %s\n", filename)
+
+	// Construct the full path to the image
+	imagePath := filepath.Join("uploads", filename)
+	fmt.Printf("Full image path: %s\n", imagePath)
+
+	// Check if file exists
+	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+		fmt.Printf("Image file not found: %s\n", imagePath)
+		tools.EncodeJSON(w, http.StatusNotFound, map[string]string{
+			"error": "Image not found",
+		})
+		return
+	}
+
+	fmt.Printf("Image file found, serving: %s\n", imagePath)
+
+	// Set proper headers for image serving
+	w.Header().Set("Content-Type", "image/jpeg")                // Default to JPEG, could be made dynamic
+	w.Header().Set("Cache-Control", "public, max-age=31536000") // Cache for 1 year
+
+	// Serve the file
+	http.ServeFile(w, r, imagePath)
 }
 
 func (app *Root) NewComment(w http.ResponseWriter, r *http.Request) {
