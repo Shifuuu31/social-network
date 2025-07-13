@@ -329,7 +329,6 @@ export const useGroupsStore = defineStore('groups', () => {
   }
 
   const requestJoinGroup = async (groupId) => {
-    // isLoading.value = true
     error.value = null
 
     try {
@@ -340,7 +339,7 @@ export const useGroupsStore = defineStore('groups', () => {
           user_id: 1, // TODO Replace with actual user ID from context or store
           group_id: groupId,
           status: 'requested',
-          prev_status: 'requested'
+          prev_status: 'none'
         })
       })
 
@@ -349,15 +348,14 @@ export const useGroupsStore = defineStore('groups', () => {
         throw new Error(errorData.message || 'Failed to join group')
       }
 
-      const data = await response.json()
+      const memberStatus = await response.json() // Backend returns just the status string
 
       // Update local state
       const updatedGroups = groups.value.map(group => {
         if (group.id === groupId) {
           return {
             ...group,
-            isMember: data.is_member || '',
-            memberCount: data.is_member ? group.memberCount + 1 : group.memberCount
+            isMember: memberStatus, // Set to 'requested'
           }
         }
         return group
@@ -368,18 +366,15 @@ export const useGroupsStore = defineStore('groups', () => {
       if (currentGroup.value?.id === groupId) {
         currentGroup.value = {
           ...currentGroup.value,
-          isMember: data.is_member || '',
-          memberCount: data.is_member ? currentGroup.value.memberCount + 1 : currentGroup.value.memberCount
+          isMember: memberStatus, // Set to 'requested'
         }
       }
 
-      // return data
+      return memberStatus
     } catch (err) {
       error.value = err.message
       console.error('Error joining group:', err)
       throw err
-    } finally {
-      // isLoading.value = false
     }
   }
 

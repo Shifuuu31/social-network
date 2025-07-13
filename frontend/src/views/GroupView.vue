@@ -95,10 +95,10 @@
                     <h3>create a post</h3>
                   </div>
                   <form @submit.prevent="handleCreatePost" class="create-post-form">
-                    <input type="text" v-model="newPost.title" placeholder="Title of your post..." class="form-input"
-                      required />
-                    <textarea v-model="newPost.content" placeholder="Share something with the group..."
-                      class="form-textarea" rows="4" required></textarea>
+                    <!-- <input type="text" v-model="newPost.title" placeholder="Title of your post..." class="form-input"
+                       required /> -->
+                    <textarea v-model="newPost.content" placeholder="Share something with the group..." 
+                     class="form-textarea" rows="4" required></textarea>
                     <div class="form-actions">
                       <button type="submit" class="btn btn-primary" :disabled="isCreatingPost">
                         {{ isCreatingPost ? 'Publishing...' : 'Publish' }}
@@ -223,10 +223,6 @@
     <!-- Invite Modal -->
     <div v-if="showInviteModal" class="modal-overlay" @click="toggleInviteModal">
       <div class="modal-content" @click.stop>
-        <!-- <div class="modal-header">
-          <h3>Inviter des personnes</h3>
-          <button class="close-btn" @click="toggleInviteModal">×</button>
-        </div> -->
         <div class="modal-body">
           <input v-model="userSearch" @input="fetchUsers" placeholder="Search users by name or nickname..."
             class="form-input" />
@@ -245,29 +241,6 @@
         </div>
       </div>
     </div>
-
-    <!-- Invite Users Modal -->
-    <!-- <div v-if="showInviteUsersModal" class="modal-overlay" @click="toggleInviteUsersModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>Invite Users to Group</h3>
-          <button class="close-btn" @click="toggleInviteUsersModal">×</button>
-        </div>
-        <div class="modal-body">
-          <input v-model="userSearch" @input="fetchUsers" placeholder="Search users by name or nickname..." class="form-input" />
-          <div v-if="isLoadingUsers" class="loading"><div class="spinner"></div>Loading users...</div>
-          <div v-else-if="usersList.length === 0" class="empty-state">No users found.</div>
-          <ul v-else class="user-list">
-            <li v-for="user in usersList" :key="user.id" class="user-list-item">
-              <span>{{ user.nickname }} ({{ user.first_name }} {{ user.last_name }})</span>
-              <button class="btn btn-primary btn-sm" @click="inviteUser(user.id)" :disabled="invitedUserIds.includes(user.id)">
-                {{ invitedUserIds.includes(user.id) ? 'Invited' : 'Invite' }}
-              </button>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div> -->
   </div>
 
   <!-- Loading state for the entire component -->
@@ -284,259 +257,6 @@
   </div>
 </template>
 
-<!-- <script setup>
-import { ref, computed, onMounted, reactive, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { useGroupsStore } from '@/stores/groups'
-
-const route = useRoute()
-const groupsStore = useGroupsStore()
-// useGroupsStore.
-
-const activeTab = ref('posts')
-const isJoining = ref(false)
-const isLeaving = ref(false)
-const isCreatingPost = ref(false)
-const isCreatingEvent = ref(false)
-const isLoadingPosts = ref(false)
-const isLoadingEvents = ref(false)
-const showInviteModal = ref(false)
-// const inviteLinkInput = ref(null)
-const showInviteUsersModal = ref(false)
-const userSearch = ref("")
-const usersList = ref([])
-const isLoadingUsers = ref(false)
-const invitedUserIds = ref([])
-
-const newPost = reactive({
-  title: '',
-  content: ''
-})
-
-const newEvent = reactive({
-  title: '',
-  description: '',
-  date: '',
-  // location: ''
-})
-
-// const inviteLink = computed(() => {
-//   return `${window.location.origin}/groups/${route.params.id}?invite=true`
-// })
-
-const setActiveTab = (tab) => {
-  activeTab.value = tab
-  if (tab === 'posts' && groupsStore.groupPosts.length === 0) {
-    loadPosts()
-  } else if (tab === 'events' && groupsStore.groupEvents.length === 0) {
-    loadEvents()
-  }
-}
-
-const loadGroup = async () => {
-  try {
-    const groupId = parseInt(route.params.id)
-    await groupsStore.fetchGroup(groupId)
-  } catch (error) {
-    console.error('Failed to load group:', error)
-  }
-}
-
-const loadPosts = async () => {
-  if (isLoadingPosts.value) return
-
-  isLoadingPosts.value = true
-  try {
-    const groupId = parseInt(route.params.id)
-    await groupsStore.fetchGroupPosts(groupId)
-  } catch (error) {
-    console.error('Failed to load posts:', error)
-  } finally {
-    isLoadingPosts.value = false
-  }
-}
-
-const loadEvents = async () => {
-  if (isLoadingEvents.value) return
-
-  isLoadingEvents.value = true
-  try {
-    const groupId = parseInt(route.params.id)
-    await groupsStore.fetchGroupEvents(groupId)
-  } catch (error) {
-    console.error('Failed to load events:', error)
-  } finally {
-    isLoadingEvents.value = false
-  }
-}
-
-
-const handleAttendEvent = async (eventId, voteType) => {
-  try {
-    await groupsStore.attendEvent(eventId, voteType)
-  } catch (error) {
-    console.error('Failed to attend event:', error)
-  }
-}
-
-const handleJoinGroup = async () => {
-  if (isJoining.value) return
-
-  isJoining.value = true
-  try {
-    const groupId = parseInt(route.params.id)
-    await groupsStore.requestJoinGroup(groupId)
-  } catch (error) {
-    console.error('Failed to join group:', error)
-  } finally {
-    isJoining.value = false
-  }
-}
-
-// const handleLeaveGroup = async () => {
-//   if (isLeaving.value) return
-
-//   isLeaving.value = true
-//   try {
-//     const groupId = parseInt(route.params.id)
-//     await groupsStore.leaveGroup(groupId)
-//   } catch (error) {
-//     console.error('Failed to leave group:', error)
-//   } finally {
-//     isLeaving.value = false
-//   }
-// }
-
-const handleAcceptInvite = async () => {
-  if (isJoining.value) return
-
-  isJoining.value = true
-  try {
-    const groupId = parseInt(route.params.id)
-    await groupsStore.acceptGroupInvite(groupId)
-    // Reload group data after accepting invite
-    await loadGroup()
-  } catch (error) {
-    console.error('Failed to accept invite:', error)
-  } finally {
-    isJoining.value = false
-  }
-}
-
-const handleCreatePost = async () => {
-  if (isCreatingPost.value) return
-
-  isCreatingPost.value = true
-  try {
-    const groupId = parseInt(route.params.id)
-    await groupsStore.createPost(groupId, {
-      title: newPost.title,
-      content: newPost.content
-    })
-    newPost.title = ''
-    newPost.content = ''
-  } catch (error) {
-    console.error('Failed to create post:', error)
-  } finally {
-    isCreatingPost.value = false
-  }
-}
-
-const handleCreateEvent = async () => {
-  if (isCreatingEvent.value) return
-
-  isCreatingEvent.value = true
-  try {
-    const groupId = parseInt(route.params.id)
-    await groupsStore.createEvent(groupId, {
-      title: newEvent.title,
-      description: newEvent.description,
-      date: newEvent.date,
-    })
-
-    // Clear form
-    newEvent.title = ''
-    newEvent.description = ''
-    newEvent.date = ''
-
-    // No need to reload events since createEvent already updates the store
-  } catch (error) {
-    console.error('Failed to create event:', error)
-  } finally {
-    isCreatingEvent.value = false
-  }
-}
-
-const toggleInviteModal = () => {
-  showInviteModal.value = !showInviteModal.value
-  if (showInviteModal.value) {
-    userSearch.value = ''
-    usersList.value = []
-    invitedUserIds.value = []
-    fetchAllUsers() // Load available users when modal opens
-  }
-}
-
-// Old fetchUsers function removed - using the new filtered version below
-
-const inviteUser = async (userId) => {
-  try {
-    const groupId = parseInt(route.params.id)
-    await groupsStore.inviteUserToGroup(groupId, userId)
-    invitedUserIds.value.push(userId)
-  } catch (e) {
-    // Optionally show error
-  }
-}
-
-const formatDate = (dateString) => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-const formatEventDay = (dateString) => {
-  const date = new Date(dateString)
-  return date.getDate()
-}
-
-const formatEventMonth = (dateString) => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('fr-FR', { month: 'short' })
-}
-
-const formatEventTime = (dateString) => {
-  const date = new Date(dateString)
-  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-}
-
-// Watch for route changes to reload data
-watch(
-  () => route.params.id,
-  async (newId) => {
-    if (newId) {
-      await loadGroup()
-      await loadPosts()
-      await loadEvents()
-    }
-  },
-  { immediate: false }
-)
-
-onMounted(async () => {
-  await loadGroup()
-  await loadPosts()
-  // Load events if we're starting on the events tab
-  if (activeTab.value === 'events') {
-    await loadEvents()
-  }
-})
-</script> -->
 
 
 <script setup>
@@ -638,6 +358,8 @@ const handleJoinGroup = async () => {
   try {
     const groupId = parseInt(route.params.id)
     await groupsStore.requestJoinGroup(groupId)
+    // The requestJoinGroup function now updates the local state
+    // so no need to manually reload the group
   } catch (error) {
     console.error('Failed to join group:', error)
   } finally {
