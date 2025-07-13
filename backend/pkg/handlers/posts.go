@@ -261,10 +261,7 @@ func (app *Root) NewPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tools.EncodeJSON(w, http.StatusCreated, map[string]interface{}{
-		"message": "Post created successfully",
-		"post_id": postId,
-	})
+	tools.EncodeJSON(w, http.StatusCreated, post)
 }
 
 // func (app *Root) GetFeedComments(w http.ResponseWriter, r *http.Request) {

@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS posts (
     user_id INTEGER NOT NULL,
     group_id INTEGER,
     content TEXT NOT NULL,
-    image_uuid TEXT UNIQUE, 
+    image_uuid TEXT , 
     privacy TEXT NOT NULL CHECK(privacy IN ('public', 'followers', 'selected', 'group')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

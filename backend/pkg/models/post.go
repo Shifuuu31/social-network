@@ -134,19 +134,28 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 	if filter.Start == -1 {
 		switch filter.Type {
 		case "group":
+			// For groups, get the max ID to start from the newest post
 			err = pm.DB.QueryRow(`SELECT IFNULL(MAX(id), 0) FROM posts WHERE group_id = ?`, filter.Id).Scan(&filter.Start)
+			if err != nil {
+				fmt.Printf("ERROR: Failed to get max ID for group %d: %v\n", filter.Id, err)
+				return nil, err
+			}
 		case "privacy", "single":
 			err = pm.DB.QueryRow(`SELECT IFNULL(MAX(id), 0) FROM posts`).Scan(&filter.Start)
 		case "public":
 			filter.Start = 0
 		}
 	}
+	fmt.Println("Filter Start after adjustment:", filter.Start)
 
 	switch filter.Type {
+
 	case "group":
 		query = `
-            SELECT posts.id, posts.user_id, users.nickname, posts.group_id, 
-                   posts.content, posts.image_uuid, posts.privacy, posts.created_at,
+            SELECT posts.id, posts.user_id, 
+                   COALESCE(NULLIF(users.nickname, ''), users.first_name || ' ' || users.last_name) as owner, 
+                   posts.group_id, 
+                   posts.content, COALESCE(posts.image_uuid, '') as image_uuid, posts.privacy, posts.created_at,
                    COALESCE(comment_counts.reply_count, 0) as replies
             FROM posts
             JOIN users ON posts.user_id = users.id
@@ -155,8 +164,8 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
                 FROM comments
                 GROUP BY post_id
             ) comment_counts ON CAST(posts.id as TEXT) = comment_counts.post_id
-            WHERE posts.group_id = ? AND posts.privacy = 'group' AND posts.id >= ?
-            ORDER BY posts.id ASC
+            WHERE posts.group_id = ? AND posts.privacy = 'group' AND posts.id <= ?
+            ORDER BY posts.id DESC
             LIMIT ?`
 
 		fmt.Printf("Executing GROUP query with params: groupId=%d, start=%d, limit=%d\n",

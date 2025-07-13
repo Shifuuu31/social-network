@@ -530,50 +530,55 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 
 	// TODO validate payload
 
-	// Check if requester is creator
-	requesterID := 3 // TODO: Uncomment when auth is ready: rt.DL.GetRequesterID(w, r)
+	// For accept/decline operations, the requester should be the user performing the action
+	// This is different from other operations where we need the authenticated user ID
+	var requesterID int
 
 	switch member.PrevStatus {
 	case "requested":
+		// For join requests, only the group creator can accept/decline
+		requesterID = 1 // TODO: Get from auth when available
 		if err := rt.DL.Groups.IsUserCreator(member.GroupID, requesterID); err != nil {
 			rt.DL.Logger.Log(models.LogEntry{
 				Level:   "ERROR",
 				Message: "Forbidden: requester isn't the group creator",
 				Metadata: map[string]any{
-					"ip":    r.RemoteAddr,
-					"path":  r.URL.Path,
-					"error": err.Error(),
+					"ip":       r.RemoteAddr,
+					"path":     r.URL.Path,
+					"error":    err.Error(),
+					"group_id": member.GroupID,
+					"user_id":  requesterID,
 				},
 			})
 			tools.RespondError(w, "Forbidden", http.StatusForbidden)
 			return
 		}
 	case "invited":
-		if requesterID != member.UserID {
-			rt.DL.Logger.Log(models.LogEntry{
-				Level:   "ERROR",
-				Message: "Forbidden: requester isn't invited to the group",
-				Metadata: map[string]any{
-					"ip":   r.RemoteAddr,
-					"path": r.URL.Path,
-				},
-			})
-			tools.RespondError(w, "Forbidden", http.StatusForbidden)
-			return
+		// For invitations, the invited user accepts their own invitation
+		// So the requester should be the same as the user_id in the request
+		// requesterID = member.UserID
 
-		}
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "DEBUG",
+			Message: "User accepting their own invitation",
+			Metadata: map[string]any{
+				"user_id":  member.UserID,
+				"group_id": member.GroupID,
+				"status":   member.Status,
+			},
+		})
 	default:
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Invalid previous status in payload",
 			Metadata: map[string]any{
-				"ip":   r.RemoteAddr,
-				"path": r.URL.Path,
+				"ip":          r.RemoteAddr,
+				"path":        r.URL.Path,
+				"prev_status": member.PrevStatus,
 			},
 		})
 		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
 		return
-
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Requester authorized for accept/decline"})
 
@@ -631,7 +636,7 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 
 			// Send a welcome message to the new member
 			if conn != nil {
-				welcomeMsg := map[string]interface{}{
+				welcomeMsg := map[string]any{
 					"type":      "group_joined",
 					"group_id":  member.GroupID,
 					"message":   "Welcome to the group! You can now participate in group chat.",

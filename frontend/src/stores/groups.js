@@ -43,12 +43,10 @@ export const useGroupsStore = defineStore('groups', () => {
     return {
       id: apiPost.id,
       groupId: apiPost.group_id,
-      title: apiPost.title,
       content: apiPost.content,
       author: apiPost.author_name,
       authorAvatar: apiPost.author_avatar ? `${API_BASE}/images/${apiPost.author_avatar.String}` : '/default-avatar.jpg',
       createdAt: apiPost.created_at,
-      likes: apiPost.likes_count || 0,
       comments: apiPost.comments_count || 0
     }
   }
@@ -180,8 +178,7 @@ export const useGroupsStore = defineStore('groups', () => {
 
       const data = await response.json()
       const transformedPosts = Array.isArray(data) ? data.map(transformPostData) : []
-
-      groupPosts.value = transformedPosts.reverse()
+      groupPosts.value = transformedPosts
       
       return transformedPosts
     } catch (err) {
@@ -281,10 +278,11 @@ export const useGroupsStore = defineStore('groups', () => {
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
       }
 
-      const newPostData = await response.json()
-      const newPost = transformPostData(newPostData)
-
-      groupPosts.value.unshift(newPost)
+      // const newPostData = await response.json()
+      // const newPost = transformPostData(newPostData)
+      // groupPosts.value.unshift(newPost)
+      // console.log(groupPosts.value);
+      fetchGroupPosts(groupId) 
       return newPost
     } catch (err) {
       error.value = err.message
@@ -489,6 +487,59 @@ export const useGroupsStore = defineStore('groups', () => {
     }
   }
 
+  const declineGroupInvite = async (groupId) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const response = await fetch(`${API_BASE}/groups/group/accept-decline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          group_id: groupId,
+          user_id: 1, // TODO: Replace with actual user ID
+          status: 'declined',
+          prev_status: 'invited'
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || 'Failed to decline invitation')
+      }
+
+      const data = await response.json()
+
+      // Update local state - remove from groups list since invitation was declined
+      const updatedGroups = groups.value.map(group => {
+        if (group.id === groupId) {
+          return {
+            ...group,
+            isMember: '', // Clear member status
+          }
+        }
+        return group
+      })
+
+      groups.value = updatedGroups
+
+      if (currentGroup.value?.id === groupId) {
+        currentGroup.value = {
+          ...currentGroup.value,
+          isMember: '', // Clear member status
+        }
+      }
+
+      return data
+    } catch (err) {
+      error.value = err.message
+      console.error('Error declining group invitation:', err)
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   const clearError = () => {
     error.value = null
   }
@@ -594,6 +645,8 @@ export const useGroupsStore = defineStore('groups', () => {
     createEvent,
     requestJoinGroup,
     leaveGroup,
+    acceptGroupInvite,
+    declineGroupInvite,
     attendEvent,
     clearError,
     inviteUserToGroup
