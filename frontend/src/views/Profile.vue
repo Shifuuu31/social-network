@@ -202,9 +202,12 @@ async function uploadProfileImage(file) {
 // Helper function to get the full avatar URL
 function getAvatarUrl(avatarUrl) {
   if (avatarUrl && avatarUrl.startsWith('/images/')) {
-    // Extract filename from /images/filename
-    const filename = avatarUrl.replace('/images/', '')
     return `http://localhost:8080${avatarUrl}`
+  }
+  if (avatarUrl && avatarUrl.startsWith('uploads/')) {
+    // Convert uploads/filename to /images/filename format
+    const filename = avatarUrl.replace('uploads/', '')
+    return `http://localhost:8080/images/${filename}`
   }
   return '/images/default-avatar.png'
 }

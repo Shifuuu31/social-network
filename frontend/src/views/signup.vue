@@ -140,38 +140,47 @@ const onSubmit = async () => {
   Object.assign(errors, validation)
   if (Object.keys(validation).length) return
 
-  // const formData = new FormData()
-  
-  // formData.append(JSON.stringify(form))
-  
-  // if (avatarFile.value) {
-  //   formData.append('avatar_file', avatarFile.value)
-  // }
-
-  // for (const key in form) {
-  //   if (form[key]) formData.append(key, form[key])
-  // }
-  // if (avatarFile.value) {
-    // formData.append('avatar_file', avatarFile.value)
-  // }
-
   loading.value = true
   try {
-    const res = await fetch('http://localhost:8080/auth/signup', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(form),
-    })
+    let res;
+    
+    if (avatarFile.value) {
+      // Send as FormData if avatar is provided
+      const formData = new FormData()
+      
+      // Add all form fields
+      for (const key in form) {
+        if (form[key] !== null && form[key] !== undefined) {
+          formData.append(key, form[key])
+        }
+      }
+      
+      // Add avatar file
+      formData.append('avatar_file', avatarFile.value)
+      
+      res = await fetch('http://localhost:8080/auth/signup', {
+        method: 'POST',
+        body: formData,
+        // Don't set Content-Type - let browser set it with boundary
+      })
+    } else {
+      // Send as JSON if no avatar
+      res = await fetch('http://localhost:8080/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(form),
+      })
+    }
 
     if (!res.ok) {
       const msg = await res.text()
       throw new Error(msg || 'Failed to sign up.')
     }
-    console.log(res,"reees");
-     alert('Account created successfully!')
-
+    
+    console.log(res, "reees");
+    alert('Account created successfully!')
     router.push('/signin') 
 
    } catch (err) {

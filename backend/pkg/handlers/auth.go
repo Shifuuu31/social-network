@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"social-network/pkg/models"
@@ -23,20 +24,86 @@ func (rt *Root) NewAuthHandler() (authMux *http.ServeMux) {
 
 func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 	var user *models.User
-	fmt.Println("s")
+	var avatarPath string
+	// fmt.Println("s")
+	fmt.Println("DEBUG Content-Type:", r.Header.Get("Content-Type"))
 
-	if err := tools.DecodeJSON(r, &user); err != nil {
-		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "ERROR",
-			Message: "Failed to decode signup JSON",
-			Metadata: map[string]interface{}{
-				"ip":   r.RemoteAddr,
-				"path": r.URL.Path,
-				"err":  err.Error(),
-			},
-		})
-		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
-		return
+	contentType := r.Header.Get("Content-Type")
+
+	if strings.Contains(contentType, "multipart/form-data") {
+		// Handle FormData (with avatar file)
+		if err := r.ParseMultipartForm(10 << 20); err != nil { // 10MB limit
+			rt.DL.Logger.Log(models.LogEntry{
+				Level:   "ERROR",
+				Message: "Failed to parse multipart form",
+				Metadata: map[string]interface{}{
+					"ip":   r.RemoteAddr,
+					"path": r.URL.Path,
+					"err":  err.Error(),
+				},
+			})
+			tools.RespondError(w, "Failed to parse form data", http.StatusBadRequest)
+			return
+		}
+
+		// Parse user data from form fields
+		user = &models.User{
+			Email:     r.FormValue("email"),
+			Password:  r.FormValue("password"),
+			FirstName: r.FormValue("first_name"),
+			LastName:  r.FormValue("last_name"),
+			Gender:    r.FormValue("gender"),
+			Nickname:  r.FormValue("nickname"),
+			AboutMe:   r.FormValue("about_me"),
+			IsPublic:  r.FormValue("is_public") == "true",
+		}
+
+		// Parse date of birth
+		if dobStr := r.FormValue("date_of_birth"); dobStr != "" {
+			if dob, err := time.Parse(time.RFC3339, dobStr); err == nil {
+				user.DateOfBirth = dob
+			}
+		}
+
+		// Handle avatar file upload
+		if file, header, err := r.FormFile("avatar_file"); err == nil {
+			defer file.Close()
+
+			// Validate file size
+			if header.Size > 5<<20 { // 5 MB limit
+				tools.RespondError(w, "Avatar file too large (max 5MB)", http.StatusBadRequest)
+				return
+			}
+
+			// Validate file type using existing tools function
+			if !tools.IsAllowedFile(header.Filename, file) {
+				tools.RespondError(w, "Avatar file format is not supported", http.StatusBadRequest)
+				return
+			}
+
+			// Upload file using existing tools function
+			uploadedPath, status := tools.UploadHandler(file, header)
+			if status != 200 {
+				tools.RespondError(w, "Failed to upload avatar", status)
+				return
+			}
+			avatarPath = uploadedPath
+		}
+	} else {
+		// Handle JSON request (no avatar)
+		if err := tools.DecodeJSON(r, &user); err != nil {
+			rt.DL.Logger.Log(models.LogEntry{
+				Level:   "ERROR",
+				Message: "Failed to decode signup JSON",
+				Metadata: map[string]interface{}{
+					"ip":   r.RemoteAddr,
+					"path": r.URL.Path,
+					"err":  err.Error(),
+				},
+			})
+			tools.RespondError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// verify user input
@@ -72,6 +139,14 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user.PasswordHash = hash
+
+	// Set avatar URL if avatar was uploaded
+	if avatarPath != "" {
+		// Convert uploads/filename.jpg to /images/filename.jpg format
+		// to match the profile upload format
+		filename := strings.TrimPrefix(avatarPath, "uploads/")
+		user.AvatarURL = "/images/" + filename
+	}
 
 	// insert user into db
 	if err := rt.DL.Users.InsertUser(user); err != nil {

@@ -21,6 +21,7 @@ type Post struct {
 	CreatedAt      string `json:"created_at"`
 	ChosenUsersIds []int  `json:"chosen_users_ids"`
 	Image_url      string `json:"image_url"`
+	AvatarURL      string `json:"avatar_url"` // User's profile image
 	// Title string `json:"title"`
 }
 
@@ -140,7 +141,8 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 			posts.image_url,
 			posts.privacy, 
 			posts.created_at,
-			COALESCE(comment_counts.reply_count, 0) as replies
+			COALESCE(comment_counts.reply_count, 0) as replies,
+			users.avatar_url
 		FROM posts
 		JOIN users ON posts.user_id = users.id
 		LEFT JOIN (
@@ -167,7 +169,6 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 		ORDER BY posts.created_at DESC
 		LIMIT ? OFFSET ?
 	`
-	
 
 	rows, err = pm.DB.Query(query, filter.Id, filter.Id, filter.Id, filter.NPost, filter.Start)
 
@@ -193,6 +194,7 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 			&post.Privacy,
 			&post.CreatedAt,
 			&post.Replies,
+			&post.AvatarURL,
 		)
 
 		if err != nil {
@@ -209,6 +211,7 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 		return nil, err
 	}
 
+	fmt.Printf("DEBUG: First post avatar_url: %v\n", posts[0].AvatarURL)
 	return posts, nil
 }
 

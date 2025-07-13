@@ -3,9 +3,11 @@
     <div class="post-header">
       <div class="post-author">
         <img
-          :src="'/default-avatar.png'"
+          :src="post.avatar_url ? getImageUrl(post.avatar_url) : '/default-avatar.png'"
           :alt="post.owner || 'User'"
           class="avatar"
+          @error="console.log('Avatar failed to load for post:', post.id, 'avatar_url:', post.avatar_url)"
+          @load="console.log('Avatar loaded successfully for post:', post.id, 'avatar_url:', post.avatar_url)"
         >
         <div class="author-info">
           <h4 class="author-name">{{ post.owner || 'Anonymous' }}</h4>
@@ -162,6 +164,11 @@ const props = defineProps({
     type: Object,
     required: true
   }
+})
+
+// Debug: Log post data when component mounts
+onMounted(() => {
+  console.log('PostItem mounted for post:', props.post.id, 'avatar_url:', props.post.avatar_url)
 })
 
 // Reactive state
