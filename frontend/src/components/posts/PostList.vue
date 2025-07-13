@@ -5,7 +5,7 @@
       No posts found. Be the first to share something!
     </div>
     <div v-else class="posts">
-      <PostItem v-for="post in posts" :key="post.id" :post="post" />
+      <PostItem v-for="post in posts" :key="post.id" :post="post" :currentUser="currentUser" />
     </div>
     <div v-if="error" class="error-message">
       {{ error }}
@@ -17,6 +17,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { getPosts } from '@/services/api'
 import PostItem from './PostItem.vue'
+import { useAuth } from '@/composables/useAuth.js'
 
 // Props
 const props = defineProps({
@@ -45,6 +46,9 @@ const props = defineProps({
     default: 'public'
   }
 })
+
+// Get current user
+const { user: currentUser } = useAuth()
 
 // State
 const posts = ref([])

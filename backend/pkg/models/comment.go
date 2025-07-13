@@ -15,7 +15,7 @@ type Comment struct {
 	OwnerId   int    `json:"owner_id"`
 	Owner     string `json:"owner"`
 	Content   string `json:"content"`
-	Image     string `json:"image"`
+	Image     string `json:"image_url"`
 	CreatedAt string `json:"created_at"`
 }
 

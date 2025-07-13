@@ -390,13 +390,27 @@ func (app *Root) ServeImageHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("ServeImageHandler called with filename: %s\n", filename)
 
-	// Construct the full path to the image
-	imagePath := filepath.Join("uploads", filename)
-	fmt.Printf("Full image path: %s\n", imagePath)
+	// Try to find the image in different subdirectories
+	possiblePaths := []string{
+		filepath.Join("uploads", "profiles", filename),
+		filepath.Join("uploads", "posts", filename),
+		filepath.Join("uploads", "comments", filename),
+		filepath.Join("uploads", filename), // Fallback to old format
+	}
 
-	// Check if file exists
-	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
-		fmt.Printf("Image file not found: %s\n", imagePath)
+	var imagePath string
+	var found bool
+
+	for _, path := range possiblePaths {
+		if _, err := os.Stat(path); err == nil {
+			imagePath = path
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		fmt.Printf("Image file not found in any directory: %s\n", filename)
 		tools.EncodeJSON(w, http.StatusNotFound, map[string]string{
 			"error": "Image not found",
 		})
@@ -405,8 +419,22 @@ func (app *Root) ServeImageHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("Image file found, serving: %s\n", imagePath)
 
+	// Determine MIME type based on file extension
+	ext := strings.ToLower(filepath.Ext(filename))
+	var mimeType string
+	switch ext {
+	case ".jpg", ".jpeg":
+		mimeType = "image/jpeg"
+	case ".png":
+		mimeType = "image/png"
+	case ".gif":
+		mimeType = "image/gif"
+	default:
+		mimeType = "image/jpeg" // Default fallback
+	}
+
 	// Set proper headers for image serving
-	w.Header().Set("Content-Type", "image/jpeg")                // Default to JPEG, could be made dynamic
+	w.Header().Set("Content-Type", mimeType)
 	w.Header().Set("Cache-Control", "public, max-age=31536000") // Cache for 1 year
 
 	// Serve the file

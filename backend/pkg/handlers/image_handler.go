@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -20,23 +21,30 @@ func (rt *Root) NewImageHandler() *ImageHandler {
 }
 
 // SetupImageRoutes sets up image-related routes
-func (ih *ImageHandler) SetupImageRoutes(mux *http.ServeMux) {
+func (ih *ImageHandler) SetupImageRoutes() *http.ServeMux {
 	imageMux := http.NewServeMux()
 
 	// Image upload routes
-	imageMux.HandleFunc("POST /upload/post", ih.UploadPostImage)
-	imageMux.HandleFunc("POST /upload/profile", ih.UploadProfileImage)
-	imageMux.HandleFunc("POST /upload/comment", ih.UploadCommentImage)
+	imageMux.HandleFunc("/post", ih.UploadPostImage)
+	imageMux.HandleFunc("/profile", ih.UploadProfileImage)
+	imageMux.HandleFunc("/comment", ih.UploadCommentImage)
 
 	// Image serving routes
-	imageMux.HandleFunc("GET /serve/{image_id}", ih.ServeImage)
-	imageMux.HandleFunc("DELETE /delete/{image_id}", ih.DeleteImage)
+	imageMux.HandleFunc("/serve/", ih.ServeImage)
+	imageMux.HandleFunc("/delete/", ih.DeleteImage)
 
-	// mux.Handle("/images/", http.StripPrefix("/images", imageMux))
+	return imageMux
 }
 
 // UploadPostImage handles post image uploads
 func (ih *ImageHandler) UploadPostImage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		tools.EncodeJSON(w, http.StatusMethodNotAllowed, map[string]string{
+			"error": "Method not allowed",
+		})
+		return
+	}
+
 	requesterID := ih.DL.GetRequesterID(w, r)
 	if requesterID <= 0 {
 		tools.EncodeJSON(w, http.StatusUnauthorized, map[string]string{
@@ -81,6 +89,13 @@ func (ih *ImageHandler) UploadPostImage(w http.ResponseWriter, r *http.Request) 
 
 // UploadProfileImage handles profile image uploads
 func (ih *ImageHandler) UploadProfileImage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		tools.EncodeJSON(w, http.StatusMethodNotAllowed, map[string]string{
+			"error": "Method not allowed",
+		})
+		return
+	}
+
 	requesterID := ih.DL.GetRequesterID(w, r)
 	if requesterID <= 0 {
 		tools.EncodeJSON(w, http.StatusUnauthorized, map[string]string{
@@ -134,6 +149,13 @@ func (ih *ImageHandler) UploadProfileImage(w http.ResponseWriter, r *http.Reques
 
 // UploadCommentImage handles comment image uploads
 func (ih *ImageHandler) UploadCommentImage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		tools.EncodeJSON(w, http.StatusMethodNotAllowed, map[string]string{
+			"error": "Method not allowed",
+		})
+		return
+	}
+
 	requesterID := ih.DL.GetRequesterID(w, r)
 	if requesterID <= 0 {
 		tools.EncodeJSON(w, http.StatusUnauthorized, map[string]string{
@@ -256,7 +278,17 @@ func (ih *ImageHandler) DeleteImage(w http.ResponseWriter, r *http.Request) {
 
 // updateUserProfileImage updates a user's profile image
 func (ih *ImageHandler) updateUserProfileImage(userID, imageID int) error {
-	query := `UPDATE users SET image_id = ? WHERE id = ?`
-	_, err := ih.DL.Posts.DB.Exec(query, imageID, userID)
+	// Get the image to construct the URL
+	imageHandler := &models.ImageHandler{DB: ih.DL.Posts.DB}
+	image, err := imageHandler.GetImageByID(imageID)
+	if err != nil {
+		return fmt.Errorf("failed to get image: %w", err)
+	}
+
+	// Construct the avatar URL
+	avatarURL := fmt.Sprintf("/images/%s", image.Filename)
+
+	query := `UPDATE users SET avatar_url = ? WHERE id = ?`
+	_, err = ih.DL.Posts.DB.Exec(query, avatarURL, userID)
 	return err
 }

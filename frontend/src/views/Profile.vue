@@ -7,7 +7,29 @@
 
     <!-- Profile Info Card -->
     <div class="profile-header">
-      <img class="avatar" :src="profileUser.avatar" alt="Profile Picture" />
+      <div class="avatar-container">
+        <img class="avatar" :src="getAvatarUrl(profileUser.avatar_url)" alt="Profile Picture" />
+        <!-- Upload button for profile owner -->
+        <div v-if="isOwner" class="avatar-upload">
+          <input 
+            type="file" 
+            ref="fileInput" 
+            @change="handleFileSelect" 
+            accept="image/*" 
+            style="display: none;"
+          />
+          <button @click="$refs.fileInput.click()" class="upload-btn">
+            📷 Change Photo
+          </button>
+        </div>
+        <!-- Upload progress -->
+        <div v-if="isUploading" class="upload-progress">
+          <div class="progress-bar">
+            <div class="progress-fill" :style="{ width: uploadProgress + '%' }"></div>
+          </div>
+          <p>Uploading... {{ uploadProgress }}%</p>
+        </div>
+      </div>
       <div class="profile-info">
         <h2>{{ profileUser.nickname || profileUser.first_name }}</h2>
         <!-- <p class="role"></p> -->
@@ -85,7 +107,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useProfileView } from '@/composables/useProfile'
 
 const {
@@ -97,13 +119,95 @@ const {
   followingList,
   canViewPrivateProfile,
   initProfile,
+  fetchProfile,
   toggleFollow,
   toggleVisibility
 } = useProfileView()
 
+// Profile image upload state
+const fileInput = ref(null)
+const isUploading = ref(false)
+const uploadProgress = ref(0)
+
 onMounted(
   initProfile
 )
+
+// Handle file selection for profile image upload
+async function handleFileSelect(event) {
+  const file = event.target.files[0]
+  if (!file) return
+
+  // Validate file type
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+  if (!allowedTypes.includes(file.type)) {
+    alert('Please select a valid image file (JPEG, PNG, or GIF)')
+    return
+  }
+
+  // Validate file size (5MB limit)
+  if (file.size > 5 * 1024 * 1024) {
+    alert('Image file must be smaller than 5MB')
+    return
+  }
+
+  await uploadProfileImage(file)
+}
+
+// Upload profile image
+async function uploadProfileImage(file) {
+  isUploading.value = true
+  uploadProgress.value = 0
+
+  try {
+    const formData = new FormData()
+    formData.append('image', file)
+
+    const response = await fetch('http://localhost:8080/upload/profile', {
+      method: 'POST',
+      credentials: 'include',
+      body: formData
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Upload failed')
+    }
+
+    const result = await response.json()
+    
+    // Simulate progress for better UX
+    for (let i = 0; i <= 100; i += 10) {
+      uploadProgress.value = i
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+
+    // Refresh profile data to get the updated avatar_url
+    await fetchProfile()
+    
+    alert('Profile image updated successfully!')
+  } catch (error) {
+    console.error('Upload error:', error)
+    alert('Failed to upload image: ' + error.message)
+  } finally {
+    isUploading.value = false
+    uploadProgress.value = 0
+    // Reset file input
+    if (fileInput.value) {
+      fileInput.value.value = ''
+    }
+  }
+}
+
+// Helper function to get the full avatar URL
+function getAvatarUrl(avatarUrl) {
+  if (avatarUrl && avatarUrl.startsWith('/images/')) {
+    // Extract filename from /images/filename
+    const filename = avatarUrl.replace('/images/', '')
+    return `http://localhost:8080${avatarUrl}`
+  }
+  return '/images/default-avatar.png'
+}
 </script>
 
 <style scoped>
@@ -134,6 +238,14 @@ onMounted(
   gap: 1.5rem;
 }
 
+.avatar-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .avatar {
   width: 100px;
   height: 100px;
@@ -141,6 +253,70 @@ onMounted(
   border: 4px solid white;
   object-fit: cover;
   background: #eee;
+  transition: transform 0.2s ease;
+}
+
+.avatar:hover {
+  transform: scale(1.05);
+}
+
+.avatar-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.upload-btn {
+  background: #6a0dad;
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.upload-btn:hover {
+  background: #7d20c0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.upload-progress {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+  min-width: 150px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #6a0dad;
+  transition: width 0.3s ease;
+}
+
+.upload-progress p {
+  margin: 0;
+  font-size: 0.8rem;
 }
 
 .profile-info {

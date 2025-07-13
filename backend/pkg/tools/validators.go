@@ -42,6 +42,7 @@ func UploadHandler(file multipart.File, handler *multipart.FileHeader) (string, 
 	// }
 
 	// Check if it's an image
+	fmt.Println("HANDLER FILNAME", handler.Filename)
 	ext := strings.ToLower(filepath.Ext(handler.Filename))
 	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".gif" {
 		fmt.Println("Invalid file type")

@@ -74,8 +74,8 @@ function goToProfile() {
   backdrop-filter: blur(8px);
   border-radius: 0;
   margin: 0;
-  max-width: none;
-  width: 100vw;
+  max-width: 100vw;
+  /* width: 95%; */
   padding: 14px 48px;
   display: flex;
   align-items: center;

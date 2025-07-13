@@ -1,8 +1,18 @@
 <template>
   <div class="create-post-container">
-    <form @submit.prevent="submitPost" class="create-post-form">
+    <!-- Show button when form is collapsed -->
+    <div v-if="!showForm" class="create-post-button" @click="showForm = true">
+      <div class="button-content">
+        <span class="button-icon">✏️</span>
+        <span class="button-text">What's on your mind?</span>
+      </div>
+    </div>
+
+    <!-- Show full form when expanded -->
+    <form v-else @submit.prevent="submitPost" class="create-post-form">
       <div class="form-header">
         <h2>Create New Post</h2>
+        <button type="button" @click="closeForm" class="close-btn">✕</button>
       </div>
       
       <div class="form-group">
@@ -127,6 +137,9 @@ const emit = defineEmits(['post-created'])
 // Get auth context
 const { user } = useAuth()
 
+// Form state
+const showForm = ref(false)
+
 // Form data
 const title = ref('')
 const content = ref('')
@@ -188,6 +201,11 @@ function removeImage() {
   if (fileInput.value) {
     fileInput.value.value = ''
   }
+}
+
+function closeForm() {
+  showForm.value = false
+  clearForm()
 }
 
 async function submitPost() {
@@ -257,6 +275,7 @@ function clearForm() {
     fileInput.value.value = ''
   }
   error.value = null
+  showForm.value = false
 }
 </script>
 
@@ -271,6 +290,38 @@ function clearForm() {
   transition: box-shadow var(--transition);
 }
 
+.create-post-button {
+  padding: 20px 24px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px dashed rgba(37,99,235,0.2);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.8);
+}
+
+.create-post-button:hover {
+  border-color: rgba(37,99,235,0.4);
+  background: rgba(255,255,255,0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(37,99,235,0.15);
+}
+
+.button-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.button-icon {
+  font-size: 1.5rem;
+}
+
+.button-text {
+  font-size: 1.1rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
 .create-post-form {
   padding: 32px 28px 24px 28px;
   display: flex;
@@ -282,6 +333,9 @@ function clearForm() {
   margin-bottom: 12px;
   padding-bottom: 10px;
   border-bottom: 1.5px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .form-header h2 {
@@ -290,6 +344,27 @@ function clearForm() {
   font-weight: 800;
   color: var(--primary);
   letter-spacing: -0.5px;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
 }
 
 .form-group {
@@ -313,18 +388,27 @@ function clearForm() {
   padding: 12px 16px;
   border: 1.5px solid #e5e7eb;
   border-radius: 10px;
-  background: #f4f6fb;
-  color: var(--text-main);
+  background: #ffffff;
+  color: #1f2937;
   font-size: 1rem;
   font-family: inherit;
   transition: border var(--transition), background var(--transition);
   resize: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.form-input::placeholder,
+.form-textarea::placeholder {
+  color: #6b7280;
+  opacity: 0.8;
 }
 .form-input:focus,
 .form-textarea:focus {
   border: 1.5px solid var(--primary);
-  background: #fff;
+  background: #ffffff;
+  color: #1f2937;
   outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .character-count {
@@ -396,16 +480,27 @@ function clearForm() {
 .image-preview {
   position: relative;
   width: 100%;
-  max-width: 300px;
+  max-width: 400px;
   margin: 0 auto;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(37,99,235,0.15);
+  border: 1px solid rgba(37,99,235,0.1);
+  background: #f8fafc;
 }
 
 .preview-image {
   width: 100%;
-  height: 200px;
+  height: 250px;
   object-fit: cover;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+}
+
+.preview-image:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 30px rgba(37,99,235,0.25);
 }
 
 .remove-image-btn {

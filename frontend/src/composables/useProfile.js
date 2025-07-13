@@ -140,6 +140,7 @@ export function useProfileView() {
         followingList,
         canViewPrivateProfile,
         initProfile,
+        fetchProfile,
         toggleFollow,
         toggleVisibility,
     }

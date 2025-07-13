@@ -23,7 +23,9 @@ func (rt *Root) Router() (uh *http.ServeMux) {
 	// 	fmt.Println("ROOT REQUEST: %s %s", r.Method, r.URL.Path)
 	// })
 	rt.SetupPostRoutes(mainMux)
-	imageHandler.SetupImageRoutes(mainMux)
+
+	// Setup image routes
+	imageMux := imageHandler.SetupImageRoutes()
 
 	// Add a test route
 	mainMux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
@@ -36,6 +38,7 @@ func (rt *Root) Router() (uh *http.ServeMux) {
 	// Mount sub-muxes under prefixes
 	mainMux.Handle("/auth/", http.StripPrefix("/auth", authMux))
 	mainMux.Handle("/users/", http.StripPrefix("/users", userHandler))
+	mainMux.Handle("/upload/", http.StripPrefix("/upload", imageMux))
 
 	return mainMux
 }

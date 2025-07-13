@@ -116,17 +116,15 @@
               <span class="comment-author">{{ comment.owner || 'Anonymous' }}</span>
               <span class="comment-time">{{ formatDate(comment.created_at) }}</span>
             </div>
-            <!-- DEBUG: Show the full comment object -->
-            <div style="font-size: 10px; color: #999; margin-top: 5px;">
-              DEBUG: {{ JSON.stringify(comment) }}
-            </div>
+
             <p class="comment-text">{{ comment.content }}</p>
-            <div v-if="comment.image_url" class="comment-image-container">
+            <div v-if="comment.image_url || comment.image" class="comment-image-container">
               <img 
-                :src="getImageUrl(comment.image_url)" 
+                :src="getImageUrl(comment.image_url || comment.image)" 
                 alt="Comment image"
                 class="comment-image"
                 @error="handleImageError"
+                @load="console.log('Comment image loaded:', comment.image_url || comment.image)"
               >
             </div>
           </div>
@@ -210,7 +208,9 @@ async function toggleComments() {
   
   try {
     // Fixed: Match your backend route structure
-    const response = await fetch(`/post/${props.post.id}/comments`)
+    const response = await fetch(`/post/${props.post.id}/comments`, {
+      credentials: 'include'
+    })
     console.log("response", response)
     
     if (!response.ok) {
@@ -218,6 +218,7 @@ async function toggleComments() {
     }
     
     const data = await response.json()
+    console.log('Loaded comments data:', data)
     
     if (commentsOffset.value === 0) {
       comments.value = data || []
@@ -253,7 +254,7 @@ async function addComment() {
     formData.append('content', newComment.value.content.trim())
     // Removed: Don't send post_id in FormData since it's in the URL
     // formData.append('post_id', props.post.id.toString())
-    formData.append('owner_id', "1") // You should use actual user ID
+    formData.append('owner_id', props.currentUser?.id?.toString() || "1") // Use actual user ID
     
     // Add image if selected
     if (newComment.value.image) {
@@ -263,7 +264,8 @@ async function addComment() {
     // Fixed: Use correct URL with post_id in path
     const response = await fetch(`/post/${props.post.id}/comments/new`, {
       method: 'POST',
-      body: formData
+      body: formData,
+      credentials: 'include'
     })
     
     if (!response.ok) {
@@ -365,6 +367,8 @@ function handleEnterKey(event) {
 function getImageUrl(imagePath) {
   if (!imagePath) return ''
   
+  console.log('getImageUrl called with:', imagePath)
+  
   // If it's already a full URL, return as is
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
     return imagePath
@@ -374,7 +378,9 @@ function getImageUrl(imagePath) {
   const filename = imagePath.split('/').pop()
   
   // Construct the full URL to the backend server
-  return `http://localhost:8080/images/${filename}`
+  const fullUrl = `http://localhost:8080/images/${filename}`
+  console.log('Generated image URL:', fullUrl)
+  return fullUrl
 }
 
 function handleImageError(event) {
@@ -481,28 +487,38 @@ function handleImageError(event) {
 }
 
 .post-image-container {
-  margin-top: 12px;
+  margin-top: 16px;
   display: flex;
   justify-content: center;
   align-items: center;
   width: 100%;
-  max-height: 340px;
+  max-height: 500px;
   overflow: hidden;
-  border-radius: 14px;
-  box-shadow: 0 2px 12px rgba(37,99,235,0.10);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(37,99,235,0.15);
+  border: 1px solid rgba(37,99,235,0.1);
+  background: #f8fafc;
 }
 
 .post-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 14px;
-  box-shadow: 0 2px 12px rgba(37,99,235,0.10);
+  border-radius: 16px;
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+  opacity: 0;
+  animation: fadeIn 0.5s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .post-image:hover {
-  transform: scale(1.05);
-  transition: transform 0.3s ease-in-out;
+  transform: scale(1.02);
+  box-shadow: 0 8px 30px rgba(37,99,235,0.25);
 }
 
 .post-actions {
@@ -580,15 +596,23 @@ function handleImageError(event) {
   border: 1.5px solid #e5e7eb;
   padding: 10px 14px;
   font-size: 1rem;
-  background: #f4f6fb;
-  color: var(--text-main);
+  background: #ffffff;
+  color: #1f2937;
   transition: border var(--transition), background var(--transition);
   resize: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.comment-input::placeholder {
+  color: #6b7280;
+  opacity: 0.8;
 }
 .comment-input:focus {
   border: 1.5px solid var(--primary);
-  background: #fff;
+  background: #ffffff;
+  color: #1f2937;
   outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .comment-actions {
@@ -635,16 +659,22 @@ function handleImageError(event) {
 }
 
 .image-preview {
-  margin-top: 6px;
+  margin-top: 8px;
   position: relative;
-  width: 90px;
+  width: 120px;
+  height: 120px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 3px 15px rgba(37,99,235,0.12);
+  border: 1px solid rgba(37,99,235,0.08);
+  background: #f8fafc;
 }
 .image-preview img {
-  width: 90px;
-  height: 90px;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(37,99,235,0.10);
+  border-radius: 12px;
+  transition: all 0.3s ease-in-out;
 }
 .remove-image {
   position: absolute;
@@ -686,10 +716,11 @@ function handleImageError(event) {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: #fff;
+  background: #ffffff;
   border-radius: 10px;
-  padding: 10px 12px;
-  box-shadow: 0 1px 4px rgba(37,99,235,0.06);
+  padding: 12px 16px;
+  box-shadow: 0 2px 8px rgba(37,99,235,0.08);
+  border: 1px solid rgba(37,99,235,0.05);
 }
 
 .comment-content {
@@ -704,45 +735,59 @@ function handleImageError(event) {
   align-items: center;
   gap: 8px;
   font-size: 0.98em;
-  color: var(--primary-dark);
+  color: #2563eb;
   font-weight: 600;
 }
 
 .comment-author {
-  color: var(--primary-dark);
+  color: #2563eb;
   font-weight: 700;
 }
 
 .comment-time {
-  color: var(--text-light);
-  opacity: 0.7;
+  color: #6b7280;
+  opacity: 0.8;
   font-size: 0.92em;
 }
 
 .comment-text {
-  color: var(--text-main);
+  color: #1f2937;
   font-size: 1em;
   margin: 2px 0 0 0;
+  line-height: 1.5;
+  font-weight: 400;
 }
 
 .comment-image-container {
-  margin-top: 4px;
+  margin-top: 8px;
   display: flex;
   justify-content: center;
   align-items: center;
   width: 100%;
-  max-height: 80px;
-  overflow: hidden;
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(37,99,235,0.10);
+  max-height: 300px;
+  overflow: visible;
+  border-radius: 12px;
+  box-shadow: 0 3px 15px rgba(37,99,235,0.12);
+  border: 1px solid rgba(37,99,235,0.08);
+  background: #f8fafc;
+  padding: 8px;
 }
 
 .comment-image {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(37,99,235,0.10);
+  height: auto;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 12px;
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+  opacity: 0;
+  animation: fadeIn 0.5s ease-in-out forwards;
+}
+
+.comment-image:hover {
+  transform: scale(1.03);
+  box-shadow: 0 6px 25px rgba(37,99,235,0.2);
 }
 
 .load-more-btn {
@@ -784,13 +829,29 @@ function handleImageError(event) {
     width: 38px;
     height: 38px;
   }
+  .post-image-container {
+    max-height: 300px;
+    border-radius: 12px;
+  }
   .post-image {
-    border-radius: 8px;
+    border-radius: 12px;
+  }
+  .comment-image-container {
+    max-height: 200px;
+    border-radius: 10px;
+    padding: 6px;
+  }
+  .comment-image {
+    border-radius: 10px;
     max-height: 180px;
   }
   .comments-section {
     padding: 10px 2px 6px 2px;
     border-radius: 8px;
+  }
+  .image-preview {
+    width: 100px;
+    height: 100px;
   }
 }
 </style>

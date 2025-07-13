@@ -167,6 +167,7 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 		ORDER BY posts.created_at DESC
 		LIMIT ? OFFSET ?
 	`
+	
 
 	rows, err = pm.DB.Query(query, filter.Id, filter.Id, filter.Id, filter.NPost, filter.Start)
 
