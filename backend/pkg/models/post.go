@@ -126,58 +126,74 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 	var query string
 	var rows *sql.Rows
 
-	fmt.Println("filter.Type: momo", filter.Type)
+ fmt.Println("filter.Type: momo", filter.Type)
 	fmt.Println("filter.Id: momo", filter.Id)
 
-	// UNIFIED QUERY: Handle all privacy types in one query
-	// This query will show posts based on each post's individual privacy setting
-	query = `
-		SELECT 
-			posts.id, 
-			posts.user_id, 
-			users.nickname, 
-			posts.group_id,
-			posts.content,
-			posts.image_url,
-			posts.privacy, 
-			posts.created_at,
-			COALESCE(comment_counts.reply_count, 0) as replies,
-			users.avatar_url
-		FROM posts
-		JOIN users ON posts.user_id = users.id
-		LEFT JOIN (
-			SELECT post_id, COUNT(*) as reply_count
-			FROM comments
-			GROUP BY post_id
-		) comment_counts ON posts.id = comment_counts.post_id
-		LEFT JOIN follow_request 
-			ON follow_request.from_user_id = ? 
-			AND follow_request.to_user_id = posts.user_id 
-			AND follow_request.status = 'accepted'
-		LEFT JOIN post_privacy_selected
-			ON post_privacy_selected.post_id = posts.id 
-			AND post_privacy_selected.user_id = ?
-		WHERE
-			-- Show user's own posts (regardless of privacy)
-			posts.user_id = ?
-			-- OR show public posts (visible to everyone)
-			OR posts.privacy = 'public'
-			-- OR show followers-only posts if user is a follower
-			OR (posts.privacy = 'followers' AND follow_request.from_user_id IS NOT NULL)
-			-- OR show private posts if user is specifically selected
-			OR (posts.privacy = 'private' AND post_privacy_selected.user_id IS NOT NULL)
-		ORDER BY posts.created_at DESC
-		LIMIT ? OFFSET ?
-	`
-
-	rows, err = pm.DB.Query(query, filter.Id, filter.Id, filter.Id, filter.NPost, filter.Start)
-
-	if err != nil {
-		fmt.Printf("ERROR: Query execution failed: %v\n", err)
-		fmt.Printf("Query was: %s\n", query)
-		return nil, err
+	if filter.Type == "user" {
+		// Only fetch posts by this user
+		query = `
+			SELECT 
+				posts.id, 
+				posts.user_id, 
+				users.nickname, 
+				posts.group_id,
+				posts.content,
+				posts.image_url,
+				posts.privacy, 
+				posts.created_at,
+				COALESCE(comment_counts.reply_count, 0) as replies,
+				users.avatar_url
+			FROM posts
+			JOIN users ON posts.user_id = users.id
+			LEFT JOIN (
+				SELECT post_id, COUNT(*) as reply_count
+				FROM comments
+				GROUP BY post_id
+			) comment_counts ON posts.id = comment_counts.post_id
+			WHERE posts.user_id = ?
+			ORDER BY posts.created_at DESC
+			LIMIT ? OFFSET ?
+		`
+		rows, err = pm.DB.Query(query, filter.Id, filter.NPost, filter.Start)
+	} else {
+		// UNIFIED QUERY: Handle all privacy types in one query
+		query = `
+			SELECT 
+				posts.id, 
+				posts.user_id, 
+				users.nickname, 
+				posts.group_id,
+				posts.content,
+				posts.image_url,
+				posts.privacy, 
+				posts.created_at,
+				COALESCE(comment_counts.reply_count, 0) as replies,
+				users.avatar_url
+			FROM posts
+			JOIN users ON posts.user_id = users.id
+			LEFT JOIN (
+				SELECT post_id, COUNT(*) as reply_count
+				FROM comments
+				GROUP BY post_id
+			) comment_counts ON posts.id = comment_counts.post_id
+			LEFT JOIN follow_request 
+				ON follow_request.from_user_id = ? 
+				AND follow_request.to_user_id = posts.user_id 
+				AND follow_request.status = 'accepted'
+			LEFT JOIN post_privacy_selected
+				ON post_privacy_selected.post_id = posts.id 
+				AND post_privacy_selected.user_id = ?
+			WHERE
+				posts.user_id = ?
+				OR posts.privacy = 'public'
+				OR (posts.privacy = 'followers' AND follow_request.from_user_id IS NOT NULL)
+				OR (posts.privacy = 'private' AND post_privacy_selected.user_id IS NOT NULL)
+			ORDER BY posts.created_at DESC
+			LIMIT ? OFFSET ?
+		`
+		rows, err = pm.DB.Query(query, filter.Id, filter.Id, filter.Id, filter.NPost, filter.Start)
 	}
-
+	
 	defer rows.Close()
 
 	postCount := 0
