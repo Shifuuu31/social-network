@@ -64,18 +64,19 @@ export const useGroupsStore = defineStore('groups', () => {
   }
 
   // Actions
-  const fetchGroups = async (filter = 'all') => {
+  const fetchGroups = async (filter = 'all', searchTerm = '') => {
     if (isLoading.value) return
 
     isLoading.value = true
     error.value = null
 
     // Always pass user_id for proper filtering (TODO: Get from auth when available)
-    const requestBody = JSON.stringify({ 
-      user_id: '1', 
-      start: -1, 
-      n_items: 20, 
-      type: filter === 'user' ? 'user' : 'all' 
+    const requestBody = JSON.stringify({
+      user_id: '1',
+      start: -1,
+      n_items: 20,
+      type: filter === 'user' ? 'user' : 'all',
+      search: searchTerm // Add search parameter
     })
 
     try {
@@ -91,7 +92,11 @@ export const useGroupsStore = defineStore('groups', () => {
 
       const data = await response.json()
       let groupsData = []
-
+      if (!data) {
+        console.log("Warning: No data received from API");
+        
+        throw new Error("No data received from API")
+      }
       if (Array.isArray(data)) {
         groupsData = data
       } else if (data.groups && Array.isArray(data.groups)) {
@@ -101,12 +106,13 @@ export const useGroupsStore = defineStore('groups', () => {
       } else {
         groupsData = []
       }
+      console.log(groupsData)
 
       const transformedGroups = groupsData.map(transformGroupData)
       groups.value = transformedGroups
 
     } catch (err) {
-      // error.value = err.message
+      error.value = err.message
       groups.value = []
     } finally {
       isLoading.value = false
@@ -118,7 +124,6 @@ export const useGroupsStore = defineStore('groups', () => {
     error.value = null
 
     try {
-      // First check if we already have the group in our store
       const existingGroup = getGroupById.value(groupId)
       if (existingGroup && currentGroup.value?.id === groupId) {
         isLoading.value = false
@@ -174,7 +179,7 @@ export const useGroupsStore = defineStore('groups', () => {
       const data = await response.json()
       const transformedPosts = Array.isArray(data) ? data.map(transformPostData) : []
       groupPosts.value = transformedPosts
-      
+
       return transformedPosts
     } catch (err) {
       error.value = err.message
@@ -213,7 +218,7 @@ export const useGroupsStore = defineStore('groups', () => {
     } finally {
       isLoading.value = false
     }
-  } 
+  }
 
   const createGroup = async (groupData) => {
     isLoading.value = true
@@ -277,7 +282,7 @@ export const useGroupsStore = defineStore('groups', () => {
       // const newPost = transformPostData(newPostData)
       // groupPosts.value.unshift(newPost)
       // console.log(groupPosts.value);
-      fetchGroupPosts(groupId) 
+      fetchGroupPosts(groupId)
       return newPost
     } catch (err) {
       error.value = err.message
@@ -560,14 +565,14 @@ export const useGroupsStore = defineStore('groups', () => {
       if (eventIndex !== -1) {
         const currentEvent = groupEvents.value[eventIndex]
         let newAttendees = currentEvent.attendees || 0
-        
+
         // Adjust attendees count based on previous and new vote
         if (currentEvent.isAttending === 'going' && voteType !== 'going') {
           newAttendees = Math.max(0, newAttendees - 1)
         } else if (currentEvent.isAttending !== 'going' && voteType === 'going') {
           newAttendees += 1
         }
-        
+
         groupEvents.value[eventIndex] = {
           ...currentEvent,
           attendees: newAttendees,
@@ -583,7 +588,7 @@ export const useGroupsStore = defineStore('groups', () => {
     }
   }
 
-  
+
 
   const inviteUserToGroup = async (groupId, userId) => {
     error.value = null
@@ -634,7 +639,6 @@ export const useGroupsStore = defineStore('groups', () => {
     createPost,
     createEvent,
     requestJoinGroup,
-    leaveGroup,
     acceptGroupInvite,
     declineGroupInvite,
     attendEvent,

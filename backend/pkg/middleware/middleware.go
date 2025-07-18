@@ -2,17 +2,12 @@ package middleware
 
 import (
 	"bytes"
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"slices"
-	"strconv"
 	"strconv"
 	"time"
 
@@ -149,7 +144,7 @@ func (dl *DataLayer) GroupAccessMiddleware(next http.Handler) http.Handler {
 		var groupID int
 		var err error
 
-		// userID, ok := r.Context().Value(models.UserIDKey).(int) //TODO: Get user ID from context 
+		// userID, ok := r.Context().Value(models.UserIDKey).(int) //TODO: Get user ID from context
 		userID, ok := 1, true
 		if !ok || userID <= 0 {
 			dl.Logger.Log(models.LogEntry{

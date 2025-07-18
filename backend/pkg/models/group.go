@@ -175,6 +175,7 @@ type GroupsPayload struct {
 	Start      int    `json:"start"`
 	NumOfItems int    `json:"n_items"`
 	Type       string `json:"type"`
+	Search     string `json:"search"`
 }
 
 func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
@@ -186,23 +187,36 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 	)
 
 	// Set userID for membership checking
-
 	userID, err = strconv.Atoi(Groups.UserID)
-	// userID = 0
 	if err != nil {
 		return nil, fmt.Errorf("convert user_id to int: %w", err)
+	}
+
+	// Prepare search condition
+	searchCondition := ""
+	if Groups.Search != "" {
+		searchCondition = "AND (g.title LIKE ? OR g.description LIKE ?)"
 	}
 
 	switch Groups.Type {
 	case "user":
 		// "My Groups" - groups where user has any interaction (member, requested, invited, or creator)
 		var maxID sql.NullInt64
-		if err := gm.DB.QueryRow(`
-	SELECT MAX(g.id) 
-	FROM groups g 
-	LEFT JOIN group_members gm ON g.id = gm.group_id 
-	WHERE (g.creator_id = ? OR gm.user_id = ?)
-`, userID, userID).Scan(&maxID); err != nil {
+		maxIDQuery := `
+			SELECT MAX(g.id) 
+			FROM groups g 
+			LEFT JOIN group_members gm ON g.id = gm.group_id 
+			WHERE (g.creator_id = ? OR gm.user_id = ?)
+		`
+		maxIDArgs := []any{userID, userID}
+		
+		if Groups.Search != "" {
+			maxIDQuery += " AND (g.title LIKE ? OR g.description LIKE ?)"
+			searchPattern := "%" + Groups.Search + "%"
+			maxIDArgs = append(maxIDArgs, searchPattern, searchPattern)
+		}
+		
+		if err := gm.DB.QueryRow(maxIDQuery, maxIDArgs...).Scan(&maxID); err != nil {
 			return []*Group{}, fmt.Errorf("get max group id: %w", err)
 		}
 		if maxID.Valid {
@@ -218,21 +232,36 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 			LEFT JOIN group_members m ON g.id = m.group_id AND m.status = 'member'
 			LEFT JOIN group_members gm ON g.id = gm.group_id
 			WHERE (g.creator_id = ? OR gm.user_id = ?) AND g.id <= ?
+		` + searchCondition + `
 			GROUP BY g.id
 			ORDER BY g.id DESC
 			LIMIT ?
 		`
-		args = []any{userID, userID, Groups.Start, Groups.NumOfItems}
+		args = []any{userID, userID, Groups.Start}
+		if Groups.Search != "" {
+			searchPattern := "%" + Groups.Search + "%"
+			args = append(args, searchPattern, searchPattern)
+		}
+		args = append(args, Groups.NumOfItems)
 
 	case "all":
 		// "Explore" - groups where user has no interaction (not creator, no record in group_members)
 		var maxID sql.NullInt64
-		if err := gm.DB.QueryRow(`
+		maxIDQuery := `
 			SELECT MAX(id) FROM groups 
 			WHERE creator_id != ? AND id NOT IN (
 				SELECT group_id FROM group_members WHERE user_id = ?
 			)
-		`, userID, userID).Scan(&maxID); err != nil {
+		`
+		maxIDArgs := []any{userID, userID}
+		
+		if Groups.Search != "" {
+			maxIDQuery += " AND (title LIKE ? OR description LIKE ?)"
+			searchPattern := "%" + Groups.Search + "%"
+			maxIDArgs = append(maxIDArgs, searchPattern, searchPattern)
+		}
+		
+		if err := gm.DB.QueryRow(maxIDQuery, maxIDArgs...).Scan(&maxID); err != nil {
 			fmt.Println("Error getting max group id:", err)
 			return []*Group{}, fmt.Errorf("get max group id: %w", err)
 		}
@@ -243,53 +272,74 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 		}
 
 		query = `
-		SELECT 
-		g.id, g.creator_id, g.title, g.description, g.image_uuid, g.created_at,
-		COUNT(m.id) AS member_count
-		FROM groups g
-		LEFT JOIN group_members m 
-		ON g.id = m.group_id AND m.status = 'member'
-		WHERE g.creator_id != ? AND g.id NOT IN (
-			SELECT group_id FROM group_members WHERE user_id = ?
-		) AND g.id <= ?
-		GROUP BY g.id
-		ORDER BY g.id DESC
-		LIMIT ?
-		`
-		args = []any{userID, userID, Groups.Start, Groups.NumOfItems}
-
-	case "not_joined":
-		var maxID sql.NullInt64
-		if err := gm.DB.QueryRow(`
-			SELECT MAX(id) FROM groups 
-			WHERE id NOT IN (
+			SELECT 
+				g.id, g.creator_id, g.title, g.description, g.image_uuid, g.created_at,
+				COUNT(m.id) AS member_count
+			FROM groups g
+			LEFT JOIN group_members m 
+				ON g.id = m.group_id AND m.status = 'member'
+			WHERE g.creator_id != ? AND g.id NOT IN (
 				SELECT group_id FROM group_members WHERE user_id = ?
-			)
-		`, userID).Scan(&maxID); err != nil {
-			fmt.Println("Error getting max group id:", err)
-			return []*Group{}, fmt.Errorf("get max group id: %w", err)
-		}
-		if maxID.Valid {
-			Groups.Start = int(maxID.Int64)
-		} else {
-			Groups.Start = 0
-		}
-
-		query = `
-		SELECT 
-		g.id, g.creator_id, g.title, g.description, g.image_uuid, g.created_at,
-		COUNT(m.id) AS member_count
-		FROM groups g
-		LEFT JOIN group_members m 
-		ON g.id = m.group_id AND m.status = 'member'
-		WHERE g.id NOT IN (
-			SELECT group_id FROM group_members WHERE user_id = ?
-		) AND g.id <= ?
-		GROUP BY g.id
-		ORDER BY g.id DESC
-		LIMIT ?
+			) AND g.id <= ?
+		` + searchCondition + `
+			GROUP BY g.id
+			ORDER BY g.id DESC
+			LIMIT ?
 		`
-		args = []any{userID, Groups.Start, Groups.NumOfItems}
+		args = []any{userID, userID, Groups.Start}
+		if Groups.Search != "" {
+			searchPattern := "%" + Groups.Search + "%"
+			args = append(args, searchPattern, searchPattern)
+		}
+		args = append(args, Groups.NumOfItems)
+
+	// case "not_joined":
+	// 	var maxID sql.NullInt64
+	// 	maxIDQuery := `
+	// 		SELECT MAX(id) FROM groups 
+	// 		WHERE id NOT IN (
+	// 			SELECT group_id FROM group_members WHERE user_id = ?
+	// 		)
+	// 	`
+	// 	maxIDArgs := []any{userID}
+		
+	// 	if Groups.Search != "" {
+	// 		maxIDQuery += " AND (title LIKE ? OR description LIKE ?)"
+	// 		searchPattern := "%" + Groups.Search + "%"
+	// 		maxIDArgs = append(maxIDArgs, searchPattern, searchPattern)
+	// 	}
+		
+	// 	if err := gm.DB.QueryRow(maxIDQuery, maxIDArgs...).Scan(&maxID); err != nil {
+	// 		fmt.Println("Error getting max group id:", err)
+	// 		return []*Group{}, fmt.Errorf("get max group id: %w", err)
+	// 	}
+	// 	if maxID.Valid {
+	// 		Groups.Start = int(maxID.Int64)
+	// 	} else {
+	// 		Groups.Start = 0
+	// 	}
+
+	// 	query = `
+	// 		SELECT 
+	// 			g.id, g.creator_id, g.title, g.description, g.image_uuid, g.created_at,
+	// 			COUNT(m.id) AS member_count
+	// 		FROM groups g
+	// 		LEFT JOIN group_members m 
+	// 			ON g.id = m.group_id AND m.status = 'member'
+	// 		WHERE g.id NOT IN (
+	// 			SELECT group_id FROM group_members WHERE user_id = ?
+	// 		) AND g.id <= ?
+	// 	` + searchCondition + `
+	// 		GROUP BY g.id
+	// 		ORDER BY g.id DESC
+	// 		LIMIT ?
+	// 	`
+	// 	args = []any{userID, Groups.Start}
+	// 	if Groups.Search != "" {
+	// 		searchPattern := "%" + Groups.Search + "%"
+	// 		args = append(args, searchPattern, searchPattern)
+	// 	}
+	// 	args = append(args, Groups.NumOfItems)
 
 	default:
 		return []*Group{}, fmt.Errorf("invalid group type: must be 'user', 'all', or 'not_joined', got: %s", Groups.Type)
@@ -308,13 +358,10 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 			return nil, fmt.Errorf("scan group: %w", err)
 		}
 
-		// Check if the user is a member of the group
 		if Groups.Type == "user" {
-			// For "My Groups", get the user's status in this group
 			var isMember string
 			err = gm.DB.QueryRow(`SELECT status FROM group_members WHERE group_id = ? AND user_id = ?`, g.ID, userID).Scan(&isMember)
 			if err != nil {
-				// If no record in group_members but user is creator, set as creator
 				if g.CreatorID == userID {
 					g.IsMember = "creator"
 				} else {
@@ -324,7 +371,6 @@ func (gm *GroupModel) GetGroups(Groups *GroupsPayload) ([]*Group, error) {
 				g.IsMember = isMember
 			}
 		} else {
-			// For "Explore" type, the user has no interaction, so IsMember is empty
 			g.IsMember = ""
 		}
 		groups = append(groups, &g)
