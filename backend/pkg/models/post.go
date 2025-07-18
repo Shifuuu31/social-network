@@ -126,7 +126,7 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 	var query string
 	var rows *sql.Rows
 
- fmt.Println("filter.Type: momo", filter.Type)
+	fmt.Println("filter.Type: momo", filter.Type)
 	fmt.Println("filter.Id: momo", filter.Id)
 
 	if filter.Type == "user" {
@@ -193,7 +193,7 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 		`
 		rows, err = pm.DB.Query(query, filter.Id, filter.Id, filter.Id, filter.NPost, filter.Start)
 	}
-	
+
 	defer rows.Close()
 
 	postCount := 0
@@ -227,7 +227,10 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 		return nil, err
 	}
 
-	fmt.Printf("DEBUG: First post avatar_url: %v\n", posts[0].AvatarURL)
+	if len(posts) > 0 {
+		fmt.Printf("DEBUG: First post avatar_url: %v\n", posts[0].AvatarURL)
+	
+	}
 	return posts, nil
 }
 

@@ -84,9 +84,12 @@ func (app *Root) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 
 	currentUserId := app.DL.GetRequesterID(w, r)
 
-	// Set the filter ID to the current user's ID
-	filter.Id = currentUserId
+	if filter.Type != "user" {
+		filter.Id = currentUserId
+	}
 
+	// Set the filter ID to the current user's ID
+ 
 	// filter.Type = "followers"
 	// Validate filter using tools function
 	fmt.Println("filter:", filter)
