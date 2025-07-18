@@ -54,20 +54,9 @@ func (post *Post) Validate() error {
 
 	// Validate ChosenUsersIds
 	if post.Privacy == "private" {
-		if len(post.ChosenUsersIds) == 0 {
-			return errors.New("chosen_users_ids required for private posts")
-		}
-		// Check for duplicates and valid IDs
-		seen := make(map[int]bool)
-		for _, id := range post.ChosenUsersIds {
-			if id <= 0 {
-				return errors.New("all chosen_users_ids must be positive integers")
-			}
-			if seen[id] {
-				return errors.New("duplicate user ID found in chosen_users_ids")
-			}
-			seen[id] = true
-		}
+		// No need to check chosen_users_ids; close friends logic is used
+		// Optionally, clear the field:
+		// post.ChosenUsersIds = nil
 	} else {
 		if len(post.ChosenUsersIds) > 0 {
 			return errors.New("chosen_users_ids should only be set for private posts")
@@ -104,14 +93,15 @@ func (pfl *PostFilter) Validate() error {
 
 	if pfl.Type != "" {
 		validTypes := map[string]bool{
-			"feed":      true,
-			"user":      true,
-			"group":     true,
-			"public":    true,
-			"followers": true,
+			"feed":          true,
+			"user":          true,
+			"group":         true,
+			"public":        true,
+			"followers":     true,
+			"close_friends": true,
 		}
 		if !validTypes[pfl.Type] {
-			return errors.New("type must be one of: feed, user, group, public")
+			return errors.New("type must be one of: feed, user, group, public, followers, close_friends")
 		}
 	}
 
@@ -180,14 +170,14 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 				ON follow_request.from_user_id = ? 
 				AND follow_request.to_user_id = posts.user_id 
 				AND follow_request.status = 'accepted'
-			LEFT JOIN post_privacy_selected
-				ON post_privacy_selected.post_id = posts.id 
-				AND post_privacy_selected.user_id = ?
+			LEFT JOIN close_friends
+				ON close_friends.user_id = posts.user_id
+				AND close_friends.friend_id = ?
 			WHERE
 				posts.user_id = ?
 				OR posts.privacy = 'public'
 				OR (posts.privacy = 'followers' AND follow_request.from_user_id IS NOT NULL)
-				OR (posts.privacy = 'private' AND post_privacy_selected.user_id IS NOT NULL)
+				OR (posts.privacy = 'private' AND close_friends.friend_id IS NOT NULL)
 			ORDER BY posts.created_at DESC
 			LIMIT ? OFFSET ?
 		`
@@ -229,7 +219,7 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 
 	if len(posts) > 0 {
 		fmt.Printf("DEBUG: First post avatar_url: %v\n", posts[0].AvatarURL)
-	
+
 	}
 	return posts, nil
 }

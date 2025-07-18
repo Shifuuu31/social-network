@@ -66,6 +66,7 @@
           <span :class="{ active: activeTab === 'posts' }" @click="activeTab = 'posts'">Posts</span>
           <span :class="{ active: activeTab === 'followers' }" @click="activeTab = 'followers'">Followers</span>
           <span :class="{ active: activeTab === 'following' }" @click="activeTab = 'following'">Following</span>
+          <span :class="{ active: activeTab === 'closeFriends' }" @click="activeTab = 'closeFriends'">Close Friends</span>
         </div>
 
         <div class="tab-content">
@@ -157,6 +158,54 @@
             <p v-else class="no-data">Not following anyone yet.</p>
           </div>
 
+          <div v-if="activeTab === 'closeFriends'">
+            <div class="close-friends-section">
+              <h4>Manage Close Friends</h4>
+              <div v-if="closeFriendsLoading" class="loading-posts"><div class="loading-spinner"></div><p>Loading close friends...</p></div>
+              <div v-if="closeFriendsError" class="no-data">{{ closeFriendsError }}</div>
+              <div v-if="Array.isArray(followersList) && followersList.length && !closeFriendsLoading" class="users-list">
+                <div v-for="f in followersList" :key="f.id" class="user-item">
+                  <img 
+                    :src="getAvatarUrl(f.avatar_url)" 
+                    :alt="f.nickname || f.first_name"
+                    class="user-avatar"
+                  >
+                  <div class="user-info">
+                    <h4 class="user-name">{{ f.nickname || f.first_name }}</h4>
+                    <span class="user-handle">@{{ f.nickname }}</span>
+                  </div>
+                  <button
+                    v-if="!isInCloseFriends(f.id)"
+                    @click="addToCloseFriends(f)"
+                    class="refresh-btn"
+                  >Add to Close Friends</button>
+                  <button
+                    v-else
+                    @click="removeFromCloseFriends(f)"
+                    class="refresh-btn"
+                  >Remove</button>
+                </div>
+              </div>
+              <p v-else-if="!closeFriendsLoading && !closeFriendsError" class="no-data">No followers to add as close friends.</p>
+              <h4 style="margin-top:2rem;">Your Close Friends</h4>
+              <div v-if="closeFriendsList.length && !closeFriendsLoading" class="users-list">
+                <div v-for="cf in closeFriendsList" :key="cf.id" class="user-item">
+                  <img 
+                    :src="getAvatarUrl(cf.avatar_url)" 
+                    :alt="cf.nickname || cf.first_name"
+                    class="user-avatar"
+                  >
+                  <div class="user-info">
+                    <h4 class="user-name">{{ cf.nickname || cf.first_name }}</h4>
+                    <span class="user-handle">@{{ cf.nickname }}</span>
+                  </div>
+                  <button @click="removeFromCloseFriends(cf)" class="refresh-btn">Remove</button>
+                </div>
+              </div>
+              <p v-else-if="!closeFriendsLoading && !closeFriendsError" class="no-data">You have no close friends yet.</p>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -178,6 +227,7 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue'
 import { useProfileView } from '@/composables/useProfile'
+import { addToCloseFriends as apiAddToCloseFriends, removeFromCloseFriends as apiRemoveFromCloseFriends, fetchCloseFriends as apiFetchCloseFriends } from '@/services/api.js'
 
 const {
   profileUser,
@@ -202,6 +252,51 @@ const uploadProgress = ref(0)
 const userPosts = ref([])
 const loadingPosts = ref(false)
 
+// Close Friends state
+const closeFriendsList = ref([])
+const closeFriendsLoading = ref(false)
+const closeFriendsError = ref('')
+
+async function loadCloseFriends() {
+  closeFriendsLoading.value = true
+  closeFriendsError.value = ''
+  try {
+    const result = await apiFetchCloseFriends()
+    console.log('DEBUG: fetchCloseFriends result:', result)
+    closeFriendsList.value = Array.isArray(result) ? result : []
+  } catch (err) {
+    console.error('DEBUG: fetchCloseFriends error:', err)
+    closeFriendsError.value = err.message || 'Failed to load close friends.'
+    closeFriendsList.value = []
+  } finally {
+    closeFriendsLoading.value = false
+  }
+}
+
+function isInCloseFriends(userId) {
+  return closeFriendsList.value.some(cf => cf.id === userId)
+}
+
+async function addToCloseFriends(user) {
+  if (!isInCloseFriends(user.id)) {
+    try {
+      await apiAddToCloseFriends(user.id)
+      await loadCloseFriends()
+    } catch (err) {
+      alert('Failed to add close friend: ' + (err.message || 'Unknown error'))
+    }
+  }
+}
+
+async function removeFromCloseFriends(user) {
+  try {
+    await apiRemoveFromCloseFriends(user.id)
+    await loadCloseFriends()
+  } catch (err) {
+    alert('Failed to remove close friend: ' + (err.message || 'Unknown error'))
+  }
+}
+
 onMounted(async () => {
   await initProfile()
   
@@ -209,12 +304,18 @@ onMounted(async () => {
   if (activeTab.value === 'posts' && canViewPrivateProfile.value) {
     fetchUserPosts()
   }
+  if (activeTab.value === 'closeFriends') {
+    await loadCloseFriends()
+  }
 })
 
 // Watch for tab changes to load posts
-watch(activeTab, (newTab) => {
+watch(activeTab, async (newTab) => {
   if (newTab === 'posts' && canViewPrivateProfile.value) {
     fetchUserPosts()
+  }
+  if (newTab === 'closeFriends') {
+    await loadCloseFriends()
   }
 })
 
@@ -1160,6 +1261,32 @@ function getAvatarUrl(avatarUrl) {
 }
 
 .profile-right h3::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 0;
+  width: 20px;
+  height: 2px;
+  background: linear-gradient(90deg, #0095f6, #0081d6);
+  border-radius: 1px;
+}
+
+/* Close Friends Section - Enhanced styling */
+.close-friends-section {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #dbdbdb;
+}
+
+.close-friends-section h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #262626;
+  position: relative;
+}
+
+.close-friends-section h4::after {
   content: '';
   position: absolute;
   bottom: -5px;

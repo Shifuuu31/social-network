@@ -142,3 +142,50 @@ func (flm *FollowRequestModel) GetFollowStatus(followRequest *FollowRequest) err
 	}
 	return nil
 }
+
+// Close Friends
+func (f *FollowRequestModel) AddCloseFriend(userID, friendID int) error {
+	_, err := f.DB.Exec(`INSERT OR IGNORE INTO close_friends (user_id, friend_id) VALUES (?, ?)`, userID, friendID)
+	return err
+}
+
+func (f *FollowRequestModel) RemoveCloseFriend(userID, friendID int) error {
+	_, err := f.DB.Exec(`DELETE FROM close_friends WHERE user_id = ? AND friend_id = ?`, userID, friendID)
+	return err
+}
+
+func (f *FollowRequestModel) ListCloseFriends(userID int) ([]*User, error) {
+	rows, err := f.DB.Query(`
+		SELECT u.id, u.nickname, u.first_name, u.last_name, u.avatar_url
+		FROM users u
+		JOIN close_friends cf ON cf.friend_id = u.id
+		WHERE cf.user_id = ?
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var friends []*User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Nickname, &u.FirstName, &u.LastName, &u.AvatarURL); err != nil {
+			return nil, err
+		}
+		friends = append(friends, &u)
+	}
+	return friends, nil
+}
+
+func (f *FollowRequestModel) IsCloseFriend(userID, friendID int) (bool, error) {
+	row := f.DB.QueryRow(`SELECT 1 FROM close_friends WHERE user_id = ? AND friend_id = ?`, userID, friendID)
+	var exists int
+	err := row.Scan(&exists)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}

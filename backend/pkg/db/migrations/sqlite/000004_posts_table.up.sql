@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS posts (
     group_id INTEGER NOT NULL,
     content TEXT NOT NULL,
     image_url TEXT NOT NULL,
-    privacy TEXT NOT NULL CHECK(privacy IN ('public', 'followers', 'selected', 'group')),
+    privacy TEXT NOT NULL CHECK(privacy IN ('public', 'followers', 'selected', 'group', 'private')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,

@@ -20,6 +20,9 @@ func (rt *Root) NewUsersHandler() (usersMux *http.ServeMux) {
 	usersMux.HandleFunc("POST /profile/visibility", rt.UpdateProfileVisibility)
 	usersMux.HandleFunc("POST /follow/follow-unfollow", rt.FollowUnfollow)
 	usersMux.HandleFunc("POST /follow/accept-decline", rt.AcceptDeclineFollowRequest)
+	usersMux.HandleFunc("POST /close-friends/add", rt.AddCloseFriendHandler)
+	usersMux.HandleFunc("POST /close-friends/remove", rt.RemoveCloseFriendHandler)
+	usersMux.HandleFunc("GET /close-friends/list", rt.ListCloseFriendsHandler)
 
 	return usersMux
 }
@@ -683,4 +686,63 @@ func (rt *Root) AcceptDeclineFollowRequest(w http.ResponseWriter, r *http.Reques
 			},
 		})
 	}
+}
+
+// --- Close Friends Handlers ---
+
+// POST /close-friends/add
+func (rt *Root) AddCloseFriendHandler(w http.ResponseWriter, r *http.Request) {
+	payload := struct {
+		FriendID int `json:"friend_id"`
+	}{}
+	if err := tools.DecodeJSON(r, &payload); err != nil {
+		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid payload"})
+		return
+	}
+	userID := rt.DL.GetRequesterID(w, r)
+	if userID <= 0 || payload.FriendID <= 0 {
+		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid user or friend ID"})
+		return
+	}
+	if err := rt.DL.Follows.AddCloseFriend(userID, payload.FriendID); err != nil {
+		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to add close friend"})
+		return
+	}
+	tools.EncodeJSON(w, http.StatusOK, map[string]string{"message": "Close friend added"})
+}
+
+// POST /close-friends/remove
+func (rt *Root) RemoveCloseFriendHandler(w http.ResponseWriter, r *http.Request) {
+	payload := struct {
+		FriendID int `json:"friend_id"`
+	}{}
+	if err := tools.DecodeJSON(r, &payload); err != nil {
+		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid payload"})
+		return
+	}
+	userID := rt.DL.GetRequesterID(w, r)
+	if userID <= 0 || payload.FriendID <= 0 {
+		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid user or friend ID"})
+		return
+	}
+	if err := rt.DL.Follows.RemoveCloseFriend(userID, payload.FriendID); err != nil {
+		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to remove close friend"})
+		return
+	}
+	tools.EncodeJSON(w, http.StatusOK, map[string]string{"message": "Close friend removed"})
+}
+
+// GET /close-friends/list
+func (rt *Root) ListCloseFriendsHandler(w http.ResponseWriter, r *http.Request) {
+	userID := rt.DL.GetRequesterID(w, r)
+	if userID <= 0 {
+		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+		return
+	}
+	friends, err := rt.DL.Follows.ListCloseFriends(userID)
+	if err != nil {
+		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to list close friends"})
+		return
+	}
+	tools.EncodeJSON(w, http.StatusOK, friends)
 }

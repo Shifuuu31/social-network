@@ -118,3 +118,62 @@ export async function getPosts(filter = {}) {
     throw err;
   }
 }
+
+// --- Close Friends API ---
+const API_BASE = 'http://localhost:8080';
+const CLOSE_FRIENDS_BASE_URL = `${API_BASE}/users/close-friends`;
+
+/**
+ * Add a user to close friends
+ * @param {number} friendId
+ * @returns {Promise<Object>}
+ */
+export async function addToCloseFriends(friendId) {
+  const response = await fetch(`${CLOSE_FRIENDS_BASE_URL}/add`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ friend_id: friendId })
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to add close friend');
+  }
+  return response.json();
+}
+
+/**
+ * Remove a user from close friends
+ * @param {number} friendId
+ * @returns {Promise<Object>}
+ */
+export async function removeFromCloseFriends(friendId) {
+  const response = await fetch(`${CLOSE_FRIENDS_BASE_URL}/remove`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ friend_id: friendId })
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to remove close friend');
+  }
+  return response.json();
+}
+
+/**
+ * Fetch the current user's close friends
+ * @returns {Promise<Array>}
+ */
+export async function fetchCloseFriends() {
+  const response = await fetch(`${CLOSE_FRIENDS_BASE_URL}/list`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: { 'Accept': 'application/json' }
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch close friends');
+  }
+  return response.json();
+}
