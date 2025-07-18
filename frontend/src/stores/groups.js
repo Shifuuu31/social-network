@@ -293,7 +293,7 @@ export const useGroupsStore = defineStore('groups', () => {
     error.value = null
 
     try {
-      const response = await fetch(`${API_BASE}/groups/group/event`, {
+      const response = await fetch(`${API_BASE}/groups/group/event/new`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -373,54 +373,54 @@ export const useGroupsStore = defineStore('groups', () => {
     }
   }
 
-  const leaveGroup = async (groupId) => {
-    isLoading.value = true
-    error.value = null
+  // const leaveGroup = async (groupId) => {
+  //   isLoading.value = true
+  //   error.value = null
 
-    try {
-      const response = await fetch(`${API_BASE}/groups/group/${groupId}/leave`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
+  //   try {
+  //     const response = await fetch(`${API_BASE}/groups/group/${groupId}/leave`, {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' }
+  //     })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
-      }
+  //     if (!response.ok) {
+  //       const errorData = await response.json().catch(() => ({}))
+  //       throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+  //     }
 
-      const data = await response.json()
+  //     const data = await response.json()
 
-      // Update local state
-      const updatedGroups = groups.value.map(group => {
-        if (group.id === groupId) {
-          return {
-            ...group,
-            isMember: '',
-            memberCount: Math.max(0, group.memberCount - 1)
-          }
-        }
-        return group
-      })
+  //     // Update local state
+  //     const updatedGroups = groups.value.map(group => {
+  //       if (group.id === groupId) {
+  //         return {
+  //           ...group,
+  //           isMember: '',
+  //           memberCount: Math.max(0, group.memberCount - 1)
+  //         }
+  //       }
+  //       return group
+  //     })
 
-      groups.value = updatedGroups
+  //     groups.value = updatedGroups
 
-      if (currentGroup.value?.id === groupId) {
-        currentGroup.value = {
-          ...currentGroup.value,
-          isMember: '',
-          memberCount: Math.max(0, currentGroup.value.memberCount - 1)
-        }
-      }
+  //     if (currentGroup.value?.id === groupId) {
+  //       currentGroup.value = {
+  //         ...currentGroup.value,
+  //         isMember: '',
+  //         memberCount: Math.max(0, currentGroup.value.memberCount - 1)
+  //       }
+  //     }
 
-      return data
-    } catch (err) {
-      error.value = err.message
-      console.error('Error leaving group:', err)
-      throw err
-    } finally {
-      isLoading.value = false
-    }
-  }
+  //     return data
+  //   } catch (err) {
+  //     error.value = err.message
+  //     console.error('Error leaving group:', err)
+  //     throw err
+  //   } finally {
+  //     isLoading.value = false
+  //   }
+  // }
 
   const acceptGroupInvite = async (groupId) => {
     isLoading.value = true

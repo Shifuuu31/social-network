@@ -124,15 +124,13 @@ type EventsPayload struct {
 func (em *EventModel) GetEventsByGroup(payload *EventsPayload) ([]*Event, error) {
 	var maxid int
 	if payload.Start == -1 {
-		if err := em.DB.QueryRow(`SELECT MAX(id) FROM events WHERE group_id = ?`, payload.GroupID).Scan(&maxid); err != nil {
-			fmt.Println("Error getting max event id:", err)
-			return nil, fmt.Errorf("get max event id: %w", err)
+		err := em.DB.QueryRow(`SELECT IFNULL(MAX(id), 0) FROM events WHERE group_id = ?`, payload.GroupID).Scan(&maxid)
+		if err != nil {
+			fmt.Printf("ERROR: Failed to get max ID for group %d: %v\n", payload.GroupID, err)
+			return nil, err
 		}
 
 		payload.Start = maxid
-		if payload.Start == 0 {
-			payload.Start = 2147483647 // max int32 value
-		}
 	}
 	fmt.Println("Fetching events for group:", payload.GroupID, "starting from ID:", payload.Start, "limit:", payload.NumOfItems)
 

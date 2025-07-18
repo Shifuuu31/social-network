@@ -82,7 +82,7 @@ type VotesPayload struct {
 // GetVotesByEvent returns a paginated list of votes for a given event.
 func (evm *EventVoteModel) GetVotesByEvent(payload *VotesPayload) ([]*EventVote, error) {
 	if payload.Start == -1 {
-		if err := evm.DB.QueryRow(`SELECT MAX(id) FROM event_votes WHERE event_id = ?`, payload.EventID).Scan(&payload.Start); err != nil {
+		if err := evm.DB.QueryRow(`SELECT IFNULL(MAX(id), 0) FROM event_votes WHERE event_id = ?`, payload.EventID).Scan(&payload.Start); err != nil {
 			return nil, fmt.Errorf("get max vote id: %w", err)
 		}
 	}

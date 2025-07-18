@@ -14,17 +14,19 @@ import (
 func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 	groupsMux = http.NewServeMux()
 
-	groupsMux.HandleFunc("POST /group/new", rt.NewGroup)
-	groupsMux.HandleFunc("GET /group/{id}", rt.GetGroup)
-	groupsMux.HandleFunc("POST /group/events", rt.GetGroupEvents)
-	groupsMux.HandleFunc("POST /group/invite", rt.InviteToJoinGroup)
-	groupsMux.HandleFunc("POST /group/request", rt.RequestToJoinGroup)
-	groupsMux.HandleFunc("POST /group/accept-decline", rt.AcceptDeclineGroup) // TODO: ws
-	groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups)
-	groupsMux.HandleFunc("POST /group/event", rt.NewEvent)
-	groupsMux.HandleFunc("POST /group/event/vote", rt.EventVote)
-	groupsMux.HandleFunc("GET /group/{id}/available-users", rt.GetAvailableUsers)
-	groupsMux.HandleFunc("GET /group/{id}/search-users", rt.SearchAvailableUsers)
+groupsMux.HandleFunc("POST /group/new", rt.NewGroup) 
+
+groupsMux.Handle("GET /group/{id}", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroup)))
+groupsMux.Handle("POST /group/events", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroupEvents)))
+groupsMux.Handle("POST /group/invite",  rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.InviteToJoinGroup)))
+groupsMux.Handle("POST /group/request",  rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.RequestToJoinGroup)))
+groupsMux.Handle("POST /group/accept-decline",  rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.AcceptDeclineGroup))) // TODO: ws
+groupsMux.Handle("POST /group/browse", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.BrowseGroups)))
+groupsMux.Handle("POST /group/event/new", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.NewEvent)))
+groupsMux.Handle("POST /group/event/vote", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.EventVote)))
+groupsMux.Handle("GET /group/{id}/available-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetAvailableUsers)))
+groupsMux.Handle("GET /group/{id}/search-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.SearchAvailableUsers)))
+
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
@@ -56,24 +58,7 @@ func (rt *Root) GetGroup(w http.ResponseWriter, r *http.Request) {
 	group := &models.Group{
 		ID: groupID,
 	}
-
-	err = rt.DL.Groups.GetGroupByID(group)
-	if err != nil {
-		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "ERROR",
-			Message: "Failed to retrieve group from DB",
-			Metadata: map[string]any{
-				"group_id": groupID,
-				"ip":       r.RemoteAddr,
-				"path":     r.URL.Path,
-				"err":      err.Error(),
-			},
-		})
-		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Check if the current user is a member of this group
+	requesterID := 17 // TODO: Get from auth when available
 	// requesterID := rt.DL.GetRequesterID(w, r) // TODO enable this when we have auth
 	// if requesterID <= 0 {
 	// 	rt.DL.Logger.Log(models.LogEntry{
@@ -88,14 +73,29 @@ func (rt *Root) GetGroup(w http.ResponseWriter, r *http.Request) {
 	// 	return
 
 	// }
-
+	
+	err = rt.DL.Groups.GetGroupByID(group)
+	
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to retrieve group from DB",
+			Metadata: map[string]any{
+				"group_id": groupID,
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"err":      err.Error(),
+			},
+		})
+		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	member := &models.GroupMember{
 		GroupID: groupID,
-		UserID:  1, // TODO enable this when we have auth
+		UserID:  requesterID,
 	}
 	err = rt.DL.Members.GetMember(member)
 	if err != nil {
-		// User is not a member - this is not an error
 		group.IsMember = ""
 	} else {
 		group.IsMember = member.Status
@@ -280,21 +280,19 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	// TODO validate payload
 
 	// Check if requester is creator
-	requesterID := 1//TODO handel
+	requesterID := 1 //TODO handel
 	// requesterID := rt.DL.GetRequesterID(w, r)
 
-	err1 := rt.DL.Members.IsUserGroupMember(member.GroupID, requesterID)
-	err2 := rt.DL.Groups.IsUserCreator(member.GroupID, requesterID)
+	err := rt.DL.Groups.IsUserCreator(member.GroupID, requesterID)
 
-	if err1 != nil && err2 != nil {
+	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Forbidden: requester isn't the group creator",
 			Metadata: map[string]any{
 				"ip":     r.RemoteAddr,
 				"path":   r.URL.Path,
-				"error1": err1.Error(),
-				"error2": err2.Error(),
+				"error1": err.Error(),
 			},
 		})
 		tools.RespondError(w, "Forbidden", http.StatusForbidden)
@@ -509,7 +507,6 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 
 	// TODO validate payload
 
-	
 	var requesterID int
 
 	switch member.PrevStatus {
@@ -1019,10 +1016,9 @@ func (rt *Root) GetAvailableUsers(w http.ResponseWriter, r *http.Request) {
 	// Check if requester is authorized (member or creator)
 	requesterID := 1 // TODO: Get from auth when available
 
-	err1 := rt.DL.Members.IsUserGroupMember(groupID, requesterID)
-	err2 := rt.DL.Groups.IsUserCreator(groupID, requesterID)
+	err = rt.DL.Groups.IsUserCreator(groupID, requesterID)
 
-	if err1 != nil && err2 != nil {
+	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Forbidden: requester isn't a group member or creator",
@@ -1111,10 +1107,9 @@ func (rt *Root) SearchAvailableUsers(w http.ResponseWriter, r *http.Request) {
 	// Check if requester is authorized (member or creator)
 	requesterID := 1 // TODO: Get from auth when available
 
-	err1 := rt.DL.Members.IsUserGroupMember(groupID, requesterID)
-	err2 := rt.DL.Groups.IsUserCreator(groupID, requesterID)
+	err = rt.DL.Groups.IsUserCreator(groupID, requesterID)
 
-	if err1 != nil && err2 != nil {
+	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Forbidden: requester isn't a group member or creator",

@@ -14,11 +14,18 @@ func DecodeJSON(r *http.Request, v any) error {
 	}
 	defer r.Body.Close()
 
-	const maxSize = 1048576 // 1MB
-	limited := io.LimitReader(r.Body, maxSize)
 
-	decoder := json.NewDecoder(limited) 
-	decoder.DisallowUnknownFields()
+	const maxSize = 1048576 // 1MB
+if r.Body != nil {
+        bodyBytes, err := io.ReadAll(r.Body)
+        if err != nil {
+            return err
+        }
+		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	limited := io.LimitReader(bytes.NewReader(bodyBytes), maxSize)
+
+	decoder := json.NewDecoder(limited)	
+	// decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(v); err != nil {
 		return errors.New("invalid JSON: " + err.Error())
@@ -27,6 +34,7 @@ func DecodeJSON(r *http.Request, v any) error {
 	if decoder.More() {
 		return errors.New("request must contain only a single JSON object")
 	}
+}
 
 	return nil
 }
