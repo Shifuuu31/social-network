@@ -16,17 +16,20 @@
       </div>
     </div>
 
-    <div class="post-content">
-      <p v-if="post.content">{{ post.content }}</p>
-      <div v-if="post.image_url" class="post-image-container">
-        <img
-          :src="getImageUrl(post.image_url)"
-          :alt="post.content || 'Post image'"
-          class="post-image"
-          @error="handleImageError"
-        >
-      </div>
-    </div>
+        <div class="post-content">
+            <p v-if="post.content">{{ post.content }}</p>
+            <div v-if="post.image_url" class="post-image-container">
+                <img
+                    :src="getImageUrl(post.image_url)"
+                    :alt="post.content || 'Post image'"
+                    class="post-image"
+                    @error="handleImageError"
+                    @click="togglePreview"
+                >
+            </div>
+            
+        </div>
+    
 
     <div class="post-actions">
       <button class="action-btn like-btn" :class="{ active: post.isLiked }">
@@ -149,6 +152,21 @@
       </div>
     </div>
   </div>
+  <div
+                class="img-preview"
+                v-if="isOpenPreview"
+                @click="togglePreview"
+            >
+                <span p="togglePreview" >
+<svg xmlns="http://www.w3.org/2000/svg" height="60px" viewBox="0 -960 960 960" width="60px" fill="#e3e3e3"><path d="M440-440v240h-60v-180H200v-60h240Zm140-320v180h180v60H520v-240h60Z"/></svg>
+</span>
+                <img
+                    :src="getImageUrl(post.image_url)"
+                    :alt="post.content || 'Post image'"
+                    @error="handleImageError"
+                    @click.stop="togglePreview"
+                >
+            </div>
 </template>
 
 <script setup>
@@ -180,6 +198,16 @@ const commentError = ref('')
 const hasMoreComments = ref(false)
 const commentsOffset = ref(0)
 const commentsLimit = 10
+let isOpenPreview = ref(false)
+
+
+
+const togglePreview = () => {
+  console.log(isOpenPreview)
+  
+isOpenPreview.value =  !isOpenPreview.value
+
+}
 
 // New comment state
 const newComment = ref({
@@ -487,46 +515,92 @@ function handleImageError(event) {
 }
 
 .post-content {
-  margin: 16px 0 10px 0;
-  font-size: 1.08rem;
-  color: var(--text-main);
-  word-break: break-word;
-}
+            margin: 16px 0 10px 0;
+            font-size: 1.08rem;
+            color: var(--text-main);
+            word-break: break-word;
+        }
 
-.post-image-container {
-  margin-top: 16px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  max-height: 500px;
-  overflow: hidden;
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(37,99,235,0.15);
-  border: 1px solid rgba(37,99,235,0.1);
-  background: #f8fafc;
-}
+        .post-image-container {
+            margin-top: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            max-height: 500px;
+            overflow: hidden;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(37,99,235,0.15);
+            border: 1px solid rgba(37,99,235,0.1);
+            background: #f8fafc;
+        }
 
-.post-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 16px;
-  transition: all 0.3s ease-in-out;
-  cursor: pointer;
-  opacity: 0;
-  animation: fadeIn 0.5s ease-in-out forwards;
-}
+        .post-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 16px;
+            transition: all 0.3s ease-in-out;
+            cursor: pointer;
+            opacity: 0;
+            animation: fadeIn 0.5s ease-in-out forwards;
+        }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
+        .img-preview {
+            background: rgba(0, 0, 0, 0.9);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
 
-.post-image:hover {
-  transform: scale(1.02);
-  box-shadow: 0 8px 30px rgba(37,99,235,0.25);
-}
+        .img-preview span {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 2rem;
+            color: white;
+            cursor: pointer;
+            opacity: 50%;
+            z-index: 10000;
+            padding: 0.3em 0.6em;
+            border-radius: 8px;
+            transition: background 0.3s;
+        }
+
+        .img-preview span:hover {
+            opacity: 100%
+        }
+
+        .img-preview img {
+            max-width: 80%;
+            max-height: 80%;
+            object-fit: contain;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+        }
+
+        @keyframes fadeIn {
+            from { 
+                opacity: 0; 
+                transform: scale(0.95); 
+            }
+            to { 
+                opacity: 1; 
+                transform: scale(1); 
+            }
+        }
+
+        .post-image:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 30px rgba(37,99,235,0.25);
+        }
 
 .post-actions {
   display: flex;
