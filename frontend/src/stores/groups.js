@@ -96,6 +96,11 @@ export const useGroupsStore = defineStore('groups', () => {
         
         throw new Error("No data received from API")
       }
+      if (!data) {
+        console.log("Warning: No data received from API");
+        
+        throw new Error("No data received from API")
+      }
       if (Array.isArray(data)) {
         groupsData = data
       } else if (data.groups && Array.isArray(data.groups)) {
@@ -106,11 +111,13 @@ export const useGroupsStore = defineStore('groups', () => {
         groupsData = []
       }
       console.log(groupsData)
+      console.log(groupsData)
 
       const transformedGroups = groupsData.map(transformGroupData)
       groups.value = transformedGroups
 
     } catch (err) {
+      error.value = err.message
       error.value = err.message
       groups.value = []
     } finally {
@@ -178,6 +185,7 @@ export const useGroupsStore = defineStore('groups', () => {
       const transformedPosts = Array.isArray(data) ? data.map(transformPostData) : []
       groupPosts.value = transformedPosts
 
+
       return transformedPosts
     } catch (err) {
       error.value = err.message
@@ -217,6 +225,7 @@ export const useGroupsStore = defineStore('groups', () => {
       isLoading.value = false
     }
   }
+  
 
   const createGroup = async (groupData) => {
     isLoading.value = true
@@ -513,6 +522,7 @@ export const useGroupsStore = defineStore('groups', () => {
           newAttendees += 1
         }
 
+
         groupEvents.value[eventIndex] = {
           ...currentEvent,
           attendees: newAttendees,
@@ -527,6 +537,7 @@ export const useGroupsStore = defineStore('groups', () => {
       throw err
     }
   }
+
 
 
 
