@@ -12,7 +12,7 @@ type GroupMember struct {
 	UserID    int       `json:"user_id"`
 	Status    string    `json:"status"` // "invited", "requested", "member", "declined"
 	CreatedAt time.Time `json:"created_at"`
-	PrevStatus string    `json:"prev_status"` // Previous status for comparison, not stored in DB
+	PrevStatus string    `json:"prev_status"` 
 }
 // TODO
 func (gm *GroupMember) Validate() error {
@@ -23,7 +23,6 @@ type GroupMemberModel struct {
 	DB *sql.DB
 }
 
-// UpsertMember insert member or update mehis status.
 func (gmm *GroupMemberModel) Upsert(member *GroupMember) error {
 	query := `
 		INSERT INTO group_members (group_id, user_id, prev_status, status)
@@ -37,7 +36,6 @@ func (gmm *GroupMemberModel) Upsert(member *GroupMember) error {
 	return nil
 }
 
-// DeleteMember removes a member from a group.
 func (gmm *GroupMemberModel) Delete(member *GroupMember) error {
 	query := `
 		DELETE FROM group_members
@@ -54,7 +52,6 @@ func (gmm *GroupMemberModel) Delete(member *GroupMember) error {
 	return nil
 }
 
-// GetMember retrieves a specific group member.
 func (gmm *GroupMemberModel) GetMember(member *GroupMember) error {
 	query := `
 		SELECT id, status, created_at
@@ -65,7 +62,6 @@ func (gmm *GroupMemberModel) GetMember(member *GroupMember) error {
 	return row.Scan(&member.ID, &member.Status, &member.CreatedAt)
 }
 
-// GetGroupMembers returns all members of a group.
 func (gmm *GroupMemberModel) GetGroupMembers(groupID int) ([]*GroupMember, error) {
 	query := `
 		SELECT id, group_id, user_id, status, created_at
@@ -89,7 +85,6 @@ func (gmm *GroupMemberModel) GetGroupMembers(groupID int) ([]*GroupMember, error
 	return members, nil
 }
 
-// IsUserInGroup checks if a user is in a specific group.
 func (gmm *GroupMemberModel) IsUserGroupMember(payload *GroupMember) error {
 	query := `
 		SELECT COUNT(*)

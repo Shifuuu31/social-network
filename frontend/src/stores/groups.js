@@ -58,25 +58,24 @@ export const useGroupsStore = defineStore('groups', () => {
       title: apiEvent.title,
       description: apiEvent.description,
       date: apiEvent.event_time,
-      isAttending: apiEvent.user_vote || '', // Get from backend user_vote field
+      isAttending: apiEvent.user_vote || '', 
       createdAt: apiEvent.created_at
     }
   }
 
-  // Actions
   const fetchGroups = async (filter = 'all', searchTerm = '') => {
     if (isLoading.value) return
 
     isLoading.value = true
     error.value = null
 
-    // Always pass user_id for proper filtering (TODO: Get from auth when available)
+    // Always pass user_id for proper filtering (//TODO: Get from auth when available)
     const requestBody = JSON.stringify({
       user_id: '1',
       start: -1,
       n_items: 20,
       type: filter === 'user' ? 'user' : 'all',
-      search: searchTerm // Add search parameter
+      search: searchTerm 
     })
 
     try {
@@ -147,7 +146,6 @@ export const useGroupsStore = defineStore('groups', () => {
         groups.value.push(transformedGroup)
       }
 
-      // Set as current group
       currentGroup.value = transformedGroup
 
       return transformedGroup
@@ -268,7 +266,6 @@ export const useGroupsStore = defineStore('groups', () => {
           privacy: "group",
           group_id: groupId,
           owner_id: 1, // TODO Replace with actual user ID from context or store
-          // title: postData.title,
           content: postData.content
         })
       })
@@ -278,10 +275,6 @@ export const useGroupsStore = defineStore('groups', () => {
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
       }
 
-      // const newPostData = await response.json()
-      // const newPost = transformPostData(newPostData)
-      // groupPosts.value.unshift(newPost)
-      // console.log(groupPosts.value);
       fetchGroupPosts(groupId)
       return newPost
     } catch (err) {
@@ -348,14 +341,13 @@ export const useGroupsStore = defineStore('groups', () => {
         throw new Error(errorData.message || 'Failed to join group')
       }
 
-      const memberStatus = await response.json() // Backend returns just the status string
+      const memberStatus = await response.json() 
 
-      // Update local state
       const updatedGroups = groups.value.map(group => {
         if (group.id === groupId) {
           return {
             ...group,
-            isMember: memberStatus, // Set to 'requested'
+            isMember: memberStatus,
           }
         }
         return group
@@ -366,7 +358,7 @@ export const useGroupsStore = defineStore('groups', () => {
       if (currentGroup.value?.id === groupId) {
         currentGroup.value = {
           ...currentGroup.value,
-          isMember: memberStatus, // Set to 'requested'
+          isMember: memberStatus,
         }
       }
 
@@ -377,55 +369,6 @@ export const useGroupsStore = defineStore('groups', () => {
       throw err
     }
   }
-
-  // const leaveGroup = async (groupId) => {
-  //   isLoading.value = true
-  //   error.value = null
-
-  //   try {
-  //     const response = await fetch(`${API_BASE}/groups/group/${groupId}/leave`, {
-  //       method: 'POST',
-  //       headers: { 'Content-Type': 'application/json' }
-  //     })
-
-  //     if (!response.ok) {
-  //       const errorData = await response.json().catch(() => ({}))
-  //       throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
-  //     }
-
-  //     const data = await response.json()
-
-  //     // Update local state
-  //     const updatedGroups = groups.value.map(group => {
-  //       if (group.id === groupId) {
-  //         return {
-  //           ...group,
-  //           isMember: '',
-  //           memberCount: Math.max(0, group.memberCount - 1)
-  //         }
-  //       }
-  //       return group
-  //     })
-
-  //     groups.value = updatedGroups
-
-  //     if (currentGroup.value?.id === groupId) {
-  //       currentGroup.value = {
-  //         ...currentGroup.value,
-  //         isMember: '',
-  //         memberCount: Math.max(0, currentGroup.value.memberCount - 1)
-  //       }
-  //     }
-
-  //     return data
-  //   } catch (err) {
-  //     error.value = err.message
-  //     console.error('Error leaving group:', err)
-  //     throw err
-  //   } finally {
-  //     isLoading.value = false
-  //   }
-  // }
 
   const acceptGroupInvite = async (groupId) => {
     isLoading.value = true
@@ -450,7 +393,6 @@ export const useGroupsStore = defineStore('groups', () => {
 
       const data = await response.json()
 
-      // Update local state
       const updatedGroups = groups.value.map(group => {
         if (group.id === groupId) {
           return {
@@ -560,13 +502,11 @@ export const useGroupsStore = defineStore('groups', () => {
 
       const data = await response.json()
 
-      // Update the event in the local state
       const eventIndex = groupEvents.value.findIndex(event => event.id === eventId)
       if (eventIndex !== -1) {
         const currentEvent = groupEvents.value[eventIndex]
         let newAttendees = currentEvent.attendees || 0
 
-        // Adjust attendees count based on previous and new vote
         if (currentEvent.isAttending === 'going' && voteType !== 'going') {
           newAttendees = Math.max(0, newAttendees - 1)
         } else if (currentEvent.isAttending !== 'going' && voteType === 'going') {
@@ -607,7 +547,6 @@ export const useGroupsStore = defineStore('groups', () => {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.message || 'Failed to invite user')
       }
-      // Optionally update local state if needed
       return true
     } catch (err) {
       error.value = err.message
