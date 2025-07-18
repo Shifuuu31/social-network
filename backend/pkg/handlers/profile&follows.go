@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"social-network/pkg/models"
@@ -24,6 +25,7 @@ func (rt *Root) NewUsersHandler() (usersMux *http.ServeMux) {
 	usersMux.HandleFunc("POST /close-friends/remove", rt.RemoveCloseFriendHandler)
 	usersMux.HandleFunc("GET /close-friends/list", rt.ListCloseFriendsHandler)
 	usersMux.HandleFunc("GET /all", rt.GetAllUsersHandler)
+	usersMux.HandleFunc("GET /{id}/close-friends", rt.GetUserCloseFriendsHandler)
 
 	return usersMux
 }
@@ -756,4 +758,20 @@ func (rt *Root) GetAllUsersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tools.EncodeJSON(w, http.StatusOK, users)
+}
+
+// Handler to get close friends of any user by id
+func (rt *Root) GetUserCloseFriendsHandler(w http.ResponseWriter, r *http.Request) {
+	userIDStr := r.PathValue("id")
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil || userID <= 0 {
+		tools.EncodeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+		return
+	}
+	friends, err := rt.DL.Follows.ListCloseFriends(userID)
+	if err != nil {
+		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to list close friends"})
+		return
+	}
+	tools.EncodeJSON(w, http.StatusOK, friends)
 }

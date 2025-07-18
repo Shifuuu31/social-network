@@ -261,7 +261,15 @@ async function loadCloseFriends() {
   closeFriendsLoading.value = true
   closeFriendsError.value = ''
   try {
-    const result = await apiFetchCloseFriends()
+    // Always fetch close friends for the profile user being viewed
+    const response = await fetch(`http://localhost:8080/users/${profileUser.id}/close-friends`, {
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
+    })
+    if (!response.ok) {
+      throw new Error('Failed to fetch close friends')
+    }
+    const result = await response.json()
     console.log('DEBUG: fetchCloseFriends result:', result)
     closeFriendsList.value = Array.isArray(result) ? result : []
   } catch (err) {

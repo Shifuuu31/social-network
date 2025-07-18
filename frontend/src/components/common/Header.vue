@@ -25,7 +25,7 @@
       </router-link>
   
       <!-- Friends Icon -->
-      <router-link to="/friends" class="icon-container" aria-label="Friends">
+      <router-link to="/discover-friend" class="icon-container" aria-label="Friends">
         <font-awesome-icon icon="fa-solid fa-user-friends" class="icon" />
       </router-link>
 

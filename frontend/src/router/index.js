@@ -29,7 +29,12 @@ const routes = [
   { path:'/',name:'home',component:Home},
   { path: '/signin', name: 'Signin', component: Signin },
   { path: '/signup', name: 'Signup', component: Signup },
-  { path: '/profile/:id?', name: 'Profile', component: Profile} 
+  { path: '/profile/:id?', name: 'Profile', component: Profile},
+  {
+    path: '/discover-friend',
+    name: 'DiscoverFriend',
+    component: () => import('@/views/DiscoverFriend.vue')
+  }
 
   // Add other routes as needed
 ]
