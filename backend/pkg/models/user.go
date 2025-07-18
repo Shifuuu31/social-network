@@ -235,3 +235,22 @@ func (um *UserModel) GetUserByID(user *User) error {
 	}
 	return nil
 }
+
+// GetAllUsers returns all users (basic info only)
+func (um *UserModel) GetAllUsers() ([]*User, error) {
+	rows, err := um.DB.Query("SELECT id, nickname, first_name, last_name, avatar_url FROM users")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Nickname, &u.FirstName, &u.LastName, &u.AvatarURL); err != nil {
+			return nil, err
+		}
+		users = append(users, &u)
+	}
+	return users, nil
+}

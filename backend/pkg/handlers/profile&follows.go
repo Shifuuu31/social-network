@@ -23,6 +23,7 @@ func (rt *Root) NewUsersHandler() (usersMux *http.ServeMux) {
 	usersMux.HandleFunc("POST /close-friends/add", rt.AddCloseFriendHandler)
 	usersMux.HandleFunc("POST /close-friends/remove", rt.RemoveCloseFriendHandler)
 	usersMux.HandleFunc("GET /close-friends/list", rt.ListCloseFriendsHandler)
+	usersMux.HandleFunc("GET /all", rt.GetAllUsersHandler)
 
 	return usersMux
 }
@@ -745,4 +746,14 @@ func (rt *Root) ListCloseFriendsHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	tools.EncodeJSON(w, http.StatusOK, friends)
+}
+
+// Handler to get all users
+func (rt *Root) GetAllUsersHandler(w http.ResponseWriter, r *http.Request) {
+	users, err := rt.DL.Users.GetAllUsers()
+	if err != nil {
+		tools.EncodeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to fetch users"})
+		return
+	}
+	tools.EncodeJSON(w, http.StatusOK, users)
 }
