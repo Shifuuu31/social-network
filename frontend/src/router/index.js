@@ -28,7 +28,7 @@ const routes = [
 
   { path:'/',name:'home',component:Home},
   { path: '/signin', name: 'Signin', component: Signin },
-  { path: '/signup', name: 'Signup', component: Signup },
+  { path: '/signup', name: 'Signup', component: Signup },                                                                                              
   { path: '/profile/:id?', name: 'Profile', component: Profile},
   {
     path: '/discover-friend',
@@ -49,9 +49,9 @@ const publicr = ['/signin', '/signup']
 router.beforeEach(async (to, from, next) => {  
   const auth = useAuth()
   const pp = publicr.includes(to.path)
-  
+                                              
   // Run check only if route requires auth 
-  if (!pp){
+  if (!pp){                                                                                        
     const success = auth.isAuthenticated.value || await auth.fetchCurrentUser()
     if (!success) {
       await auth.logout()
@@ -60,7 +60,7 @@ router.beforeEach(async (to, from, next) => {
   } 
   next()
 })
-
+                                                         
 
 
 export default router

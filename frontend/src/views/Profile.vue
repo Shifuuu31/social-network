@@ -160,34 +160,33 @@
 
           <div v-if="activeTab === 'closeFriends'">
             <div class="close-friends-section">
-              <h4>Manage Close Friends</h4>
+              <h4>Close Friends</h4>
               <div v-if="closeFriendsLoading" class="loading-posts"><div class="loading-spinner"></div><p>Loading close friends...</p></div>
               <div v-if="closeFriendsError" class="no-data">{{ closeFriendsError }}</div>
-              <div v-if="Array.isArray(followersList) && followersList.length && !closeFriendsLoading" class="users-list">
-                <div v-for="f in followersList" :key="f.id" class="user-item">
-                  <img 
-                    :src="getAvatarUrl(f.avatar_url)" 
-                    :alt="f.nickname || f.first_name"
-                    class="user-avatar"
-                  >
-                  <div class="user-info">
-                    <h4 class="user-name">{{ f.nickname || f.first_name }}</h4>
-                    <span class="user-handle">@{{ f.nickname }}</span>
+              <template v-if="isOwner">
+                <h4>Manage Close Friends</h4>
+                <div v-if="followersList.length && !closeFriendsLoading" class="users-list">
+                  <div v-for="f in followersList" :key="f.id" class="user-item">
+                    <button
+                      v-if="!isInCloseFriends(f.id)"
+                      @click="addToCloseFriends(f)"
+                      class="refresh-btn"
+                    >Add to Close Friends</button>
+                    <button
+                      v-else
+                      @click="removeFromCloseFriends(f)"
+                      class="refresh-btn"
+                    >Remove</button>
+                    <img :src="getAvatarUrl(f.avatar_url)" class="user-avatar" :alt="f.nickname || f.first_name" />
+                    <div class="user-info">
+                      <h4 class="user-name">{{ f.nickname || f.first_name }}</h4>
+                      <span class="user-handle">@{{ f.nickname }}</span>
+                    </div>
                   </div>
-                  <button
-                    v-if="!isInCloseFriends(f.id)"
-                    @click="addToCloseFriends(f)"
-                    class="refresh-btn"
-                  >Add to Close Friends</button>
-                  <button
-                    v-else
-                    @click="removeFromCloseFriends(f)"
-                    class="refresh-btn"
-                  >Remove</button>
                 </div>
-              </div>
-              <p v-else-if="!closeFriendsLoading && !closeFriendsError" class="no-data">No followers to add as close friends.</p>
-              <h4 style="margin-top:2rem;">Your Close Friends</h4>
+                <p v-else-if="!closeFriendsLoading && !closeFriendsError" class="no-data">No followers to add as close friends.</p>
+              </template>
+              <h4 style="margin-top:2rem;">{{ isOwner ? 'Your Close Friends' : (profileUser.nickname || profileUser.first_name) + "'s Close Friends" }}</h4>
               <div v-if="closeFriendsList.length && !closeFriendsLoading" class="users-list">
                 <div v-for="cf in closeFriendsList" :key="cf.id" class="user-item">
                   <img 
@@ -199,10 +198,10 @@
                     <h4 class="user-name">{{ cf.nickname || cf.first_name }}</h4>
                     <span class="user-handle">@{{ cf.nickname }}</span>
                   </div>
-                  <button @click="removeFromCloseFriends(cf)" class="refresh-btn">Remove</button>
+                  <button v-if="isOwner" @click="removeFromCloseFriends(cf)" class="refresh-btn">Remove</button>
                 </div>
               </div>
-              <p v-else-if="!closeFriendsLoading && !closeFriendsError" class="no-data">You have no close friends yet.</p>
+              <p v-else-if="!closeFriendsLoading && !closeFriendsError" class="no-data">No close friends found.</p>
             </div>
           </div>
 
