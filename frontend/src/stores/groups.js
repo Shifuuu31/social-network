@@ -58,11 +58,6 @@ export const useGroupsStore = defineStore('groups', () => {
       title: apiEvent.title,
       description: apiEvent.description,
       date: apiEvent.event_time,
-      location: null, // Not available in current backend model
-      attendees: apiEvent.vote_count || 0,
-      maxAttendees: null, // Not available in current backend model
-      image: null, // Not available in current backend model
-      organizer: null, // Not available in current backend model
       isAttending: apiEvent.user_vote || '', // Get from backend user_vote field
       createdAt: apiEvent.created_at
     }

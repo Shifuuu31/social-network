@@ -1,6 +1,5 @@
 <template>
   <div class="group-view" v-if="groupsStore.currentGroup">
-    <!-- Header -->
     <div class="group-header">
       <div class="group-header-bg">
         <img :src="groupsStore.currentGroup.image" :alt="groupsStore.currentGroup.name" />
@@ -21,37 +20,31 @@
       </div>
     </div>
 
-    <!-- Main Content Area -->
     <div class="group-content">
       <div class="container">
         <div class="content-layout">
-          <!-- Sidebar -->
           <div class="sidebar">
             <div class="sidebar-section">
               <h3>invite </h3>
               <div class="sidebar-actions">
-                <!-- Not a member -->
                 <button v-if="!groupsStore.currentGroup.isMember" class="btn btn-primary sidebar-btn"
                   @click="handleJoinGroup" :disabled="isJoining">
                   <span class="icon">+</span>
                   {{ isJoining ? 'Joining...' : 'Join Group' }}
                 </button>
 
-                <!-- Requested to join -->
                 <button v-else-if="groupsStore.currentGroup.isMember === 'requested'" class="btn btn-grey sidebar-btn"
                   disabled>
                   <span class="icon">⏳</span>
                   Request Sent
                 </button>
 
-                <!-- Invited to join -->
                 <button v-else-if="groupsStore.currentGroup.isMember === 'invited'" class="btn btn-grey sidebar-btn"
                   @click="handleAcceptInvite" :disabled="isJoining">
                   <span class="icon">📨</span>
                   {{ isJoining ? 'Accepting...' : 'Accept Invite' }}
                 </button>
 
-                <!-- Full member -->
                 <button v-else-if="groupsStore.currentGroup.isMember === 'member'"
                   class="btn btn-success sidebar-btn desactivated">
                   <span class="icon">✓</span>
@@ -67,7 +60,6 @@
             </div>
 
             <div class="sidebar-section">
-              <!-- <h3>sidebar where you toggle posts and events</h3> -->
               <div class="sidebar-nav">
                 <button :class="['nav-btn', { active: activeTab === 'posts' }]" @click="setActiveTab('posts')">
                   <span class="icon">📝</span>
@@ -81,22 +73,18 @@
             </div>
           </div>
 
-          <!-- Main Content -->
           <div class="main-content">
             <div class="content-header">
               <h2>{{ activeTab === 'posts' ? 'Posts' : 'Events' }}</h2>
             </div>
 
             <div class="tab-content">
-              <!-- Posts Tab -->
               <div v-if="activeTab === 'posts'" class="posts-section">
                 <div class="create-post" v-if="groupsStore.currentGroup.isMember === 'member'">
                   <div class="create-post-header">
                     <h3>create a post</h3>
                   </div>
                   <form @submit.prevent="handleCreatePost" class="create-post-form">
-                    <!-- <input type="text" v-model="newPost.title" placeholder="Title of your post..." class="form-input"
-                       required /> -->
                     <textarea v-model="newPost.content" placeholder="Share something with the group..." 
                      class="form-textarea" rows="4" required></textarea>
                     <div class="form-actions">
@@ -142,7 +130,6 @@
                 </div>
               </div>
 
-              <!-- Events Tab -->
               <div v-else-if="activeTab === 'events'" class="events-section">
                 <div class="create-event" v-if="groupsStore.currentGroup.isMember === 'member'">
                   <div class="create-event-header">
@@ -155,7 +142,6 @@
                       rows="3" required></textarea>
                     <div class="form-row">
                       <input type="datetime-local" v-model="newEvent.date" class="form-input" required />
-                      <!-- <input type="text" v-model="newEvent.location" placeholder="Location" class="form-input" /> -->
                     </div>
                     <div class="form-actions">
                       <button type="submit" class="btn btn-primary" :disabled="isCreatingEvent">
@@ -186,7 +172,6 @@
                         <div class="event-meta">
                           <h4 class="event-title">{{ event.title }}</h4>
                           <p class="event-time">{{ formatEventTime(event.date) }}</p>
-                          <!-- <p class="event-location" v-if="event.location">📍 {{ event.location }}</p> -->
                         </div>
                       </div>
                       <div class="event-content">
@@ -220,7 +205,6 @@
       </div>
     </div>
 
-    <!-- Invite Modal -->
     <div v-if="showInviteModal" class="modal-overlay" @click="toggleInviteModal">
       <div class="modal-content" @click.stop>
         <div class="modal-body">

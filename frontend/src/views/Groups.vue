@@ -71,7 +71,6 @@ const activeFilter = ref('all')
 const filteredGroups = computed(() => {
   let filtered = groupsStore.groups
 
-  // Filter by search query only (membership filtering is handled by backend)
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(group =>
@@ -83,7 +82,6 @@ const filteredGroups = computed(() => {
   return filtered
 })
 
-// Watch for filter changes, but don't run immediately
 watch(activeFilter, () => {
   // const filterType = newFilter === 'joined' ? 'user' : 'all'
   // groupsStore.fetchGroups(filterType)
@@ -98,14 +96,6 @@ const loadGroups = async () => {
   const filterType = activeFilter.value === 'joined' ? 'user' : 'all'
   await groupsStore.fetchGroups(filterType)
 }
-
-// const handleGroupJoined = (groupId) => {
-//   // console.log(`Joined group ${groupId}`)
-// }
-
-// const handleGroupLeft = (groupId) => {
-//   // console.log(`Left group ${groupId}`)
-// }
 
 onMounted(() => {
   loadGroups()

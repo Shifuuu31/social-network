@@ -101,20 +101,6 @@ func (rt *Root) GetGroup(w http.ResponseWriter, r *http.Request) {
 		group.IsMember = member.Status
 	}
 
-	// if group == nil {    // this will never be nil
-	// 	rt.DL.Logger.Log(models.LogEntry{
-	// 		Level:   "INFO",
-	// 		Message: "Group not found",
-	// 		Metadata: map[string]any{
-	// 			"group_id": groupID,
-	// 			"ip":       r.RemoteAddr,
-	// 			"path":     r.URL.Path,
-	// 		},
-	// 	})
-	// 	http.NotFound(w, r)
-	// 	return
-	// }
-
 	if err := tools.EncodeJSON(w, http.StatusOK, group); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -146,10 +132,8 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "New group JSON decoded"})
 
-	// Set the creator ID from the authenticated user (for now using hardcoded 1)
-	group.CreatorID = 2 // TODO: Uncomment when auth is ready: rt.DL.GetRequesterID(w, r)
+	group.CreatorID = 1 // TODO: comment when auth is ready: rt.DL.GetRequesterID(w, r)
 
-	// verify group creation input
 	if err := group.Validate(); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "INFO",
@@ -166,12 +150,10 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group input validated"})
 
-	// generate a unique uuid
 	group.ImgUUID = uuid.NewString()
 
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "img uuid generated successfully"})
 
-	// insert group into db
 	if err := rt.DL.Groups.Insert(group); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -188,12 +170,11 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group inserted into DB"})
 
-	// Add creator as a member of the group
 	creator := &models.GroupMember{
 		GroupID:    group.ID,
 		UserID:     group.CreatorID,
 		Status:     "member",
-		PrevStatus: "none", // Creator starts with no previous status
+		PrevStatus: "none",
 	}
 	if err := rt.DL.Members.Upsert(creator); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -207,8 +188,6 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 				"err":      err.Error(),
 			},
 		})
-		// Note: We don't return here as the group was successfully created
-		// This is just a membership addition that failed
 	} else {
 		rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Creator added as group member"})
 	}
@@ -301,7 +280,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	// TODO validate payload
 
 	// Check if requester is creator
-	requesterID := 1
+	requesterID := 1//TODO handel
 	// requesterID := rt.DL.GetRequesterID(w, r)
 
 	err1 := rt.DL.Members.IsUserGroupMember(member.GroupID, requesterID)
@@ -530,13 +509,11 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 
 	// TODO validate payload
 
-	// For accept/decline operations, the requester should be the user performing the action
-	// This is different from other operations where we need the authenticated user ID
+	
 	var requesterID int
 
 	switch member.PrevStatus {
 	case "requested":
-		// For join requests, only the group creator can accept/decline
 		requesterID = 1 // TODO: Get from auth when available
 		if err := rt.DL.Groups.IsUserCreator(member.GroupID, requesterID); err != nil {
 			rt.DL.Logger.Log(models.LogEntry{
@@ -554,10 +531,6 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "invited":
-		// For invitations, the invited user accepts their own invitation
-		// So the requester should be the same as the user_id in the request
-		// requesterID = member.UserID
-
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "DEBUG",
 			Message: "User accepting their own invitation",
