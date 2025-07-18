@@ -1,9 +1,14 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"slices"
+	"strconv"
 	"time"
 
 	"social-network/pkg/models"
@@ -102,6 +107,121 @@ func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 		})
 		ctx := context.WithValue(r.Context(), models.UserIDKey, requesterID)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// func (dl *DataLayer) GroupAccessMiddleware(next http.Handler) http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		var member *models.GroupMember
+// 	if err := tools.DecodeJSON(r, &member); err != nil {
+// 		dl.Logger.Log(models.LogEntry{
+// 			Level:   "ERROR",
+// 			Message: "Failed to decode group invite info JSON",
+// 			Metadata: map[string]any{
+// 				"ip":    r.RemoteAddr,
+// 				"path":  r.URL.Path,
+// 				"error": err.Error(),
+// 			},
+// 		})
+// 		tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
+// 		return
+// 	}
+// 		// decode paylod
+// 		if err := dl.Members.IsUserGroupMember(member); err != nil {
+// 		dl.Logger.Log(models.LogEntry{
+// 				Level:    "WARN",
+// 				Message:  "Forbidden",
+// 				Metadata: map[string]any{},
+// 			})
+// 			tools.RespondError(w, "Forbidden", http.StatusForbidden)
+// 			return
+// 		}
+// 	})
+// }
+
+func (dl *DataLayer) GroupAccessMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var groupID int
+		var err error
+
+		// userID, ok := r.Context().Value(models.UserIDKey).(int)
+		userID, ok := 1, true
+		if !ok || userID <= 0 {
+			dl.Logger.Log(models.LogEntry{
+				Level:   "WARN",
+				Message: "Missing or invalid user ID in context",
+				Metadata: map[string]any{
+					"path":  r.URL.Path,
+					"blasa": "groupMiddleWare",
+				},
+			})
+			tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		switch r.Method {
+		case http.MethodGet:
+			groupIDStr := r.PathValue("id")
+			groupID, err = strconv.Atoi(groupIDStr)
+			if err != nil {
+				tools.RespondError(w, "Invalid group ID", http.StatusBadRequest)
+				return
+			}
+
+		case http.MethodPost:
+			var payload struct {
+				GroupID int `json:"group_id"`
+			}
+
+			bodyBytes, err := io.ReadAll(r.Body)
+			if err != nil {
+				tools.RespondError(w, "Failed to read body", http.StatusBadRequest)
+				return
+			}
+			defer r.Body.Close()
+
+			if len(bodyBytes) > 0 {
+				if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+					dl.Logger.Log(models.LogEntry{
+						Level:   "WARN",
+						Message: "Failed to decode group payload",
+						Metadata: map[string]any{
+							"path":  r.URL.Path,
+							"error": err.Error(),
+						},
+					})
+					tools.RespondError(w, "Invalid payload", http.StatusBadRequest)
+					return
+				}
+				groupID = payload.GroupID
+			}
+
+			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+		default:
+			tools.RespondError(w, "Unsupported method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		if err := dl.Members.IsUserGroupMember(&models.GroupMember{
+			GroupID: groupID,
+			UserID:  userID,
+		}); err != nil {
+			dl.Logger.Log(models.LogEntry{
+				Level:   "WARN",
+				Message: "User not in group",
+				Metadata: map[string]any{
+					"group_id": groupID,
+					"user_id":  userID,
+					"path":     r.URL.Path,
+				},
+			})
+			tools.RespondError(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		fmt.Println("User is in group, proceeding with request", groupID, userID)
+
+		next.ServeHTTP(w, r)
 	})
 }
 

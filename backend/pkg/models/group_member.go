@@ -90,7 +90,7 @@ func (gmm *GroupMemberModel) GetGroupMembers(groupID int) ([]*GroupMember, error
 }
 
 // IsUserInGroup checks if a user is in a specific group.
-func (gmm *GroupMemberModel) IsUserGroupMember(groupID, userID int) error {
+func (gmm *GroupMemberModel) IsUserGroupMember(payload *GroupMember) error {
 	query := `
 		SELECT COUNT(*)
 		FROM group_members
@@ -98,7 +98,7 @@ func (gmm *GroupMemberModel) IsUserGroupMember(groupID, userID int) error {
 	`
 	var count int
 	
-	if err := gmm.DB.QueryRow(query, groupID, userID).Scan(&count);err != nil || count <= 0 {
+	if err := gmm.DB.QueryRow(query, payload.GroupID, payload.UserID).Scan(&count);err != nil || count <= 0 {
 		return fmt.Errorf("check user in group: %w", err)
 	}
 	return nil
