@@ -8,8 +8,14 @@
 
       <div class="groups-filters">
         <div class="search-bar">
-          <input type="text" placeholder="Search groups..." v-model="searchQuery" class="search-input" />
-          <button class="search-btn">
+          <input 
+            type="text" 
+            placeholder="Search groups..." 
+            v-model="searchQuery" 
+            @input="handleSearchInput"
+            class="search-input" 
+          />
+          <button class="search-btn" @click="performSearch">
             <span class="icon">🔍</span>
           </button>
         </div>
@@ -37,15 +43,23 @@
       </div>
 
       <div v-else class="groups-grid">
-        <GroupCard v-for="group in filteredGroups" :key="group.id" :group="group" @group-joined="handleGroupJoined"
-          @group-left="handleGroupLeft" />
+        <GroupCard 
+          v-for="group in groupsStore.groups" 
+          :key="group.id" 
+          :group="group" 
+          @group-joined="handleGroupJoined"
+          @group-left="handleGroupLeft" 
+        />
       </div>
 
-      <div v-if="filteredGroups.length === 0 && !groupsStore.isLoading" class="empty-state">
+      <div v-if="groupsStore.groups.length === 0 && !groupsStore.isLoading" class="empty-state">
         <div class="empty-icon">📭</div>
         <h3>No groups found</h3>
         <p v-if="activeFilter === 'joined'">
           You haven't interacted with any groups yet. Explore some groups to get started!
+        </p>
+        <p v-else-if="searchQuery.trim()">
+          No groups found matching "{{ searchQuery.trim() }}". Try different keywords or check back later.
         </p>
         <p v-else>
           No new groups to explore. Try changing your search criteria or check back later.
@@ -59,32 +73,31 @@
 </template>
 
 <script setup>
-import { watch } from 'vue'
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useGroupsStore } from '@/stores/groups'
 import GroupCard from '@/components/GroupCard.vue'
 
 const groupsStore = useGroupsStore()
 const searchQuery = ref('')
 const activeFilter = ref('all')
+let searchTimeout = null
 
-const filteredGroups = computed(() => {
-  let filtered = groupsStore.groups
+// Handle search input with debouncing
+const handleSearchInput = () => {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    loadGroups()
+  }, 200) 
+}
 
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(group =>
-      group.name.toLowerCase().includes(query) ||
-      group.description.toLowerCase().includes(query)
-    )
-  }
+// Perform immediate search when search button is clicked
+const performSearch = () => {
+  clearTimeout(searchTimeout)
+  loadGroups()
+}
 
-  return filtered
-})
-
+// Watch for filter changes
 watch(activeFilter, () => {
-  // const filterType = newFilter === 'joined' ? 'user' : 'all'
-  // groupsStore.fetchGroups(filterType)
   loadGroups()
 })
 
@@ -94,7 +107,18 @@ const setFilter = (filter) => {
 
 const loadGroups = async () => {
   const filterType = activeFilter.value === 'joined' ? 'user' : 'all'
-  await groupsStore.fetchGroups(filterType)
+  const searchTerm = searchQuery.value.trim()
+  await groupsStore.fetchGroups(filterType, searchTerm)
+}
+
+const handleGroupJoined = (groupId) => {
+  // Handle group joined event
+  loadGroups()
+}
+
+const handleGroupLeft = (groupId) => {
+  // Handle group left event
+  loadGroups()
 }
 
 onMounted(() => {
