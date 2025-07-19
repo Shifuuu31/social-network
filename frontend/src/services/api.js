@@ -120,7 +120,7 @@ export async function getPosts(filter = {}) {
 }
 
 // --- Close Friends API ---
-const API_BASE = 'http://localhost:8080';
+const API_BASE = '/api';
 const CLOSE_FRIENDS_BASE_URL = `${API_BASE}/users/close-friends`;
 
 /**

@@ -7,6 +7,7 @@ import Signup from '@/views/signup.vue'
 import Home from '@/views/Home.vue'
 import { useAuth } from '@/composables/useAuth'
 import Profile from '@/views/Profile.vue'
+import Chat from '@/views/Chat.vue'
 
 
 // Import other views as needed
@@ -30,6 +31,7 @@ const routes = [
   { path: '/signin', name: 'Signin', component: Signin },
   { path: '/signup', name: 'Signup', component: Signup },                                                                                              
   { path: '/profile/:id?', name: 'Profile', component: Profile},
+  { path: '/chat', name: 'Chat', component: Chat },
   {
     path: '/discover-friend',
     name: 'DiscoverFriend',

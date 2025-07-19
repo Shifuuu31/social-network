@@ -1,0 +1,629 @@
+<template>
+  <div class="chat-window">
+    <div v-if="!selectedUserId" class="no-selection">
+      <div class="placeholder">
+        <div class="icon">💬</div>
+        <h3>Select a conversation</h3>
+        <p>Choose a conversation from the list to start chatting</p>
+      </div>
+    </div>
+
+    <div v-else class="chat-container">
+      <!-- Chat Header -->
+      <div class="chat-header">
+        <div class="user-info">
+          <div class="avatar">
+            <img 
+              :src="getAvatarUrl(selectedUser?.avatar_url)" 
+              :alt="selectedUser?.nickname || selectedUser?.first_name"
+            />
+          </div>
+          <div class="user-details">
+            <h4>{{ selectedUser?.nickname || selectedUser?.first_name }}</h4>
+            <span class="status" :class="{ online: isUserOnline }">
+              {{ isUserOnline ? 'Online' : 'Offline' }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Messages Area -->
+      <div class="messages-container" ref="messagesContainer">
+        <div v-if="loading" class="loading-messages">
+          <div class="loading-spinner"></div>
+          <p>Loading messages...</p>
+        </div>
+
+        <div v-else-if="error" class="error-messages">
+          {{ error }}
+        </div>
+
+        <div v-else-if="messages.length === 0" class="no-messages">
+          <p>No messages yet</p>
+          <p class="hint">Start the conversation!</p>
+        </div>
+
+        <div v-else class="messages">
+          <div
+            v-for="message in messages"
+            :key="message.id"
+            class="message"
+            :class="{ 
+              'message-sent': message.sender_id === currentUserId,
+              'message-received': message.sender_id !== currentUserId
+            }"
+          >
+            <div class="message-content">
+              <div class="message-text">{{ message.content }}</div>
+              <div class="message-time">
+                {{ formatMessageTime(message.created_at) }}
+              </div>
+            </div>
+            <div v-if="message.sender_id === currentUserId && !isTemporaryMessage(message.id)" class="message-actions">
+              <button 
+                @click="deleteMessage(message.id)"
+                class="delete-btn"
+                title="Delete message"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Message Input -->
+      <div class="message-input-container">
+        <div class="input-wrapper">
+          <textarea
+            v-model="newMessage"
+            @keydown.enter.prevent="sendMessage"
+            @keydown.enter.ctrl="sendMessage"
+            placeholder="Type a message..."
+            class="message-input"
+            rows="1"
+            ref="messageInput"
+          ></textarea>
+          <button 
+            @click="sendMessage"
+            :disabled="!newMessage.trim() || sending"
+            class="send-btn"
+          >
+            <span v-if="sending">...</span>
+            <span v-else>Send</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useAuth } from '../../composables/useAuth.js'
+import chatService from '../../services/chatService.js'
+
+// Debug logging utility
+const DEBUG = true;
+const debugLog = (method, message, data = null) => {
+  if (DEBUG) {
+    console.log(`🔍 [ChatWindow.${method}] ${message}`, data || '');
+  }
+};
+
+export default {
+  name: 'ChatWindow',
+  props: {
+    selectedUserId: {
+      type: Number,
+      default: null
+    }
+  },
+  setup(props) {
+    const { user } = useAuth()
+    const messages = ref([])
+    const selectedUser = ref(null)
+    const loading = ref(false)
+    const error = ref(null)
+    const newMessage = ref('')
+    const sending = ref(false)
+    const isUserOnline = ref(false)
+    const messagesContainer = ref(null)
+    const messageInput = ref(null)
+
+    const currentUserId = user.value?.id
+    debugLog('setup', `Component initialized with currentUserId: ${currentUserId}, selectedUserId: ${props.selectedUserId}`);
+
+    const loadMessages = async () => {
+      if (!props.selectedUserId) {
+        debugLog('loadMessages', 'No selectedUserId, skipping load');
+        return;
+      }
+
+      debugLog('loadMessages', `Loading messages for user ${props.selectedUserId}`);
+      loading.value = true
+      error.value = null
+      
+      try {
+        const response = await chatService.getConversation(props.selectedUserId, 50, 0)
+        debugLog('loadMessages', 'Received response:', response);
+        
+        messages.value = (response.messages || []).reverse() // Show oldest first
+        debugLog('loadMessages', `Loaded ${messages.value.length} messages`);
+        
+        await nextTick()
+        scrollToBottom()
+      } catch (err) {
+        debugLog('loadMessages', 'Error loading messages:', err);
+        console.error('Error loading messages:', err)
+        error.value = err.message
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const loadSelectedUser = async () => {
+      if (!props.selectedUserId) {
+        debugLog('loadSelectedUser', 'No selectedUserId, clearing selectedUser');
+        selectedUser.value = null
+        return
+      }
+
+      debugLog('loadSelectedUser', `Loading user info for ${props.selectedUserId}`);
+      try {
+        // You might want to create an API endpoint to get user by ID
+        // For now, we'll use the existing user data from messages
+        const response = await chatService.getConversation(props.selectedUserId, 1, 0)
+        debugLog('loadSelectedUser', 'Response for user info:', response);
+        
+        if (response.messages && response.messages.length > 0) {
+          const message = response.messages[0]
+          selectedUser.value = {
+            id: props.selectedUserId,
+            nickname: message.sender_id === props.selectedUserId ? message.sender_name : message.receiver_name,
+            first_name: message.sender_id === props.selectedUserId ? message.sender_name : message.receiver_name,
+            avatar_url: message.sender_id === props.selectedUserId ? message.sender_avatar : null
+          }
+          debugLog('loadSelectedUser', 'Set selectedUser:', selectedUser.value);
+        }
+      } catch (err) {
+        debugLog('loadSelectedUser', 'Error loading selected user:', err);
+        console.error('Error loading selected user:', err)
+      }
+    }
+
+    const sendMessage = async () => {
+      if (!newMessage.value.trim() || sending.value) {
+        debugLog('sendMessage', 'Cannot send message - empty or already sending');
+        return;
+      }
+
+      const content = newMessage.value.trim()
+      debugLog('sendMessage', `Sending message: "${content}" to user ${props.selectedUserId}`);
+      
+      newMessage.value = ''
+      sending.value = true
+
+      try {
+        // Add message to local state immediately for better UX
+        const tempMessage = {
+          id: Date.now(), // Temporary ID
+          sender_id: currentUserId,
+          receiver_id: props.selectedUserId,
+          content: content,
+          created_at: new Date().toISOString(),
+          sender_name: user.value?.nickname || user.value?.first_name,
+          sender_avatar: user.value?.avatar_url
+        }
+        debugLog('sendMessage', 'Adding temporary message to local state:', tempMessage);
+        messages.value.push(tempMessage)
+        await nextTick()
+        scrollToBottom()
+
+        // Use HTTP API directly since it's working
+        debugLog('sendMessage', 'Using HTTP API to send message');
+        const response = await chatService.sendMessageAPI(props.selectedUserId, content)
+        debugLog('sendMessage', 'HTTP API response:', response);
+        
+        // Update the temporary message with the real ID from the database
+        if (response.message_id) {
+          const messageIndex = messages.value.findIndex(msg => msg.id === tempMessage.id)
+          if (messageIndex !== -1) {
+            debugLog('sendMessage', `Updating temporary message ${tempMessage.id} with real ID ${response.message_id}`);
+            messages.value[messageIndex].id = response.message_id
+          }
+        }
+      } catch (err) {
+        debugLog('sendMessage', 'Error sending message:', err);
+        console.error('Error sending message:', err)
+        // Remove the temporary message if sending failed
+        messages.value = messages.value.filter(msg => msg.id !== tempMessage.id)
+        // Restore message if sending failed
+        newMessage.value = content
+      } finally {
+        sending.value = false
+      }
+    }
+
+    const deleteMessage = async (messageId) => {
+      debugLog('deleteMessage', `Attempting to delete message ${messageId}`);
+      
+      // Don't allow deletion of temporary messages (messages with timestamp IDs)
+      if (isTemporaryMessage(messageId)) {
+        debugLog('deleteMessage', 'Cannot delete temporary message');
+        console.warn('Cannot delete temporary message')
+        return
+      }
+      
+      try {
+        await chatService.deleteMessage(messageId)
+        debugLog('deleteMessage', `Successfully deleted message ${messageId}`);
+        messages.value = messages.value.filter(msg => msg.id !== messageId)
+      } catch (err) {
+        debugLog('deleteMessage', 'Error deleting message:', err);
+        console.error('Error deleting message:', err)
+      }
+    }
+
+    const scrollToBottom = () => {
+      if (messagesContainer.value) {
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+      }
+    }
+
+    const getAvatarUrl = (avatarUrl) => {
+      if (!avatarUrl) return '/default-avatar.png'
+      if (avatarUrl.startsWith('http')) return avatarUrl
+      return `/api/images/${avatarUrl}`
+    }
+
+    const formatMessageTime = (timestamp) => {
+      const date = new Date(timestamp)
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+
+    const isTemporaryMessage = (messageId) => {
+      return typeof messageId === 'number' && messageId > 1000000000000
+    }
+
+    // WebSocket message handler
+    const handleMessage = (message) => {
+      debugLog('handleMessage', 'Received WebSocket message:', message);
+      
+      if (message.sender_id === props.selectedUserId || message.receiver_id === props.selectedUserId) {
+        debugLog('handleMessage', 'Message is for current conversation');
+        
+        // Check if this is a message from the current user (sent via WebSocket)
+        if (message.sender_id === currentUserId) {
+          debugLog('handleMessage', 'Message is from current user, looking for temporary message to update');
+          
+          // Find the temporary message and update it with the real ID
+          const tempMessageIndex = messages.value.findIndex(msg => 
+            msg.content === message.content && 
+            msg.sender_id === message.sender_id &&
+            msg.receiver_id === message.receiver_id &&
+            isTemporaryMessage(msg.id)
+          )
+          
+          if (tempMessageIndex !== -1) {
+            debugLog('handleMessage', `Found temporary message at index ${tempMessageIndex}, updating with real ID ${message.id}`);
+            // Update the temporary message with the real ID
+            messages.value[tempMessageIndex].id = message.id || Date.now()
+            messages.value[tempMessageIndex].created_at = message.timestamp
+          } else {
+            debugLog('handleMessage', 'No matching temporary message found');
+          }
+        } else {
+          debugLog('handleMessage', 'Message is from other user, adding to conversation');
+          
+          // This is a message from the other user, add it to the conversation
+          const newMsg = {
+            id: message.id || Date.now(),
+            sender_id: message.sender_id,
+            receiver_id: message.receiver_id,
+            content: message.content,
+            created_at: message.timestamp,
+            sender_name: message.sender_id === props.selectedUserId ? selectedUser.value?.nickname : user.value?.nickname,
+            sender_avatar: message.sender_id === props.selectedUserId ? selectedUser.value?.avatar_url : user.value?.avatar_url
+          }
+          debugLog('handleMessage', 'Adding new message to conversation:', newMsg);
+          messages.value.push(newMsg)
+          nextTick(() => scrollToBottom())
+        }
+      } else {
+        debugLog('handleMessage', 'Message is not for current conversation, ignoring');
+      }
+    }
+
+    // Watch for selected user changes
+    watch(() => props.selectedUserId, async (newUserId) => {
+      debugLog('watch', `Selected user changed from ${props.selectedUserId} to ${newUserId}`);
+      
+      if (newUserId) {
+        await loadSelectedUser()
+        await loadMessages()
+      } else {
+        debugLog('watch', 'Clearing messages and selectedUser');
+        messages.value = []
+        selectedUser.value = null
+      }
+    })
+
+    onMounted(async () => {
+      debugLog('onMounted', 'Component mounted');
+      
+      if (props.selectedUserId) {
+        await loadSelectedUser()
+        await loadMessages()
+      }
+      
+      // Set up WebSocket message handler
+      debugLog('onMounted', 'Setting up WebSocket message handler');
+      chatService.onMessage(handleMessage)
+    })
+
+    onUnmounted(() => {
+      debugLog('onUnmounted', 'Component unmounted');
+      // Cleanup is handled by the chat service
+    })
+
+    return {
+      messages,
+      selectedUser,
+      loading,
+      error,
+      newMessage,
+      sending,
+      isUserOnline,
+      currentUserId,
+      messagesContainer,
+      messageInput,
+      sendMessage,
+      deleteMessage,
+      getAvatarUrl,
+      formatMessageTime,
+      isTemporaryMessage
+    }
+  }
+}
+</script>
+
+<style scoped>
+.chat-window {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: white;
+}
+
+.no-selection {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8f9fa;
+}
+
+.placeholder {
+  text-align: center;
+  color: #6c757d;
+}
+
+.placeholder .icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.placeholder h3 {
+  margin: 0 0 0.5rem 0;
+  color: #1a1a1a;
+}
+
+.chat-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-header {
+  padding: 1rem;
+  border-bottom: 1px solid #e1e5e9;
+  background: white;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-right: 1rem;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-details h4 {
+  margin: 0 0 0.25rem 0;
+  color: #1a1a1a;
+}
+
+.status {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.status.online {
+  color: #28a745;
+}
+
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  background: #f8f9fa;
+}
+
+.loading-messages, .error-messages, .no-messages {
+  text-align: center;
+  color: #6c757d;
+  padding: 2rem;
+}
+
+.loading-spinner {
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #007bff;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.message {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.message-sent {
+  justify-content: flex-end;
+}
+
+.message-received {
+  justify-content: flex-start;
+}
+
+.message-content {
+  max-width: 70%;
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
+  position: relative;
+}
+
+.message-sent .message-content {
+  background: #007bff;
+  color: white;
+  border-bottom-right-radius: 0.25rem;
+}
+
+.message-received .message-content {
+  background: white;
+  color: #1a1a1a;
+  border: 1px solid #e1e5e9;
+  border-bottom-left-radius: 0.25rem;
+}
+
+.message-text {
+  margin-bottom: 0.25rem;
+  word-wrap: break-word;
+}
+
+.message-time {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.message-actions {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.message:hover .message-actions {
+  opacity: 1;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: #dc3545;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0.25rem;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-btn:hover {
+  background: #f8d7da;
+}
+
+.message-input-container {
+  padding: 1rem;
+  border-top: 1px solid #e1e5e9;
+  background: white;
+}
+
+.input-wrapper {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.message-input {
+  flex: 1;
+  border: 1px solid #e1e5e9;
+  border-radius: 1rem;
+  padding: 0.75rem 1rem;
+  resize: none;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  max-height: 100px;
+  min-height: 40px;
+}
+
+.message-input:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.send-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 1rem;
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s;
+  min-width: 80px;
+}
+
+.send-btn:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.send-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: 0.9rem;
+  color: #adb5bd;
+  margin-top: 0.5rem;
+}
+</style> 

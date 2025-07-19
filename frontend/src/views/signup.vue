@@ -158,14 +158,14 @@ const onSubmit = async () => {
       // Add avatar file
       formData.append('avatar_file', avatarFile.value)
       
-      res = await fetch('http://localhost:8080/auth/signup', {
+      res = await fetch('/api/auth/signup', {
         method: 'POST',
         body: formData,
         // Don't set Content-Type - let browser set it with boundary
       })
     } else {
       // Send as JSON if no avatar
-      res = await fetch('http://localhost:8080/auth/signup', {
+      res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

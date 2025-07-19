@@ -42,7 +42,7 @@ export function useProfileView() {
 
     async function fetchProfile() {
       try {
-        const res = await fetch('http://localhost:8080/users/profile/info', {
+        const res = await fetch('/api/users/profile/info', {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -70,7 +70,7 @@ export function useProfileView() {
 
     async function toggleFollow(action) {
       try {
-        const res = await fetch('http://localhost:8080/users/follow/follow-unfollow', {
+        const res = await fetch('/api/users/follow/follow-unfollow', {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -87,7 +87,7 @@ export function useProfileView() {
 
     async function toggleVisibility() {
       try {
-        const res = await fetch('http://localhost:8080/users/profile/visibility', {
+        const res = await fetch('/api/users/profile/visibility', {
           method: 'POST',
           credentials: 'include',
         })
@@ -106,7 +106,7 @@ export function useProfileView() {
 
     async function fetchConnections(type) {
       try {
-        const endpoint = type === 'followers' ? 'http://localhost:8080/users/profile/followers' : 'http://localhost:8080/users/profile/following'
+        const endpoint = type === 'followers' ? '/api/users/profile/followers' : '/api/users/profile/following'
 
         const res = await fetch(endpoint, {
           method: 'POST',

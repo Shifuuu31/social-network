@@ -35,9 +35,9 @@
         <span class="badge red">3</span>
       </router-link>
  
-      <!-- Message Icon -->
-      <router-link to="/messages" class="icon-container" aria-label="Messages">
-        <font-awesome-icon icon="fa-solid fa-envelope" class="icon" />
+      <!-- Chat Icon -->
+      <router-link to="/chat" class="icon-container" aria-label="Chat">
+        <span class="chat-text">💬</span>
         <span class="badge green">2</span>
       </router-link>
       <!-- Profile Icon -->
@@ -133,6 +133,15 @@ function goToProfile() {
   transition: color 0.18s;
 }
 .icon-container:hover .icon {
+  color: #1d4ed8;
+}
+
+.chat-text {
+  font-size: 20px;
+  color: #2563eb;
+  transition: color 0.18s;
+}
+.icon-container:hover .chat-text {
   color: #1d4ed8;
 }
 

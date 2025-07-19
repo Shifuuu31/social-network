@@ -11,7 +11,7 @@ async function fetchCurrentUser() {
   error.value = null
 
   try {
-    const res = await fetch('http://localhost:8080/users/profile/me', {
+    const res = await fetch('/api/users/profile/me', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' }
@@ -34,7 +34,7 @@ async function fetchCurrentUser() {
 
 async function logout() {
   try {
-    await fetch('http://localhost:8080/auth/signout', {
+    await fetch('/api/auth/signout', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' }
