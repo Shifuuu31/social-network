@@ -13,19 +13,20 @@ import (
 func (rt *Root) NewUsersHandler() (usersMux *http.ServeMux) {
 	usersMux = http.NewServeMux()
 	fmt.Println("ss")
-	usersMux.HandleFunc("POST /profile/info", rt.ProfileInfo)
-	usersMux.HandleFunc("POST /profile/me", rt.GetCurrentUser)
-	usersMux.HandleFunc("POST /profile/activity", rt.ProfileActivity)
-	usersMux.HandleFunc("POST /profile/followers", rt.ProfileFollowers)
-	usersMux.HandleFunc("POST /profile/following", rt.ProfileFollowing)
-	usersMux.HandleFunc("POST /profile/visibility", rt.UpdateProfileVisibility)
-	usersMux.HandleFunc("POST /follow/follow-unfollow", rt.FollowUnfollow)
-	usersMux.HandleFunc("POST /follow/accept-decline", rt.AcceptDeclineFollowRequest)
-	usersMux.HandleFunc("POST /close-friends/add", rt.AddCloseFriendHandler)
-	usersMux.HandleFunc("POST /close-friends/remove", rt.RemoveCloseFriendHandler)
-	usersMux.HandleFunc("GET /close-friends/list", rt.ListCloseFriendsHandler)
-	usersMux.HandleFunc("GET /all", rt.GetAllUsersHandler)
-	usersMux.HandleFunc("GET /{id}/close-friends", rt.GetUserCloseFriendsHandler)
+	usersMux.HandleFunc("/profile/info", rt.ProfileInfo)
+	usersMux.HandleFunc("/profile/me", rt.GetCurrentUser)
+	usersMux.HandleFunc("/profile/activity", rt.ProfileActivity)
+	usersMux.HandleFunc("/profile/followers", rt.ProfileFollowers)
+	usersMux.HandleFunc("/profile/following", rt.ProfileFollowing)
+	usersMux.HandleFunc("/profile/visibility", rt.UpdateProfileVisibility)
+	usersMux.HandleFunc("/follow/follow-unfollow", rt.FollowUnfollow)
+	usersMux.HandleFunc("/follow/accept-decline", rt.AcceptDeclineFollowRequest)
+	usersMux.HandleFunc("/close-friends/add", rt.AddCloseFriendHandler)
+	usersMux.HandleFunc("/close-friends/remove", rt.RemoveCloseFriendHandler)
+	usersMux.HandleFunc("/close-friends/list", rt.ListCloseFriendsHandler)
+	usersMux.HandleFunc("/following", rt.GetCurrentUserFollowingHandler)
+	usersMux.HandleFunc("/all", rt.GetAllUsersHandler)
+	usersMux.HandleFunc("/{id}/close-friends", rt.GetUserCloseFriendsHandler)
 
 	return usersMux
 }
@@ -774,4 +775,62 @@ func (rt *Root) GetUserCloseFriendsHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	tools.EncodeJSON(w, http.StatusOK, friends)
+}
+
+// GET /following - Get current user's following list
+func (rt *Root) GetCurrentUserFollowingHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("GetCurrentUserFollowingHandler called")
+
+	if r.Method != http.MethodGet {
+		fmt.Println("Method not allowed:", r.Method)
+		tools.RespondError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	requesterID := rt.DL.GetRequesterID(w, r)
+	fmt.Println("Requester ID:", requesterID)
+
+	if requesterID <= 0 {
+		fmt.Println("Unauthorized - no requester ID")
+		tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	following, err := rt.DL.Follows.GetFollows(requesterID, "following")
+	fmt.Println("Following result:", following, "Error:", err)
+
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to get following list",
+			Metadata: map[string]any{
+				"user_id": requesterID,
+				"ip":      r.RemoteAddr,
+				"path":    r.URL.Path,
+				"error":   err.Error(),
+			},
+		})
+		tools.RespondError(w, "Failed to get following list", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"following": following,
+		"count":     len(following),
+	}
+
+	fmt.Println("Sending response:", response)
+
+	if err := tools.EncodeJSON(w, http.StatusOK, response); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to send following response",
+			Metadata: map[string]any{
+				"user_id": requesterID,
+				"ip":      r.RemoteAddr,
+				"path":    r.URL.Path,
+				"error":   err.Error(),
+			},
+		})
+	}
 }

@@ -1,0 +1,5 @@
+nohup: ignoring input
+ss
+aalo
+2025/07/19 01:12:40 server listening on http://localhost:8080
+2025/07/19 01:12:40 listen tcp :8080: bind: address already in use

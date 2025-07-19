@@ -17,6 +17,7 @@ type DataLayer struct {
 	Posts    *models.PostModel
 	Comments *models.CommentModel
 	Follows  *models.FollowRequestModel
+	Messages *models.MessageModel
 	Logger   *models.LoggerModel
 	// link to other models db connection
 }

@@ -5,18 +5,21 @@ import (
 	"net/http"
 
 	"social-network/pkg/middleware"
+	"social-network/pkg/websocket"
 )
 
 // TODO add routes...
 
 type Root struct {
-	DL *middleware.DataLayer
+	DL  *middleware.DataLayer
+	Hub *websocket.Hub
 }
 
 func (rt *Root) Router() (uh *http.ServeMux) {
 	authMux := rt.NewAuthHandler()
 	userHandler := rt.NewUsersHandler()
 	imageHandler := rt.NewImageHandler()
+	chatHandler := NewChatHandler(rt.DL, rt.Hub)
 
 	mainMux := http.NewServeMux()
 	// mainMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -26,6 +29,9 @@ func (rt *Root) Router() (uh *http.ServeMux) {
 
 	// Setup image routes
 	imageMux := imageHandler.SetupImageRoutes()
+
+	// Setup chat routes
+	chatMux := chatHandler.SetupChatRoutes()
 
 	// Add a test route
 	mainMux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
@@ -39,6 +45,7 @@ func (rt *Root) Router() (uh *http.ServeMux) {
 	mainMux.Handle("/auth/", http.StripPrefix("/auth", authMux))
 	mainMux.Handle("/users/", http.StripPrefix("/users", userHandler))
 	mainMux.Handle("/upload/", http.StripPrefix("/upload", imageMux))
+	mainMux.Handle("/chat/", http.StripPrefix("/chat", chatMux))
 
 	return mainMux
 }

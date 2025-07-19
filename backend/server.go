@@ -9,6 +9,7 @@ import (
 	"social-network/pkg/handlers"
 	"social-network/pkg/middleware"
 	"social-network/pkg/models"
+	"social-network/pkg/websocket"
 )
 
 func main() {
@@ -22,6 +23,10 @@ func main() {
 	defer db.Close()
 
 	_ = db
+
+	// Create WebSocket hub
+	hub := websocket.NewHub()
+	go hub.Run()
 
 	AppRoot := handlers.Root{
 		DL: &middleware.DataLayer{
@@ -40,10 +45,14 @@ func main() {
 			Follows: &models.FollowRequestModel{
 				DB: db,
 			},
+			Messages: &models.MessageModel{
+				DB: db,
+			},
 			Logger: &models.LoggerModel{
 				DB: db,
 			},
 		},
+		Hub: hub,
 	}
 
 	port := ":" + os.Getenv("PORT")
