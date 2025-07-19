@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -197,12 +198,13 @@ func (ch *ChatHandler) GetRecentConversations(w http.ResponseWriter, r *http.Req
 			limit = l
 		}
 	}
-
+	fmt.Println("requesterID", requesterID)
 	messages, err := ch.DL.Messages.GetRecentConversations(requesterID, limit)
 	if err != nil {
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	fmt.Println("messages", messages)
 
 	tools.EncodeJSON(w, http.StatusOK, map[string]interface{}{
 		"conversations": messages,
@@ -247,8 +249,22 @@ func (ch *ChatHandler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 
 // HandleWebSocket handles WebSocket upgrade and connection
 func (ch *ChatHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	// Try to get user ID from session cookie first (normal HTTP auth)
 	requesterID := ch.DL.GetRequesterID(w, r)
+
+	// If no session cookie, try token from query parameter (for WebSocket)
 	if requesterID == 0 {
+		token := r.URL.Query().Get("token")
+		if token != "" {
+			session, err := ch.DL.Sessions.GetSessionByToken(token)
+			if err == nil && session != nil {
+				requesterID = session.UserID
+			}
+		}
+	}
+
+	if requesterID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -258,6 +274,7 @@ func (ch *ChatHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 // SetupChatRoutes sets up chat-related routes
 func (ch *ChatHandler) SetupChatRoutes() *http.ServeMux {
 	mux := http.NewServeMux()
+	fmt.Println("SetupChatRoutes555555")
 
 	mux.HandleFunc("/send", ch.SendMessage)
 	mux.HandleFunc("/conversation", ch.GetConversation)

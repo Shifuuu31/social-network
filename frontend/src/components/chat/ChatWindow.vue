@@ -103,14 +103,6 @@ import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useAuth } from '../../composables/useAuth.js'
 import chatService from '../../services/chatService.js'
 
-// Debug logging utility
-const DEBUG = true;
-const debugLog = (method, message, data = null) => {
-  if (DEBUG) {
-    console.log(`🔍 [ChatWindow.${method}] ${message}`, data || '');
-  }
-};
-
 export default {
   name: 'ChatWindow',
   props: {
@@ -132,29 +124,23 @@ export default {
     const messageInput = ref(null)
 
     const currentUserId = user.value?.id
-    debugLog('setup', `Component initialized with currentUserId: ${currentUserId}, selectedUserId: ${props.selectedUserId}`);
 
     const loadMessages = async () => {
       if (!props.selectedUserId) {
-        debugLog('loadMessages', 'No selectedUserId, skipping load');
         return;
       }
 
-      debugLog('loadMessages', `Loading messages for user ${props.selectedUserId}`);
       loading.value = true
       error.value = null
       
       try {
         const response = await chatService.getConversation(props.selectedUserId, 50, 0)
-        debugLog('loadMessages', 'Received response:', response);
         
         messages.value = (response.messages || []).reverse() // Show oldest first
-        debugLog('loadMessages', `Loaded ${messages.value.length} messages`);
         
         await nextTick()
         scrollToBottom()
       } catch (err) {
-        debugLog('loadMessages', 'Error loading messages:', err);
         console.error('Error loading messages:', err)
         error.value = err.message
       } finally {
@@ -164,17 +150,14 @@ export default {
 
     const loadSelectedUser = async () => {
       if (!props.selectedUserId) {
-        debugLog('loadSelectedUser', 'No selectedUserId, clearing selectedUser');
         selectedUser.value = null
         return
       }
 
-      debugLog('loadSelectedUser', `Loading user info for ${props.selectedUserId}`);
       try {
         // You might want to create an API endpoint to get user by ID
         // For now, we'll use the existing user data from messages
         const response = await chatService.getConversation(props.selectedUserId, 1, 0)
-        debugLog('loadSelectedUser', 'Response for user info:', response);
         
         if (response.messages && response.messages.length > 0) {
           const message = response.messages[0]
@@ -184,22 +167,18 @@ export default {
             first_name: message.sender_id === props.selectedUserId ? message.sender_name : message.receiver_name,
             avatar_url: message.sender_id === props.selectedUserId ? message.sender_avatar : null
           }
-          debugLog('loadSelectedUser', 'Set selectedUser:', selectedUser.value);
         }
       } catch (err) {
-        debugLog('loadSelectedUser', 'Error loading selected user:', err);
         console.error('Error loading selected user:', err)
       }
     }
 
     const sendMessage = async () => {
       if (!newMessage.value.trim() || sending.value) {
-        debugLog('sendMessage', 'Cannot send message - empty or already sending');
         return;
       }
 
       const content = newMessage.value.trim()
-      debugLog('sendMessage', `Sending message: "${content}" to user ${props.selectedUserId}`);
       
       newMessage.value = ''
       sending.value = true
@@ -215,26 +194,21 @@ export default {
           sender_name: user.value?.nickname || user.value?.first_name,
           sender_avatar: user.value?.avatar_url
         }
-        debugLog('sendMessage', 'Adding temporary message to local state:', tempMessage);
         messages.value.push(tempMessage)
         await nextTick()
         scrollToBottom()
 
         // Use HTTP API directly since it's working
-        debugLog('sendMessage', 'Using HTTP API to send message');
         const response = await chatService.sendMessageAPI(props.selectedUserId, content)
-        debugLog('sendMessage', 'HTTP API response:', response);
         
         // Update the temporary message with the real ID from the database
         if (response.message_id) {
           const messageIndex = messages.value.findIndex(msg => msg.id === tempMessage.id)
           if (messageIndex !== -1) {
-            debugLog('sendMessage', `Updating temporary message ${tempMessage.id} with real ID ${response.message_id}`);
             messages.value[messageIndex].id = response.message_id
           }
         }
       } catch (err) {
-        debugLog('sendMessage', 'Error sending message:', err);
         console.error('Error sending message:', err)
         // Remove the temporary message if sending failed
         messages.value = messages.value.filter(msg => msg.id !== tempMessage.id)
@@ -246,21 +220,17 @@ export default {
     }
 
     const deleteMessage = async (messageId) => {
-      debugLog('deleteMessage', `Attempting to delete message ${messageId}`);
       
       // Don't allow deletion of temporary messages (messages with timestamp IDs)
       if (isTemporaryMessage(messageId)) {
-        debugLog('deleteMessage', 'Cannot delete temporary message');
         console.warn('Cannot delete temporary message')
         return
       }
       
       try {
         await chatService.deleteMessage(messageId)
-        debugLog('deleteMessage', `Successfully deleted message ${messageId}`);
         messages.value = messages.value.filter(msg => msg.id !== messageId)
       } catch (err) {
-        debugLog('deleteMessage', 'Error deleting message:', err);
         console.error('Error deleting message:', err)
       }
     }
@@ -288,14 +258,11 @@ export default {
 
     // WebSocket message handler
     const handleMessage = (message) => {
-      debugLog('handleMessage', 'Received WebSocket message:', message);
       
       if (message.sender_id === props.selectedUserId || message.receiver_id === props.selectedUserId) {
-        debugLog('handleMessage', 'Message is for current conversation');
         
         // Check if this is a message from the current user (sent via WebSocket)
         if (message.sender_id === currentUserId) {
-          debugLog('handleMessage', 'Message is from current user, looking for temporary message to update');
           
           // Find the temporary message and update it with the real ID
           const tempMessageIndex = messages.value.findIndex(msg => 
@@ -306,15 +273,11 @@ export default {
           )
           
           if (tempMessageIndex !== -1) {
-            debugLog('handleMessage', `Found temporary message at index ${tempMessageIndex}, updating with real ID ${message.id}`);
             // Update the temporary message with the real ID
             messages.value[tempMessageIndex].id = message.id || Date.now()
             messages.value[tempMessageIndex].created_at = message.timestamp
-          } else {
-            debugLog('handleMessage', 'No matching temporary message found');
           }
         } else {
-          debugLog('handleMessage', 'Message is from other user, adding to conversation');
           
           // This is a message from the other user, add it to the conversation
           const newMsg = {
@@ -326,31 +289,25 @@ export default {
             sender_name: message.sender_id === props.selectedUserId ? selectedUser.value?.nickname : user.value?.nickname,
             sender_avatar: message.sender_id === props.selectedUserId ? selectedUser.value?.avatar_url : user.value?.avatar_url
           }
-          debugLog('handleMessage', 'Adding new message to conversation:', newMsg);
           messages.value.push(newMsg)
           nextTick(() => scrollToBottom())
         }
-      } else {
-        debugLog('handleMessage', 'Message is not for current conversation, ignoring');
       }
     }
 
     // Watch for selected user changes
     watch(() => props.selectedUserId, async (newUserId) => {
-      debugLog('watch', `Selected user changed from ${props.selectedUserId} to ${newUserId}`);
       
       if (newUserId) {
         await loadSelectedUser()
         await loadMessages()
       } else {
-        debugLog('watch', 'Clearing messages and selectedUser');
         messages.value = []
         selectedUser.value = null
       }
     })
 
     onMounted(async () => {
-      debugLog('onMounted', 'Component mounted');
       
       if (props.selectedUserId) {
         await loadSelectedUser()
@@ -358,12 +315,10 @@ export default {
       }
       
       // Set up WebSocket message handler
-      debugLog('onMounted', 'Setting up WebSocket message handler');
       chatService.onMessage(handleMessage)
     })
 
     onUnmounted(() => {
-      debugLog('onUnmounted', 'Component unmounted');
       // Cleanup is handled by the chat service
     })
 

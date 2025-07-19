@@ -18,11 +18,9 @@
         <div class="loading-spinner"></div>
         <p>Loading conversations...</p>
       </div>
-
       <div v-else-if="error" class="error">
         {{ error }}
       </div>
-
       <div v-else-if="conversations.length === 0" class="no-conversations">
         <p>No conversations yet</p>
         <p class="hint">Start chatting with people you follow!</p>
@@ -30,7 +28,6 @@
           Start New Chat
         </button>
       </div>
-
       <div v-else class="conversations">
         <div
           v-for="conversation in conversations"
@@ -42,12 +39,12 @@
           <div class="avatar">
             <img 
               :src="getAvatarUrl(getOtherUser(conversation).avatar_url)" 
-              :alt="getOtherUser(conversation).sender_name || getOtherUser(conversation).receiver_name"
+              :alt="getOtherUser(conversation).nickname || getOtherUser(conversation).first_name"
             />
           </div>
           <div class="conversation-info">
             <div class="name">
-              {{ getOtherUser(conversation).sender_name || getOtherUser(conversation).receiver_name }}
+              {{ getOtherUser(conversation).nickname || getOtherUser(conversation).first_name }}
             </div>
             <div class="last-message">
               {{ conversation.content }}
@@ -66,11 +63,9 @@
         <div class="loading-spinner"></div>
         <p>Loading people you follow...</p>
       </div>
-
       <div v-else-if="followingError" class="error">
         {{ followingError }}
       </div>
-
       <div v-else-if="followingList.length === 0" class="no-following">
         <p>You're not following anyone yet</p>
         <p class="hint">Follow people to start chatting with them!</p>
@@ -78,7 +73,6 @@
           Discover People
         </router-link>
       </div>
-
       <div v-else class="following-list">
         <div
           v-for="user in followingList"
@@ -107,185 +101,186 @@
   </div>
 </template>
 
-<script>
+<script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuth } from '../../composables/useAuth.js'
 import chatService from '../../services/chatService.js'
 
-export default {
-  name: 'ChatList',
-  props: {
-    selectedUserId: {
-      type: Number,
-      default: null
-    }
-  },
-  emits: ['select-conversation'],
-  setup(props, { emit }) {
-    const { user } = useAuth()
-    const conversations = ref([])
-    const followingList = ref([])
-    const loading = ref(false)
-    const loadingFollowing = ref(false)
-    const error = ref(null)
-    const followingError = ref(null)
-    const isConnected = ref(false)
-    const showNewChat = ref(false)
+const emit = defineEmits(['select-conversation'])
+const { user } = useAuth()
+const conversations = ref([])
+const followingList = ref([])
+const loading = ref(false)
+const loadingFollowing = ref(false)
+const error = ref(null)
+const followingError = ref(null)
+const isConnected = ref(false)
+const showNewChat = ref(false)
+const selectedUserId = ref(null)
 
-    const loadConversations = async () => {
-      loading.value = true
-      error.value = null
-      
-      try {
-        const response = await chatService.getRecentConversations(20)
-        conversations.value = response.conversations || []
-      } catch (err) {
-        error.value = err.message
-        console.error('Error loading conversations:', err)
-      } finally {
-        loading.value = false
+function loadFromCache() {
+  const cached = localStorage.getItem('followingCache')
+  if (cached) {
+    try {
+      const cacheData = JSON.parse(cached)
+      const cacheAge = Date.now() - cacheData.timestamp
+      if (cacheAge < 5 * 60 * 1000) {
+        followingList.value = cacheData.data
+        return true
       }
-    }
+    } catch {}
+  }
+  return false
+}
 
-    const loadFollowing = async () => {
-      loadingFollowing.value = true
-      followingError.value = null
-      
-      try {
-        console.log('Loading following list...')
-        const response = await fetch('/api/users/following', {
-          method: 'GET',
-          credentials: 'include',
-          headers: { 'Accept': 'application/json' }
-        })
-        console.log('Response status:', response.status)
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error('Error response:', errorText)
-          throw new Error(`Failed to load following list: ${response.status} ${errorText}`)
-        }
-        const data = await response.json()
-        console.log('Following data:', data)
-        followingList.value = data.following || []
-        console.log('Following list length:', followingList.value.length)
-      } catch (err) {
-        console.error('Error loading following:', err)
-        followingError.value = err.message
-      } finally {
-        loadingFollowing.value = false
-      }
-    }
+async function loadFollowing() {
+  if (!user.value?.id) {
+    followingError.value = 'Please sign in to see people you follow'
+    loadingFollowing.value = false
+    return
+  }
+  if (loadFromCache()) {
+    loadFollowingFresh()
+    return
+  }
+  await loadFollowingFresh()
+}
 
-    const connectWebSocket = async () => {
-      try {
-        await chatService.connect(user.value?.id)
-        isConnected.value = true
-      } catch (err) {
-        console.error('Failed to connect WebSocket:', err)
-        isConnected.value = false
-      }
-    }
-
-    const getOtherUserId = (conversation) => {
-      const otherUserId = conversation.sender_id === user.value?.id 
-        ? conversation.receiver_id 
-        : conversation.sender_id;
-      return otherUserId;
-    }
-
-    const getOtherUser = (conversation) => {
-      const otherUserId = getOtherUserId(conversation)
-      return {
-        id: otherUserId,
-        nickname: conversation.sender_id === otherUserId ? conversation.sender_name : conversation.receiver_name,
-        first_name: conversation.sender_id === otherUserId ? conversation.sender_name : conversation.receiver_name,
-        avatar_url: conversation.sender_id === otherUserId ? conversation.sender_avatar : null
-      }
-    }
-
-    const selectConversation = (conversation) => {
-      const otherUserId = getOtherUserId(conversation)
-      emit('select-conversation', otherUserId)
-    }
-
-    const selectUser = (user) => {
-      emit('select-conversation', user.id)
-    }
-
-    const toggleView = () => {
-      showNewChat.value = !showNewChat.value
-    }
-
-    const hasConversation = (userId) => {
-      return conversations.value.some(conv => 
-        conv.sender_id === userId || conv.receiver_id === userId
-      )
-    }
-
-    const getAvatarUrl = (avatarUrl) => {
-      if (!avatarUrl) return '/default-avatar.png'
-      if (avatarUrl.startsWith('http')) return avatarUrl
-      return `/api/images/${avatarUrl}`
-    }
-
-    const formatTimestamp = (timestamp) => {
-      const date = new Date(timestamp)
-      const now = new Date()
-      const diffInHours = (now - date) / (1000 * 60 * 60)
-      if (diffInHours < 24) {
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      } else if (diffInHours < 48) {
-        return 'Yesterday'
-      } else {
-        return date.toLocaleDateString()
-      }
-    }
-
-    // WebSocket message handler
-    const handleMessage = (message) => {
-      // Refresh conversations when new message arrives
-      loadConversations()
-    }
-
-    // Connection status handler
-    const handleConnectionChange = (connected) => {
-      isConnected.value = connected
-    }
-
-    onMounted(async () => {
-      await connectWebSocket()
-      await loadConversations()
-      await loadFollowing()
-      chatService.onMessage(handleMessage)
-      chatService.onConnectionChange(handleConnectionChange)
+async function loadFollowingFresh() {
+  loadingFollowing.value = true
+  followingError.value = null
+  try {
+    const response = await fetch('/api/users/following', {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
     })
-
-    onUnmounted(() => {
-      chatService.disconnect()
-    })
-
-    return {
-      conversations,
-      followingList,
-      loading,
-      loadingFollowing,
-      error,
-      followingError,
-      isConnected,
-      showNewChat,
-      loadConversations,
-      loadFollowing,
-      selectConversation,
-      selectUser,
-      toggleView,
-      hasConversation,
-      getOtherUserId,
-      getOtherUser,
-      getAvatarUrl,
-      formatTimestamp
+    if (response.status === 401) {
+      throw new Error('Please sign in to see people you follow')
     }
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Failed to load following list: ${response.status} ${errorText}`)
+    }
+    const data = await response.json()
+    if (!data.following || !Array.isArray(data.following)) {
+      followingList.value = []
+      return
+    }
+    followingList.value = data.following
+    localStorage.setItem('followingCache', JSON.stringify({
+      data: data.following,
+      timestamp: Date.now()
+    }))
+  } catch (err) {
+    followingError.value = err.message
+    if (!loadFromCache()) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        setTimeout(() => {
+          if (!loadingFollowing.value) loadFollowingFresh()
+        }, 2000)
+      }
+    }
+  } finally {
+    loadingFollowing.value = false
   }
 }
+
+async function loadConversations() {
+  loading.value = true
+  error.value = null
+  try {
+    const response = await chatService.getRecentConversations(20)
+    conversations.value = response.conversations || []
+  } catch (err) {
+    error.value = err.message
+  } finally {
+    loading.value = false
+  }
+}
+
+async function connectWebSocket() {
+  try {
+    await chatService.connect(user.value?.id)
+    isConnected.value = true
+  } catch {
+    isConnected.value = false
+  }
+}
+
+function getOtherUserId(conversation) {
+  return conversation.sender_id === user.value?.id
+    ? conversation.receiver_id
+    : conversation.sender_id
+}
+
+function getOtherUser(conversation) {
+  const otherUserId = getOtherUserId(conversation)
+  return {
+    id: otherUserId,
+    nickname: conversation.sender_id === otherUserId ? conversation.sender_name : conversation.receiver_name,
+    first_name: conversation.sender_id === otherUserId ? conversation.sender_name : conversation.receiver_name,
+    avatar_url: conversation.sender_id === otherUserId ? conversation.sender_avatar : null
+  }
+}
+
+function selectConversation(conversation) {
+  const otherUserId = getOtherUserId(conversation)
+  emit('select-conversation', otherUserId)
+}
+
+function selectUser(user) {
+  emit('select-conversation', user.id)
+}
+
+function toggleView() {
+  showNewChat.value = !showNewChat.value
+}
+
+function hasConversation(userId) {
+  return conversations.value.some(conv =>
+    conv.sender_id === userId || conv.receiver_id === userId
+  )
+}
+
+function getAvatarUrl(avatarUrl) {
+  if (!avatarUrl) return '/default-avatar.png'
+  if (avatarUrl.startsWith('http')) return avatarUrl
+  return `/api/images/${avatarUrl}`
+}
+
+function formatTimestamp(timestamp) {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diffInHours = (now - date) / (1000 * 60 * 60)
+  if (diffInHours < 24) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  } else if (diffInHours < 48) {
+    return 'Yesterday'
+  } else {
+    return date.toLocaleDateString()
+  }
+}
+
+function handleMessage() {
+  loadConversations()
+}
+
+function handleConnectionChange(connected) {
+  isConnected.value = connected
+}
+
+onMounted(async () => {
+  await connectWebSocket()
+  await loadConversations()
+  await loadFollowing()
+  chatService.onMessage(handleMessage)
+  chatService.onConnectionChange(handleConnectionChange)
+})
+
+onUnmounted(() => {
+  chatService.disconnect()
+})
 </script>
 
 <style scoped>

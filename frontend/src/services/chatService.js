@@ -13,8 +13,21 @@ const connectionHandlers = new Set();
 // Get the current host and port for WebSocket connection
 const getWebSocketUrl = () => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.host;
-  return `${protocol}//${host}/api/chat/ws`;
+  // If running on Vite dev server, use backend port
+  const host = window.location.hostname + ':8080';
+
+  // Get session token from cookies
+  const getCookie = (name) => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+  };
+  
+  const sessionToken = getCookie('session_token');
+  const tokenParam = sessionToken ? `?token=${encodeURIComponent(sessionToken)}` : '';
+
+  return `${protocol}//${host}/chat/ws${tokenParam}`;
 };
 
 // Send authentication message to identify the user
@@ -58,13 +71,18 @@ const connect = (userId) => {
   return new Promise((resolve, reject) => {
     try {
       const wsUrl = getWebSocketUrl();
+      
+      // Create WebSocket with credentials
       socket = new WebSocket(wsUrl);
+      
       socket.onopen = () => {
+        console.log("WebSocket connected successfully");
         isConnected = true;
         notifyConnectionHandlers(true);
-        sendAuthMessage(userId);
+        // No need to send auth message since backend handles auth via session
         resolve();
       };
+      
       socket.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
@@ -73,18 +91,21 @@ const connect = (userId) => {
           console.error('Error parsing WebSocket message:', error);
         }
       };
-      socket.onclose = () => {
+      
+      socket.onclose = (event) => {
+        console.log("WebSocket connection closed:", event.code, event.reason);
         isConnected = false;
         notifyConnectionHandlers(false);
       };
+      
       socket.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('WebSocket connection error:', error);
         isConnected = false;
         notifyConnectionHandlers(false);
         reject(error);
       };
     } catch (error) {
-      console.error('Error connecting to WebSocket:', error);
+      console.error('Error creating WebSocket connection:', error);
       reject(error);
     }
   });
@@ -185,6 +206,7 @@ const getConversation = async (otherUserId, limit = 50, offset = 0) => {
 
 // Get recent conversations
 const getRecentConversations = async (limit = 20) => {
+  console.log('getRecentConversations', limit);
   const url = `${CHAT_BASE_URL}/recent?limit=${limit}`;
   try {
     const response = await fetch(url, {
@@ -192,6 +214,9 @@ const getRecentConversations = async (limit = 20) => {
       credentials: 'include',
       headers: { 'Accept': 'application/json' }
     });
+    if (response.status === 401) {
+      throw new Error('Please sign in to see your recent chats.');
+    }
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || 'Failed to get recent conversations');
