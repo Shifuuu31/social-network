@@ -68,7 +68,7 @@ func (m *Message) Validate() error {
 // At least one user must be following the other
 func (mm *MessageModel) CanSendMessage(senderID, receiverID int) (bool, error) {
 	debugLog("CanSendMessage", "Checking if user %d can send message to user %d", senderID, receiverID)
-
+	fmt.Print("aaaaa")
 	query := `
 		SELECT COUNT(*) FROM follow_request 
 		WHERE ((from_user_id = ? AND to_user_id = ?) OR (from_user_id = ? AND to_user_id = ?))

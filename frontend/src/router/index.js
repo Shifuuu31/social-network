@@ -51,7 +51,10 @@ const publicr = ['/signin', '/signup']
 router.beforeEach(async (to, from, next) => {  
   const auth = useAuth()
   const pp = publicr.includes(to.path)
-                                              
+  if (pp && auth.isAuthenticated) {
+    return next('/')
+
+  }        
   // Run check only if route requires auth 
   if (!pp){                                                                                        
     const success = auth.isAuthenticated.value || await auth.fetchCurrentUser()

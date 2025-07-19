@@ -32,8 +32,9 @@ func (rt *Root) NewUsersHandler() (usersMux *http.ServeMux) {
 }
 
 type ProfileInfoResponse struct {
-	User         *models.User `json:"user"`
-	FollowStatus string       `json:"follow_status"`
+	User          *models.User `json:"user"`
+	FollowStatus  string       `json:"follow_status"`
+	IsRequestToMe bool         `json:"is_request_to_me"`
 }
 
 func NewUserDTO(u *models.User) *models.UserDTO {
@@ -207,10 +208,29 @@ func (rt *Root) ProfileInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Println("Follow", followRequest.Status)
-	response := ProfileInfoResponse{
-		User:         user,
-		FollowStatus: followRequest.Status,
+	incomingRequest := &models.FollowRequest{
+		FromUserID: user.ID,
+		ToUserID:   requesterID,
 	}
+	isRequestToMe := false
+
+	if err := rt.DL.Follows.GetFollowStatus(incomingRequest); err == nil {
+		fmt.Println("Incoming Request Found:", incomingRequest)
+
+		if incomingRequest.Status == "pending" {
+			fmt.Println("It is a pending request TO ME")
+			isRequestToMe = true
+		}
+	} else {
+		fmt.Println("No incoming follow request or error:", err)
+	}
+
+	response := ProfileInfoResponse{
+		User:          user,
+		FollowStatus:  followRequest.Status,
+		IsRequestToMe: isRequestToMe,
+	}
+
 	if err := tools.EncodeJSON(w, http.StatusOK, response); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",

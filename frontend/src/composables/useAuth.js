@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-
+import { useRouter } from 'vue-router'    
+  
 const user = ref(null)
 const isAuthenticated = computed(() => !!user.value)
 const isLoading = ref(false)

@@ -30,16 +30,25 @@
           <p>Uploading... {{ uploadProgress }}%</p>
         </div>
       </div>
-      <div class="profile-info">
+            <div class="profile-info">
         <h2>{{ profileUser.nickname || profileUser.first_name }}</h2>
-        <!-- <p class="role"></p> -->
         <div class="profile-buttons">
-          <button v-if="isOwner" @click="toggleVisibility"> {{ profileUser.is_public ? '🔓 Public' : '🔒 Private' }} </button>
+          <!-- 🔐 Toggle Public/Private -->
+          <button v-if="isOwner" @click="toggleVisibility">
+            {{ profileUser.is_public ? '🔓 Public' : '🔒 Private' }}
+          </button>
+  
+          <!-- 👤 Follow/Unfollow Section -->
           <template v-else>
-            <button v-if="followStatus === 'none'" @click="toggleFollow('follow')"> Follow </button>
-            <button v-else-if="followStatus === 'pending'" disabled> Pending </button>
-            <button v-else-if="followStatus === 'accepted'" @click="toggleFollow('unfollow')"> Unfollow </button>
+            <button v-if="followStatus === 'none' || followStatus === 'declined'" @click="toggleFollow('follow')"> Follow</button>
+            <button v-else-if="followStatus === 'pending'" disabled>  Pending</button>
+            <button v-else-if="followStatus === 'accepted'" @click="toggleFollow('unfollow')"> Unfollow</button>
           </template>
+        </div>
+                <!-- Accept/Decline Buttons (if I'm the target of a pending request) -->
+        <div class="profile-requests" v-if="isRequestToMe">
+          <button @click="respondToRequest('accepted')">✅ Accept</button>
+          <button @click="respondToRequest('declined')">❌ Decline</button>
         </div>
       </div>
     </div>
@@ -66,7 +75,7 @@
           <span :class="{ active: activeTab === 'posts' }" @click="activeTab = 'posts'">Posts</span>
           <span :class="{ active: activeTab === 'followers' }" @click="activeTab = 'followers'">Followers</span>
           <span :class="{ active: activeTab === 'following' }" @click="activeTab = 'following'">Following</span>
-          <span :class="{ active: activeTab === 'closeFriends' }" @click="activeTab = 'closeFriends'">Close Friends</span>
+          <span v-if="isOwner" :class="{ active: activeTab === 'closeFriends' }" @click="activeTab = 'closeFriends'">Close Friends</span>
         </div>
 
         <div class="tab-content">
@@ -158,7 +167,7 @@
             <p v-else class="no-data">Not following anyone yet.</p>
           </div>
 
-          <div v-if="activeTab === 'closeFriends'">
+          <div v-if="activeTab === 'closeFriends' && isOwner">
             <div class="close-friends-section">
               <h4>Close Friends</h4>
               <div v-if="closeFriendsLoading" class="loading-posts"><div class="loading-spinner"></div><p>Loading close friends...</p></div>
@@ -236,6 +245,8 @@ const {
   followersList,
   followingList,
   canViewPrivateProfile,
+  isRequestToMe,
+  respondToRequest,
   initProfile,
   fetchProfile,
   toggleFollow,
@@ -567,11 +578,15 @@ function getAvatarUrl(avatarUrl) {
   align-items: flex-start;
   gap: 3rem;
   z-index: 10;
-  max-width: 935px;
+  /* max-width: 935px; */
   margin: 0 auto;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
-
+.profile-requests {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
 .profile-header::before {
   content: '';
   position: absolute;
@@ -876,7 +891,7 @@ function getAvatarUrl(avatarUrl) {
   grid-template-columns: 1fr 2fr 1fr;
   gap: 2rem;
   padding: 2rem;
-  max-width: 935px;
+  /*max-width: 935px;*/
   margin: 0 auto;
 }
 

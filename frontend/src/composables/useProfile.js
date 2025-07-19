@@ -13,6 +13,7 @@ export function useProfileView() {
     const activeTab = ref('posts')
     const followersList = ref([])
     const followingList = ref([])
+    const isRequestToMe = ref(false)
 
     let targetId = null
 
@@ -54,13 +55,14 @@ export function useProfileView() {
           return false
         }
 
-        const { user: u, follow_status } = await res.json()
+        const { user: u, follow_status,is_request_to_me } = await res.json()
         Object.keys(u).forEach(key => {
           profileUser[key] = u[key]
         })
 
         followStatus.value = follow_status
-        
+        isRequestToMe.value = is_request_to_me
+        console.log("isRequestToMe.value: ",isRequestToMe.value)
         return true
       }catch(err){
         console.log(err)
@@ -124,6 +126,29 @@ export function useProfileView() {
         console.log(err)
       }
     }
+    
+    async function respondToRequest(action) {
+    try {
+      const res = await fetch('/api/users/follow/accept-decline', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_id: profileUser.id,
+          action: action,
+        }),
+      })
+
+      if (!res.ok) {
+        console.error('Failed to respond to follow request:', res.status, res.text)
+        return alert('Failed to respond to follow request')
+      }
+
+      isRequestToMe.value = false // hide buttons
+    } catch (err) {
+      console.error('Failed to respond to request:', err)
+    }
+  }
 
     watch(activeTab, (newTab) => {
       if (canViewPrivateProfile.value && (newTab === 'followers' || newTab === 'following')) {
@@ -139,6 +164,8 @@ export function useProfileView() {
         followersList,
         followingList,
         canViewPrivateProfile,
+        isRequestToMe,
+        respondToRequest,
         initProfile,
         fetchProfile,
         toggleFollow,
