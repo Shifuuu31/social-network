@@ -112,14 +112,6 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuth } from '../../composables/useAuth.js'
 import chatService from '../../services/chatService.js'
 
-// Debug logging utility
-const DEBUG = true;
-const debugLog = (method, message, data = null) => {
-  if (DEBUG) {
-    console.log(`🔍 [ChatList.${method}] ${message}`, data || '');
-  }
-};
-
 export default {
   name: 'ChatList',
   props: {
@@ -140,20 +132,14 @@ export default {
     const isConnected = ref(false)
     const showNewChat = ref(false)
 
-    debugLog('setup', `Component initialized with user:`, user.value);
-
     const loadConversations = async () => {
-      debugLog('loadConversations', 'Loading recent conversations');
       loading.value = true
       error.value = null
       
       try {
         const response = await chatService.getRecentConversations(20)
-        debugLog('loadConversations', 'Received response:', response);
         conversations.value = response.conversations || []
-        debugLog('loadConversations', `Loaded ${conversations.value.length} conversations`);
       } catch (err) {
-        debugLog('loadConversations', 'Error loading conversations:', err);
         error.value = err.message
         console.error('Error loading conversations:', err)
       } finally {
@@ -162,39 +148,27 @@ export default {
     }
 
     const loadFollowing = async () => {
-      debugLog('loadFollowing', 'Loading following list');
       loadingFollowing.value = true
       followingError.value = null
       
       try {
         console.log('Loading following list...')
-        debugLog('loadFollowing', 'Making request to /api/users/following');
-        
         const response = await fetch('/api/users/following', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Accept': 'application/json' }
         })
-        
-        debugLog('loadFollowing', `Response status: ${response.status} ${response.statusText}`);
         console.log('Response status:', response.status)
-        console.log('Response headers:', response.headers)
-        
         if (!response.ok) {
           const errorText = await response.text()
-          debugLog('loadFollowing', 'Error response:', errorText);
           console.error('Error response:', errorText)
           throw new Error(`Failed to load following list: ${response.status} ${errorText}`)
         }
-        
         const data = await response.json()
-        debugLog('loadFollowing', 'Following data received:', data);
         console.log('Following data:', data)
         followingList.value = data.following || []
-        debugLog('loadFollowing', `Following list length: ${followingList.value.length}`);
         console.log('Following list length:', followingList.value.length)
       } catch (err) {
-        debugLog('loadFollowing', 'Error loading following:', err);
         console.error('Error loading following:', err)
         followingError.value = err.message
       } finally {
@@ -203,13 +177,10 @@ export default {
     }
 
     const connectWebSocket = async () => {
-      debugLog('connectWebSocket', `Attempting to connect WebSocket for user ${user.value?.id}`);
       try {
         await chatService.connect(user.value?.id)
         isConnected.value = true
-        debugLog('connectWebSocket', 'WebSocket connected successfully');
       } catch (err) {
-        debugLog('connectWebSocket', 'Failed to connect WebSocket:', err);
         console.error('Failed to connect WebSocket:', err)
         isConnected.value = false
       }
@@ -219,15 +190,11 @@ export default {
       const otherUserId = conversation.sender_id === user.value?.id 
         ? conversation.receiver_id 
         : conversation.sender_id;
-      // Only log when debugging specific issues, not on every render
-      // debugLog('getOtherUserId', `Getting other user ID from conversation: ${otherUserId}`);
       return otherUserId;
     }
 
     const getOtherUser = (conversation) => {
       const otherUserId = getOtherUserId(conversation)
-      
-      // Use conversation data directly to avoid recursive updates
       return {
         id: otherUserId,
         nickname: conversation.sender_id === otherUserId ? conversation.sender_name : conversation.receiver_name,
@@ -238,17 +205,14 @@ export default {
 
     const selectConversation = (conversation) => {
       const otherUserId = getOtherUserId(conversation)
-      debugLog('selectConversation', `Selecting conversation with user ${otherUserId}`);
       emit('select-conversation', otherUserId)
     }
 
     const selectUser = (user) => {
-      debugLog('selectUser', `Selecting user ${user.id} for new conversation`);
       emit('select-conversation', user.id)
     }
 
     const toggleView = () => {
-      debugLog('toggleView', `Toggling view from ${showNewChat.value} to ${!showNewChat.value}`);
       showNewChat.value = !showNewChat.value
     }
 
@@ -268,7 +232,6 @@ export default {
       const date = new Date(timestamp)
       const now = new Date()
       const diffInHours = (now - date) / (1000 * 60 * 60)
-      
       if (diffInHours < 24) {
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       } else if (diffInHours < 48) {
@@ -290,18 +253,14 @@ export default {
     }
 
     onMounted(async () => {
-      debugLog('onMounted', 'Component mounted');
       await connectWebSocket()
       await loadConversations()
       await loadFollowing()
-      
-      // Set up WebSocket handlers
       chatService.onMessage(handleMessage)
       chatService.onConnectionChange(handleConnectionChange)
     })
 
     onUnmounted(() => {
-      debugLog('onUnmounted', 'Component unmounted');
       chatService.disconnect()
     })
 
