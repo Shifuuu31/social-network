@@ -8,13 +8,8 @@
 
       <div class="groups-filters">
         <div class="search-bar">
-          <input 
-            type="text" 
-            placeholder="Search groups..." 
-            v-model="searchQuery" 
-            @input="handleSearchInput"
-            class="search-input" 
-          />
+          <input type="text" placeholder="Search groups..." v-model="searchQuery" @input="handleSearchInput"
+            class="search-input" />
           <button class="search-btn" @click="performSearch">
             <span class="icon">🔍</span>
           </button>
@@ -36,20 +31,15 @@
         <div class="spinner"></div>
         <p>Loading groups...</p>
       </div>
-
+      <!-- TODO handle errors styling better -->
       <div v-else-if="groupsStore.error" class="error">
         <p>{{ groupsStore.error }}</p>
         <button @click="loadGroups" class="btn btn-primary">Retry</button>
       </div>
 
       <div v-else class="groups-grid">
-        <GroupCard 
-          v-for="group in groupsStore.groups" 
-          :key="group.id" 
-          :group="group" 
-          @group-joined="handleGroupJoined"
-          @group-left="handleGroupLeft" 
-        />
+        <GroupCard v-for="group in groupsStore.groups" :key="group.id" :group="group" @group-joined="handleGroupJoined"
+          @group-left="handleGroupLeft" />
       </div>
 
       <div v-if="groupsStore.groups.length === 0 && !groupsStore.isLoading" class="empty-state">
@@ -87,7 +77,7 @@ const handleSearchInput = () => {
   clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
     loadGroups()
-  }, 200) 
+  }, 200)
 }
 
 // Perform immediate search when search button is clicked

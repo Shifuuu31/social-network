@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"social-network/pkg/models"
 	"social-network/pkg/tools"
@@ -14,19 +15,18 @@ import (
 func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 	groupsMux = http.NewServeMux()
 
-groupsMux.HandleFunc("POST /group/new", rt.NewGroup) 
-groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups)
+	groupsMux.HandleFunc("POST /group/new", rt.NewGroup)
+	groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups)
 
-groupsMux.Handle("GET /group/{id}", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroup)))
-groupsMux.Handle("POST /group/events", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroupEvents)))
-groupsMux.Handle("POST /group/invite",  rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.InviteToJoinGroup)))
-groupsMux.Handle("POST /group/request",  rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.RequestToJoinGroup)))
-groupsMux.Handle("POST /group/accept-decline",  rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.AcceptDeclineGroup))) // TODO: ws
-groupsMux.Handle("POST /group/event/new", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.NewEvent)))
-groupsMux.Handle("POST /group/event/vote", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.EventVote)))
-groupsMux.Handle("GET /group/{id}/available-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetAvailableUsers)))
-groupsMux.Handle("GET /group/{id}/search-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.SearchAvailableUsers)))
-
+	groupsMux.Handle("GET /group/{id}", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroup)))
+	groupsMux.Handle("POST /group/events", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroupEvents)))
+	groupsMux.Handle("POST /group/invite", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.InviteToJoinGroup)))
+	groupsMux.Handle("POST /group/request", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.RequestToJoinGroup)))
+	groupsMux.Handle("POST /group/accept-decline", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.AcceptDeclineGroup))) // TODO: ws
+	groupsMux.Handle("POST /group/event/new", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.NewEvent)))
+	groupsMux.Handle("POST /group/event/vote", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.EventVote)))
+	groupsMux.Handle("GET /group/{id}/available-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetAvailableUsers)))
+	groupsMux.Handle("GET /group/{id}/search-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.SearchAvailableUsers)))
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
@@ -58,7 +58,7 @@ func (rt *Root) GetGroup(w http.ResponseWriter, r *http.Request) {
 	group := &models.Group{
 		ID: groupID,
 	}
-	requesterID := 17 // TODO: Get from auth when available
+	requesterID := rt.DL.GetRequesterID(w, r) // Get consistent user ID from middleware
 	// requesterID := rt.DL.GetRequesterID(w, r) // TODO enable this when we have auth
 	// if requesterID <= 0 {
 	// 	rt.DL.Logger.Log(models.LogEntry{
@@ -73,9 +73,9 @@ func (rt *Root) GetGroup(w http.ResponseWriter, r *http.Request) {
 	// 	return
 
 	// }
-	
+
 	err = rt.DL.Groups.GetGroupByID(group)
-	
+
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -96,8 +96,26 @@ func (rt *Root) GetGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	err = rt.DL.Members.GetMember(member)
 	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "INFO",
+			Message: "User is not a member of this group",
+			Metadata: map[string]any{
+				"group_id": groupID,
+				"user_id":  requesterID,
+				"error":    err.Error(),
+			},
+		})
 		group.IsMember = ""
 	} else {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "INFO",
+			Message: "User membership status found",
+			Metadata: map[string]any{
+				"group_id": groupID,
+				"user_id":  requesterID,
+				"status":   member.Status,
+			},
+		})
 		group.IsMember = member.Status
 	}
 
@@ -132,7 +150,7 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "New group JSON decoded"})
 
-	group.CreatorID = 1 // TODO: comment when auth is ready: rt.DL.GetRequesterID(w, r)
+	group.CreatorID = rt.DL.GetRequesterID(w, r) // Get consistent user ID from middleware
 
 	if err := group.Validate(); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -203,7 +221,7 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// If the creator has an active WebSocket connection, automatically join them to the group chat
-	if conn, hasConnection := rt.Hub.Clients[group.CreatorID]; hasConnection {
+	if conns, ok := rt.Hub.Clients[group.CreatorID]; ok {
 		rt.Hub.JoinGroup(group.CreatorID, group.ID)
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "DEBUG",
@@ -215,25 +233,29 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 		})
 
 		// Send a welcome message to the creator
-		if conn != nil {
-			welcomeMsg := map[string]any{
-				"type":      "group_chat_created",
-				"group_id":  group.ID,
-				"message":   "Group chat has been created! You can now start chatting with group members.",
-				"timestamp": group.CreatedAt,
-			}
-			if err := conn.WriteJSON(welcomeMsg); err != nil {
-				rt.DL.Logger.Log(models.LogEntry{
-					Level:   "WARN",
-					Message: "Failed to send welcome message to group creator",
-					Metadata: map[string]any{
-						"group_id": group.ID,
-						"user_id":  group.CreatorID,
-						"error":    err.Error(),
-					},
-				})
+		for _, conn := range conns {
+
+			if conns != nil {
+				welcomeMsg := map[string]any{
+					"type":      "group_chat_created",
+					"group_id":  group.ID,
+					"message":   "Group chat has been created! You can now start chatting with group members.",
+					"timestamp": group.CreatedAt,
+				}
+				if err := conn.WriteJSON(welcomeMsg); err != nil {
+					rt.DL.Logger.Log(models.LogEntry{
+						Level:   "WARN",
+						Message: "Failed to send welcome message to group creator",
+						Metadata: map[string]any{
+							"group_id": group.ID,
+							"user_id":  group.CreatorID,
+							"error":    err.Error(),
+						},
+					})
+				}
 			}
 		}
+
 	}
 
 	rt.DL.Logger.Log(models.LogEntry{
@@ -280,10 +302,10 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	// TODO validate payload
 
 	// Check if requester is creator
-	requesterID := 1 //TODO handel
+	// requesterID := 1 //TODO handel
 	// requesterID := rt.DL.GetRequesterID(w, r)
 
-	err := rt.DL.Groups.IsUserCreator(member.GroupID, requesterID)
+	err := rt.DL.Members.IsUserGroupMember(member) // TODO:all members can send invites
 
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -361,6 +383,29 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 				"notification_id": notification.ID,
 			},
 		})
+
+		// Send real-time notification via WebSocket if user is online
+		if conns, ok := rt.Hub.Clients[member.UserID]; ok {
+			wsMessage := map[string]any{
+				"type":         "notification",
+				"notification": notification,
+				"timestamp":    time.Now(),
+			}
+
+			for _, conn := range conns {
+				if err := conn.WriteJSON(wsMessage); err != nil {
+					rt.DL.Logger.Log(models.LogEntry{
+						Level:   "WARN",
+						Message: "Failed to send real-time notification",
+						Metadata: map[string]any{
+							"user_id":         member.UserID,
+							"notification_id": notification.ID,
+							"error":           err.Error(),
+						},
+					})
+				}
+			}
+		}
 	}
 
 	rt.DL.Logger.Log(models.LogEntry{
@@ -483,6 +528,29 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 				"notification_id": notification.ID,
 			},
 		})
+
+		// Send real-time notification via WebSocket if creator is online
+		if conns, ok := rt.Hub.Clients[groupInfo.CreatorID]; ok {
+			wsMessage := map[string]any{
+				"type":         "notification",
+				"notification": notification,
+				"timestamp":    time.Now(),
+			}
+
+			for _, conn := range conns {
+				if err := conn.WriteJSON(wsMessage); err != nil {
+					rt.DL.Logger.Log(models.LogEntry{
+						Level:   "WARN",
+						Message: "Failed to send real-time notification",
+						Metadata: map[string]any{
+							"creator_id":      groupInfo.CreatorID,
+							"notification_id": notification.ID,
+							"error":           err.Error(),
+						},
+					})
+				}
+			}
+		}
 	}
 
 	tools.EncodeJSON(w, http.StatusCreated, member.Status)
@@ -593,7 +661,7 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 		rt.Hub.InitializeGroupChat(member.GroupID)
 
 		// If the new member has an active WebSocket connection, join them to the group chat
-		if conn, hasConnection := rt.Hub.Clients[member.UserID]; hasConnection {
+		if conns, ok := rt.Hub.Clients[member.UserID]; ok {
 			rt.Hub.JoinGroup(member.UserID, member.GroupID)
 			rt.DL.Logger.Log(models.LogEntry{
 				Level:   "DEBUG",
@@ -603,28 +671,31 @@ func (rt *Root) AcceptDeclineGroup(w http.ResponseWriter, r *http.Request) {
 					"user_id":  member.UserID,
 				},
 			})
+			for _, conn := range conns {
 
-			// Send a welcome message to the new member
-			if conn != nil {
-				welcomeMsg := map[string]any{
-					"type":      "group_joined",
-					"group_id":  member.GroupID,
-					"message":   "Welcome to the group! You can now participate in group chat.",
-					"timestamp": "",
-				}
-				if err := conn.WriteJSON(welcomeMsg); err != nil {
-					rt.DL.Logger.Log(models.LogEntry{
-						Level:   "WARN",
-						Message: "Failed to send welcome message to new group member",
-						Metadata: map[string]any{
-							"group_id": member.GroupID,
-							"user_id":  member.UserID,
-							"error":    err.Error(),
-						},
-					})
+				// Send a welcome message to the new member
+				if conn != nil {
+					welcomeMsg := map[string]any{
+						"type":      "group_joined",
+						"group_id":  member.GroupID,
+						"message":   "Welcome to the group! You can now participate in group chat.",
+						"timestamp": "",
+					}
+					if err := conn.WriteJSON(welcomeMsg); err != nil {
+						rt.DL.Logger.Log(models.LogEntry{
+							Level:   "WARN",
+							Message: "Failed to send welcome message to new group member",
+							Metadata: map[string]any{
+								"group_id": member.GroupID,
+								"user_id":  member.UserID,
+								"error":    err.Error(),
+							},
+						})
+					}
 				}
 			}
 		}
+
 	}
 
 	// TODO Notify group creator
@@ -733,7 +804,7 @@ func (rt *Root) NewEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Event input validated"})
 
-	// insert user into db
+	// insert event into db
 	if err := rt.DL.Events.Insert(event); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -906,8 +977,6 @@ func (rt *Root) EventVote(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
-	// TODO send notification to group members
-
 	if err := tools.EncodeJSON(w, http.StatusCreated, vote); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -997,7 +1066,7 @@ func (rt *Root) GetGroupEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetAvailableUsers retrieves users who have never been invited or been members of a specific group
+// retrieves users who have never been invited or been members of a specific group
 func (rt *Root) GetAvailableUsers(w http.ResponseWriter, r *http.Request) {
 	groupID, err := strconv.Atoi(r.PathValue("id"))
 	if groupID <= 0 || err != nil {
@@ -1074,7 +1143,7 @@ func (rt *Root) GetAvailableUsers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// SearchAvailableUsers searches for users who have never been invited or been members of a specific group
+// searches for users who have never been invited or been members of a specific group
 func (rt *Root) SearchAvailableUsers(w http.ResponseWriter, r *http.Request) {
 	groupID, err := strconv.Atoi(r.PathValue("id"))
 	if groupID <= 0 || err != nil {

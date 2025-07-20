@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 type Notification struct {
@@ -11,7 +12,7 @@ type Notification struct {
 	Type      string `json:"type"`
 	Message   string `json:"message"`
 	Seen      bool   `json:"seen"`
-	CreatedAt int    `json:"created_at"`
+	CreatedAt string `json:"created_at"`
 }
 
 type NotificationModel struct {
@@ -121,4 +122,70 @@ func (nm *NotificationModel) GetByUser(payload *NotificationPayload) ([]*Notific
 		notifications = append(notifications, n)
 	}
 	return notifications, nil
+}
+
+// GetUserNotifications retrieves notifications for a user with pagination
+func (nm *NotificationModel) GetUserNotifications(userID, limit, offset int) ([]*Notification, error) {
+	query := `SELECT id, user_id, type, message, seen, created_at FROM notifications 
+			  WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`
+
+	rows, err := nm.DB.Query(query, userID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("get user notifications: %w", err)
+	}
+	defer rows.Close()
+
+	var notifications []*Notification
+	for rows.Next() {
+		n := &Notification{}
+		if err := rows.Scan(&n.ID, &n.UserID, &n.Type, &n.Message, &n.Seen, &n.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan notification: %w", err)
+		}
+		notifications = append(notifications, n)
+	}
+	return notifications, nil
+}
+
+// MarkAsRead marks specific notifications as read
+func (nm *NotificationModel) MarkAsRead(userID int, notificationIDs []int) error {
+	if len(notificationIDs) == 0 {
+		return nil
+	}
+
+	args := make([]interface{}, len(notificationIDs)+1)
+	args[0] = userID
+
+	for i, id := range notificationIDs {
+		args[i+1] = id
+	}
+
+	var query string
+	if len(notificationIDs) == 1 {
+		query = `UPDATE notifications SET seen = 1 WHERE user_id = ? AND id = ?`
+	} else {
+		query = fmt.Sprintf(`UPDATE notifications SET seen = 1 WHERE user_id = ? AND id IN (%s)`,
+			strings.Repeat("?,", len(notificationIDs)-1)+"?")
+	}
+
+	if _, err := nm.DB.Exec(query, args...); err != nil {
+		return fmt.Errorf("mark as read: %w", err)
+	}
+	return nil
+}
+
+// GetUnreadCount returns the number of unread notifications for a user
+func (nm *NotificationModel) GetUnreadCount(userID int) (int, error) {
+	var count int
+	if err := nm.DB.QueryRow(`SELECT COUNT(*) FROM notifications WHERE user_id = ? AND seen = 0`, userID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("get unread count: %w", err)
+	}
+	return count, nil
+}
+
+// MarkAllAsRead marks all user notifications as read
+func (nm *NotificationModel) MarkAllAsRead(userID int) error {
+	if _, err := nm.DB.Exec(`UPDATE notifications SET seen = 1 WHERE user_id = ? AND seen = 0`, userID); err != nil {
+		return fmt.Errorf("mark all as read: %w", err)
+	}
+	return nil
 }

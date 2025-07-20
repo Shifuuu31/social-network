@@ -14,6 +14,9 @@
         <router-link to="/groups/create" class="nav-link nav-link-primary">
           Créer un groupe
         </router-link>
+        
+        <!-- Notification Header -->
+        <NotificationHeader />
       </nav>
     </div>
   </header>

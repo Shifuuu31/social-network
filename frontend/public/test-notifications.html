@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Notification API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .result { background: #f5f5f5; padding: 10px; margin: 10px 0; }
+        .error { background: #ffeeee; color: #cc0000; }
+        .success { background: #eeffee; color: #006600; }
+        button { padding: 8px 16px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Notification System Test</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Fetch Notifications</h2>
+        <button onclick="testFetchNotifications()">Fetch Notifications</button>
+        <div id="fetch-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: Get Unread Count</h2>
+        <button onclick="testUnreadCount()">Get Unread Count</button>
+        <div id="unread-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 3: Mark as Read</h2>
+        <button onclick="testMarkAsRead()">Mark First Notification as Read</button>
+        <div id="mark-result" class="result"></div>
+    </div>
+
+    <script>
+        let lastNotifications = [];
+
+        async function testFetchNotifications() {
+            const resultDiv = document.getElementById('fetch-result');
+            try {
+                const response = await fetch('http://localhost:8080/api/notifications', {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                lastNotifications = data.notifications || [];
+                
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h3>Success!</h3>
+                    <p>Total notifications: ${data.total || 0}</p>
+                    <p>Page: ${data.page || 1}, Limit: ${data.limit || 20}</p>
+                    <h4>Notifications:</h4>
+                    <pre>${JSON.stringify(data.notifications, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<h3>Error:</h3><p>${error.message}</p>`;
+            }
+        }
+
+        async function testUnreadCount() {
+            const resultDiv = document.getElementById('unread-result');
+            try {
+                const response = await fetch('http://localhost:8080/api/notifications/unread-count', {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h3>Success!</h3>
+                    <p>Unread count: ${data.unread_count}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<h3>Error:</h3><p>${error.message}</p>`;
+            }
+        }
+
+        async function testMarkAsRead() {
+            const resultDiv = document.getElementById('mark-result');
+            
+            if (lastNotifications.length === 0) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = '<p>Please fetch notifications first to get notification IDs</p>';
+                return;
+            }
+            
+            const firstNotification = lastNotifications[0];
+            
+            try {
+                const response = await fetch('http://localhost:8080/api/notifications/mark-read', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        notification_ids: [firstNotification.id]
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h3>Success!</h3>
+                    <p>Marked notification ${firstNotification.id} as read</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<h3>Error:</h3><p>${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

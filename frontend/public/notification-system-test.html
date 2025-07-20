@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frontend Notification System Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .result { padding: 15px; margin: 15px 0; border-radius: 4px; }
+        .error { background: #ffeeee; color: #cc0000; border: 1px solid #ffcdd2; }
+        .success { background: #eeffee; color: #006600; border: 1px solid #c8e6c9; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background: #e3f2fd; color: #1976d2; border: 1px solid #bbdefb; }
+        button { padding: 10px 20px; margin: 8px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .notification-display { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 4px; margin: 10px 0; }
+        .notification-item { border-bottom: 1px solid #eee; padding: 10px 0; }
+        .notification-item:last-child { border-bottom: none; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .stats { display: flex; gap: 20px; }
+        .stat-item { text-align: center; padding: 10px; background: #e9ecef; border-radius: 4px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 Frontend Notification System Test</h1>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <strong id="total-count">0</strong>
+                <div>Total Notifications</div>
+            </div>
+            <div class="stat-item">
+                <strong id="unread-count">0</strong>
+                <div>Unread Notifications</div>
+            </div>
+            <div class="stat-item">
+                <strong id="websocket-status">Disconnected</strong>
+                <div>WebSocket Status</div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📡 Connection Tests</h2>
+            <div class="controls">
+                <button onclick="testBackendConnection()">Test Backend Connection</button>
+                <button onclick="testWebSocketConnection()">Test WebSocket Connection</button>
+                <button onclick="testCORSHeaders()">Test CORS Headers</button>
+            </div>
+            <div id="connection-results" class="result info">Click buttons above to test connections...</div>
+        </div>
+
+        <div class="test-section">
+            <h2>📋 Notification API Tests</h2>
+            <div class="controls">
+                <button onclick="fetchNotifications()">Fetch Notifications</button>
+                <button onclick="getUnreadCount()">Get Unread Count</button>
+                <button onclick="markFirstAsRead()">Mark First as Read</button>
+                <button onclick="createTestNotification()">Create Test Notification</button>
+            </div>
+            <div id="api-results" class="result info">Click buttons above to test API...</div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔄 Real-time Tests</h2>
+            <div class="controls">
+                <button onclick="simulateGroupInvite()">Simulate Group Invite</button>
+                <button onclick="simulateGroupEvent()">Simulate Group Event</button>
+                <button onclick="testWebSocketMessage()">Send Test WebSocket Message</button>
+            </div>
+            <div id="realtime-results" class="result info">Click buttons above to test real-time features...</div>
+        </div>
+
+        <div class="test-section">
+            <h2>📱 Current Notifications</h2>
+            <div class="controls">
+                <button onclick="refreshNotificationDisplay()">Refresh Display</button>
+                <button onclick="clearAllNotifications()">Clear All</button>
+            </div>
+            <div id="notifications-display" class="notification-display">
+                <p>Click "Refresh Display" to load notifications...</p>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 System Diagnostics</h2>
+            <div class="controls">
+                <button onclick="runFullDiagnostic()">Run Full Diagnostic</button>
+                <button onclick="checkSystemHealth()">Check System Health</button>
+            </div>
+            <div id="diagnostic-results" class="result info">Click buttons above to run diagnostics...</div>
+        </div>
+    </div>
+
+    <script>
+        let notifications = [];
+        let websocket = null;
+        const API_BASE = 'http://localhost:8080/api';
+        const WS_BASE = 'ws://localhost:8080/ws';
+
+        // Utility functions
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.className = `result ${type}`;
+            element.innerHTML = message;
+        }
+
+        function updateStats() {
+            document.getElementById('total-count').textContent = notifications.length;
+            document.getElementById('unread-count').textContent = notifications.filter(n => !n.seen).length;
+            document.getElementById('websocket-status').textContent = websocket && websocket.readyState === WebSocket.OPEN ? 'Connected' : 'Disconnected';
+        }
+
+        // Connection Tests
+        async function testBackendConnection() {
+            try {
+                const response = await fetch(`${API_BASE}/notifications`);
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('connection-results', `✅ Backend Connected Successfully<br>Response: ${data.total} notifications available`, 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                showResult('connection-results', `❌ Backend Connection Failed<br>Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testWebSocketConnection() {
+            try {
+                if (websocket) {
+                    websocket.close();
+                }
+                
+                websocket = new WebSocket(`${WS_BASE}/connect`);
+                
+                websocket.onopen = () => {
+                    showResult('connection-results', '✅ WebSocket Connected Successfully', 'success');
+                    updateStats();
+                };
+                
+                websocket.onerror = (error) => {
+                    showResult('connection-results', `❌ WebSocket Connection Failed<br>Error: ${error}`, 'error');
+                    updateStats();
+                };
+                
+                websocket.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        showResult('realtime-results', `📨 WebSocket Message Received<br><pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                        
+                        // Handle notification messages
+                        if (data.type === 'notification' || data.type === 'new_notification') {
+                            notifications.unshift(data.notification || data);
+                            refreshNotificationDisplay();
+                            updateStats();
+                        }
+                    } catch (e) {
+                        console.error('Error parsing WebSocket message:', e);
+                    }
+                };
+                
+                websocket.onclose = () => {
+                    updateStats();
+                };
+                
+            } catch (error) {
+                showResult('connection-results', `❌ WebSocket Setup Failed<br>Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCORSHeaders() {
+            try {
+                const response = await fetch(`${API_BASE}/notifications`, {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                
+                const corsHeaders = {
+                    'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                    'Access-Control-Allow-Credentials': response.headers.get('Access-Control-Allow-Credentials')
+                };
+                
+                if (response.ok) {
+                    showResult('connection-results', `✅ CORS Headers OK<br><pre>${JSON.stringify(corsHeaders, null, 2)}</pre>`, 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                showResult('connection-results', `❌ CORS Test Failed<br>Error: ${error.message}`, 'error');
+            }
+        }
+
+        // API Tests
+        async function fetchNotifications() {
+            try {
+                const response = await fetch(`${API_BASE}/notifications`, {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                notifications = data.notifications || [];
+                updateStats();
+                refreshNotificationDisplay();
+                
+                showResult('api-results', `✅ Fetched ${notifications.length} notifications<br>Total: ${data.total}, Page: ${data.page}`, 'success');
+            } catch (error) {
+                showResult('api-results', `❌ Fetch Failed<br>Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function getUnreadCount() {
+            try {
+                const response = await fetch(`${API_BASE}/notifications/unread-count`, {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                showResult('api-results', `✅ Unread Count: ${data.unread_count}`, 'success');
+                updateStats();
+            } catch (error) {
+                showResult('api-results', `❌ Unread Count Failed<br>Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function markFirstAsRead() {
+            if (notifications.length === 0) {
+                showResult('api-results', '⚠️ No notifications to mark as read. Fetch notifications first.', 'warning');
+                return;
+            }
+            
+            const firstNotification = notifications[0];
+            if (firstNotification.seen) {
+                showResult('api-results', '⚠️ First notification is already marked as read.', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/notifications/mark-read`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ notification_ids: [firstNotification.id] })
+                });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                firstNotification.seen = true;
+                refreshNotificationDisplay();
+                updateStats();
+                
+                showResult('api-results', `✅ Marked notification ${firstNotification.id} as read`, 'success');
+            } catch (error) {
+                showResult('api-results', `❌ Mark as Read Failed<br>Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function createTestNotification() {
+            // This would typically be done through group actions, but for testing we'll simulate
+            try {
+                const response = await fetch('http://localhost:8080/groups/group/invite', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        group_id: 1,
+                        user_id: 2,
+                        status: 'invited',
+                        prev_status: 'none'
+                    })
+                });
+                
+                if (response.ok) {
+                    showResult('api-results', '✅ Test notification created via group invite', 'success');
+                    // Refresh notifications after a short delay
+                    setTimeout(fetchNotifications, 1000);
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                showResult('api-results', `❌ Create Test Notification Failed<br>Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Real-time Tests
+        function simulateGroupInvite() {
+            const testNotification = {
+                id: Date.now(),
+                type: 'group_invite',
+                message: 'You have been invited to join Test Group (simulated)',
+                seen: false,
+                created_at: new Date().toISOString()
+            };
+            
+            notifications.unshift(testNotification);
+            refreshNotificationDisplay();
+            updateStats();
+            
+            showResult('realtime-results', '✅ Simulated group invite notification added', 'success');
+        }
+
+        function simulateGroupEvent() {
+            const testNotification = {
+                id: Date.now() + 1,
+                type: 'group_event',
+                message: 'New event created in Test Group (simulated)',
+                seen: false,
+                created_at: new Date().toISOString()
+            };
+            
+            notifications.unshift(testNotification);
+            refreshNotificationDisplay();
+            updateStats();
+            
+            showResult('realtime-results', '✅ Simulated group event notification added', 'success');
+        }
+
+        function testWebSocketMessage() {
+            if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                showResult('realtime-results', '❌ WebSocket not connected. Connect first.', 'error');
+                return;
+            }
+            
+            const testMessage = {
+                type: 'test',
+                message: 'Test message from frontend',
+                timestamp: new Date().toISOString()
+            };
+            
+            websocket.send(JSON.stringify(testMessage));
+            showResult('realtime-results', '✅ Test message sent via WebSocket', 'success');
+        }
+
+        // Display Functions
+        function refreshNotificationDisplay() {
+            const display = document.getElementById('notifications-display');
+            
+            if (notifications.length === 0) {
+                display.innerHTML = '<p>No notifications found.</p>';
+                return;
+            }
+            
+            const html = notifications.map(notification => `
+                <div class="notification-item">
+                    <strong>${getNotificationTitle(notification.type)}</strong>
+                    ${notification.seen ? '<span style="color: #6c757d;">(Read)</span>' : '<span style="color: #007bff;">(Unread)</span>'}
+                    <div>${notification.message}</div>
+                    <small>ID: ${notification.id} | ${formatDate(notification.created_at)}</small>
+                </div>
+            `).join('');
+            
+            display.innerHTML = html;
+            updateStats();
+        }
+
+        function getNotificationTitle(type) {
+            const titles = {
+                'group_invite': '📧 Group Invitation',
+                'group_event': '📅 Group Event',
+                'group_join_request': '👥 Join Request',
+                'follow_request': '👤 Follow Request'
+            };
+            return titles[type] || '📢 Notification';
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'Unknown';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        function clearAllNotifications() {
+            notifications = [];
+            refreshNotificationDisplay();
+            updateStats();
+            showResult('notifications-display', 'All notifications cleared (local only)', 'info');
+        }
+
+        // Diagnostic Functions
+        async function runFullDiagnostic() {
+            showResult('diagnostic-results', '🔍 Running full diagnostic...', 'info');
+            
+            const results = [];
+            
+            // Test backend connection
+            try {
+                const response = await fetch(`${API_BASE}/notifications`);
+                results.push(`✅ Backend API: ${response.ok ? 'OK' : 'FAIL'}`);
+            } catch (e) {
+                results.push(`❌ Backend API: FAIL (${e.message})`);
+            }
+            
+            // Test WebSocket
+            results.push(`${websocket && websocket.readyState === WebSocket.OPEN ? '✅' : '❌'} WebSocket: ${websocket ? websocket.readyState === WebSocket.OPEN ? 'Connected' : 'Disconnected' : 'Not initialized'}`);
+            
+            // Test CORS
+            try {
+                const response = await fetch(`${API_BASE}/notifications`, { method: 'HEAD' });
+                const corsOrigin = response.headers.get('Access-Control-Allow-Origin');
+                results.push(`${corsOrigin === 'http://localhost:5175' ? '✅' : '❌'} CORS: ${corsOrigin || 'Not set'}`);
+            } catch (e) {
+                results.push(`❌ CORS: FAIL (${e.message})`);
+            }
+            
+            // System stats
+            results.push(`📊 Notifications loaded: ${notifications.length}`);
+            results.push(`📊 Unread count: ${notifications.filter(n => !n.seen).length}`);
+            
+            showResult('diagnostic-results', results.join('<br>'), 'info');
+        }
+
+        async function checkSystemHealth() {
+            const healthChecks = [];
+            
+            try {
+                // Backend health
+                const backendResponse = await fetch(`${API_BASE}/notifications`);
+                healthChecks.push({
+                    name: 'Backend API',
+                    status: backendResponse.ok ? 'healthy' : 'unhealthy',
+                    details: `HTTP ${backendResponse.status}`
+                });
+                
+                // Database health (indirect check via API response)
+                if (backendResponse.ok) {
+                    const data = await backendResponse.json();
+                    healthChecks.push({
+                        name: 'Database',
+                        status: data.notifications !== undefined ? 'healthy' : 'unhealthy',
+                        details: `${data.total || 0} total notifications`
+                    });
+                }
+                
+                // WebSocket health
+                healthChecks.push({
+                    name: 'WebSocket',
+                    status: websocket && websocket.readyState === WebSocket.OPEN ? 'healthy' : 'unhealthy',
+                    details: websocket ? `State: ${websocket.readyState}` : 'Not connected'
+                });
+                
+                const healthReport = healthChecks.map(check => 
+                    `${check.status === 'healthy' ? '✅' : '❌'} ${check.name}: ${check.status} (${check.details})`
+                ).join('<br>');
+                
+                showResult('diagnostic-results', `<strong>System Health Report:</strong><br>${healthReport}`, 'info');
+                
+            } catch (error) {
+                showResult('diagnostic-results', `❌ Health check failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize on page load
+        window.onload = function() {
+            updateStats();
+            showResult('connection-results', 'Ready for testing. Click buttons to start.', 'info');
+            showResult('api-results', 'Ready for API testing.', 'info');
+            showResult('realtime-results', 'Ready for real-time testing.', 'info');
+            showResult('diagnostic-results', 'Ready for diagnostics.', 'info');
+        };
+
+        // Auto-connect to WebSocket for convenience
+        setTimeout(() => {
+            testWebSocketConnection();
+            fetchNotifications();
+        }, 1000);
+    </script>
+</body>
+</html>

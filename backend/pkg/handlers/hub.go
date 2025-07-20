@@ -13,10 +13,10 @@ import (
 
 type WSHub struct {
 	Upgrader  websocket.Upgrader
-	Clients   map[int]*websocket.Conn         // userID -> connection
-	Groups    map[int]map[int]*websocket.Conn // groupID -> userID -> connection
-	Broadcast chan any                        // broadcast channel for messages
-	Lock      sync.RWMutex                    // protects Clients and Groups
+	Clients   map[int][]*websocket.Conn         // userID -> connections
+	Groups    map[int]map[int][]*websocket.Conn // groupID -> userID -> connections
+	Broadcast chan any                          // broadcast channel for messages
+	Lock      sync.RWMutex                      // protects Clients and Groups
 }
 
 type WSResponse struct {
@@ -29,8 +29,8 @@ func NewHub() *WSHub {
 		Upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool { return true }, // allow all origins
 		},
-		Clients:   make(map[int]*websocket.Conn),
-		Groups:    make(map[int]map[int]*websocket.Conn),
+		Clients:   make(map[int][]*websocket.Conn),
+		Groups:    make(map[int]map[int][]*websocket.Conn),
 		Broadcast: make(chan any),
 	}
 }
@@ -201,7 +201,7 @@ func (hub *WSHub) AddClient(userID int, conn *websocket.Conn) {
 	hub.Lock.Lock()
 	defer hub.Lock.Unlock()
 
-	hub.Clients[userID] = conn
+	hub.Clients[userID] = append(hub.Clients[userID], conn)
 	log.Printf("Added client userID=%d", userID)
 }
 
@@ -210,10 +210,13 @@ func (hub *WSHub) RemoveClient(userID int) {
 	hub.Lock.Lock()
 	defer hub.Lock.Unlock()
 
-	if conn, ok := hub.Clients[userID]; ok {
-		conn.Close()
-		delete(hub.Clients, userID)
-		log.Printf("Removed client userID=%d", userID)
+	if conns, ok := hub.Clients[userID]; ok {
+		for _, conn := range conns {
+
+			conn.Close()
+			delete(hub.Clients, userID)
+			log.Printf("Removed client userID=%d", userID)
+		}
 	}
 }
 
@@ -223,7 +226,7 @@ func (hub *WSHub) JoinGroup(requesterID, groupID int) {
 	defer hub.Lock.Unlock()
 
 	if hub.Groups[groupID] == nil {
-		hub.Groups[groupID] = make(map[int]*websocket.Conn)
+		hub.Groups[groupID] = make(map[int][]*websocket.Conn)
 	}
 	if conn, ok := hub.Clients[requesterID]; ok {
 		hub.Groups[groupID][requesterID] = conn
@@ -237,7 +240,7 @@ func (hub *WSHub) InitializeGroupChat(groupID int) {
 	defer hub.Lock.Unlock()
 
 	if hub.Groups[groupID] == nil {
-		hub.Groups[groupID] = make(map[int]*websocket.Conn)
+		hub.Groups[groupID] = make(map[int][]*websocket.Conn)
 		log.Printf("Initialized group chat for group %d", groupID)
 	} else {
 		log.Printf("Group chat for group %d already exists", groupID)
@@ -247,15 +250,18 @@ func (hub *WSHub) InitializeGroupChat(groupID int) {
 // SendToUser sends data to a single user
 func (hub *WSHub) SendToUser(receiverID int, data any) error {
 	hub.Lock.RLock()
-	conn, ok := hub.Clients[receiverID]
+	conns, ok := hub.Clients[receiverID]
 	hub.Lock.RUnlock()
 
 	if ok {
-		err := conn.WriteJSON(data)
-		if err != nil {
-			log.Printf("Error sending to user %d: %v", receiverID, err)
-			return err
+		for _, conn := range conns {
+			err := conn.WriteJSON(data)
+			if err != nil {
+				log.Printf("Error sending to user %d: %v", receiverID, err)
+				return err
+			}
 		}
+
 	}
 	log.Printf("SendToUser: user %d connection not found", receiverID)
 	return nil
@@ -266,18 +272,21 @@ func (hub *WSHub) BroadcastToGroup(groupID, senderID int, data any) error {
 	hub.Lock.RLock()
 	defer hub.Lock.RUnlock()
 
-	conns, ok := hub.Groups[groupID]
+	groups, ok := hub.Groups[groupID]
 	if !ok {
 		log.Printf("BroadcastToGroup: group %d not found", groupID)
 		return nil
 	}
 
-	for userID, conn := range conns {
+	for userID, conns := range groups {
 		if userID != senderID {
-			err := conn.WriteJSON(data)
-			if err != nil {
-				log.Printf("BroadcastToGroup: failed to send to user %d in group %d: %v", userID, groupID, err)
-				return err
+			for _, conn := range conns {
+
+				err := conn.WriteJSON(data)
+				if err != nil {
+					log.Printf("BroadcastToGroup: failed to send to user %d in group %d: %v", userID, groupID, err)
+					return err
+				}
 			}
 		}
 	}

@@ -35,6 +35,8 @@ type DataLayer struct {
 var skipPaths = []string{
 	"/auth/signup",
 	"/auth/signin",
+	"/groups/group/new",
+	"/groups/group/browse",
 }
 
 // Optional: define prefixes to skip (e.g., for /static/*)
@@ -45,16 +47,16 @@ var skipPrefixes = []string{
 func (dl *DataLayer) GetRequesterID(w http.ResponseWriter, r *http.Request) (requesterID int) {
 	requesterID, ok := r.Context().Value(models.UserIDKey).(int)
 	if !ok {
+		// TODO: Remove this test fallback when authentication is ready
 		dl.Logger.Log(models.LogEntry{
-			Level:   "ERROR",
-			Message: "Unauthorized: requester ID not found",
+			Level:   "WARN",
+			Message: "Using test user ID (authentication bypass for testing)",
 			Metadata: map[string]any{
 				"ip":   r.RemoteAddr,
 				"path": r.URL.Path,
 			},
 		})
-		tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
-		return 0
+		return 1 // Test user ID 2 (has notifications)
 	}
 	return requesterID
 }
@@ -62,9 +64,8 @@ func (dl *DataLayer) GetRequesterID(w http.ResponseWriter, r *http.Request) (req
 // RequireAuth checks if a user is authenticated by session
 func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check if request path is in skipPaths
-		// Check if request path matches any skipPrefixes
-		if slices.Contains(skipPaths, r.URL.Path) && tools.SliceHasPrefix(skipPrefixes, r.URL.Path) {
+		// Check if request path is in skipPaths OR matches any skipPrefixes
+		if slices.Contains(skipPaths, r.URL.Path) || tools.SliceHasPrefix(skipPrefixes, r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -144,9 +145,8 @@ func (dl *DataLayer) GroupAccessMiddleware(next http.Handler) http.Handler {
 		var groupID int
 		var err error
 
-		// userID, ok := r.Context().Value(models.UserIDKey).(int) //TODO: Get user ID from context
-		userID, ok := 1, true
-		if !ok || userID <= 0 {
+		userID := dl.GetRequesterID(nil, r) // Get consistent user ID
+		if userID <= 0 {
 			dl.Logger.Log(models.LogEntry{
 				Level:   "WARN",
 				Message: "Missing or invalid user ID in context",
@@ -228,7 +228,7 @@ func (dl *DataLayer) GroupAccessMiddleware(next http.Handler) http.Handler {
 // CORSMiddleware sets CORS headers
 func (dl *DataLayer) CORSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5174")
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5175")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")

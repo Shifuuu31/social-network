@@ -73,9 +73,16 @@ func main() {
 	if port == ":" {
 		port += "8080"
 	}
+
+	// Apply middleware to the router
+	router := App.Router()
+	handlerWithMiddleware := App.DL.CORSMiddleware(
+		App.DL.RecoverMiddleware(router),
+	)
+
 	server := http.Server{
 		Addr:    port,
-		Handler: App.Router(),
+		Handler: handlerWithMiddleware,
 	}
 
 	log.Println("server listening on http://localhost" + port)

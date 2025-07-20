@@ -2,8 +2,14 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Groups from '../views/Groups.vue'
 import GroupView from '../views/GroupView.vue'
 import CreateGroup from '../views/CreateGroup.vue'
+// import Chat from '../components/chat/ChatWindow.vue'
 
 const routes = [
+  // {
+  //   path: '/chat',
+  //   name: 'Chat',
+  //   component: Chat
+  // },
   {
     path: '/',
     name: 'groups',

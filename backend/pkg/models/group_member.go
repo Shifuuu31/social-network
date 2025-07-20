@@ -7,13 +7,14 @@ import (
 )
 
 type GroupMember struct {
-	ID        int       `json:"id"`
-	GroupID   int       `json:"group_id"`
-	UserID    int       `json:"user_id"`
-	Status    string    `json:"status"` // "invited", "requested", "member", "declined"
-	CreatedAt time.Time `json:"created_at"`
-	PrevStatus string    `json:"prev_status"` 
+	ID         int       `json:"id"`
+	GroupID    int       `json:"group_id"`
+	UserID     int       `json:"user_id"`
+	Status     string    `json:"status"` // "invited", "requested", "member", "declined"
+	CreatedAt  time.Time `json:"created_at"`
+	PrevStatus string    `json:"prev_status"`
 }
+
 // TODO
 func (gm *GroupMember) Validate() error {
 	return nil
@@ -54,12 +55,12 @@ func (gmm *GroupMemberModel) Delete(member *GroupMember) error {
 
 func (gmm *GroupMemberModel) GetMember(member *GroupMember) error {
 	query := `
-		SELECT id, status, created_at
+		SELECT id, group_id, user_id, status, prev_status, created_at
 		FROM group_members
 		WHERE group_id = ? AND user_id = ?
 	`
 	row := gmm.DB.QueryRow(query, member.GroupID, member.UserID)
-	return row.Scan(&member.ID, &member.Status, &member.CreatedAt)
+	return row.Scan(&member.ID, &member.GroupID, &member.UserID, &member.Status, &member.PrevStatus, &member.CreatedAt)
 }
 
 func (gmm *GroupMemberModel) GetGroupMembers(groupID int) ([]*GroupMember, error) {
@@ -92,8 +93,8 @@ func (gmm *GroupMemberModel) IsUserGroupMember(payload *GroupMember) error {
 		WHERE group_id = ? AND user_id = ?
 	`
 	var count int
-	
-	if err := gmm.DB.QueryRow(query, payload.GroupID, payload.UserID).Scan(&count);err != nil || count <= 0 {
+
+	if err := gmm.DB.QueryRow(query, payload.GroupID, payload.UserID).Scan(&count); err != nil || count <= 0 {
 		return fmt.Errorf("check user in group: %w", err)
 	}
 	return nil
