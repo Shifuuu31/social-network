@@ -85,6 +85,14 @@
             ref="messageInput"
           ></textarea>
           <button 
+            type="button"
+            class="emoji-btn"
+            @click="toggleEmojiPicker"
+            title="Add emoji"
+          >
+            😊
+          </button>
+          <button 
             @click="sendMessage"
             :disabled="!newMessage.trim() || sending"
             class="send-btn"
@@ -92,6 +100,11 @@
             <span v-if="sending">...</span>
             <span v-else>Send</span>
           </button>
+          <div v-if="showEmojiPicker" class="emoji-picker-dropdown" ref="emojiPicker">
+            <div class="emoji-grid">
+              <span v-for="emoji in emojis" :key="emoji" class="emoji-item" @click="insertEmoji(emoji)">{{ emoji }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -122,6 +135,11 @@ export default {
     const isUserOnline = ref(false)
     const messagesContainer = ref(null)
     const messageInput = ref(null)
+    const showEmojiPicker = ref(false)
+    const emojis = [
+      '😀','😁','😂','🤣','😊','😍','😘','😜','🤔','😎','😢','😭','😡','👍','🙏','👏','🙌','💪','🔥','🎉','🥳','❤️','💔','😇','😱','😴','🤗','😅','😉','😏','😬','😋','😆','😃','😄','😚','😙','😗','😐','😑','😶','🙄','😯','😲','😳','🥺','😤','😠','😩','😖','😞','😟','😔','😕','🙃','🤑','🤠','😷','🤒','🤕','🤢','🤮','🥵','🥶','😵','🤯','🤓','🧐','😺','😸','😹','😻','😼','😽','🙀','😿','😾'
+    ]
+    const emojiPicker = ref(null)
 
     const currentUserId = user.value?.id
 
@@ -322,6 +340,41 @@ export default {
       // Cleanup is handled by the chat service
     })
 
+    function toggleEmojiPicker() {
+      showEmojiPicker.value = !showEmojiPicker.value
+    }
+
+    function insertEmoji(emoji) {
+      // Insert emoji at cursor position in textarea
+      const textarea = messageInput.value
+      if (textarea) {
+        const start = textarea.selectionStart
+        const end = textarea.selectionEnd
+        const text = newMessage.value
+        newMessage.value = text.slice(0, start) + emoji + text.slice(end)
+        nextTick(() => {
+          textarea.focus()
+          textarea.selectionStart = textarea.selectionEnd = start + emoji.length
+        })
+      } else {
+        newMessage.value += emoji
+      }
+      showEmojiPicker.value = false
+    }
+
+    // Close emoji picker when clicking outside
+    function handleClickOutside(event) {
+      if (showEmojiPicker.value && emojiPicker.value && !emojiPicker.value.contains(event.target) && !event.target.classList.contains('emoji-btn')) {
+        showEmojiPicker.value = false
+      }
+    }
+    onMounted(() => {
+      document.addEventListener('mousedown', handleClickOutside)
+    })
+    onUnmounted(() => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    })
+
     return {
       messages,
       selectedUser,
@@ -337,7 +390,12 @@ export default {
       deleteMessage,
       getAvatarUrl,
       formatMessageTime,
-      isTemporaryMessage
+      isTemporaryMessage,
+      showEmojiPicker,
+      emojis,
+      toggleEmojiPicker,
+      insertEmoji,
+      emojiPicker
     }
   }
 }
@@ -533,6 +591,7 @@ export default {
   padding: 1rem;
   border-top: 1px solid #e1e5e9;
   background: white;
+  position: relative; /* Added for emoji picker positioning */
 }
 
 .input-wrapper {
@@ -584,5 +643,53 @@ export default {
   font-size: 0.9rem;
   color: #adb5bd;
   margin-top: 0.5rem;
+}
+
+.emoji-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  margin-right: 0.5rem;
+  transition: background 0.2s;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.emoji-btn:hover {
+  background: #f0f0f0;
+}
+.emoji-picker-dropdown {
+  position: absolute;
+  bottom: 48px;
+  left: 0;
+  z-index: 10;
+  background: white;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  padding: 8px;
+  width: 320px;
+  max-width: 90vw;
+}
+.emoji-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.emoji-item {
+  font-size: 1.3rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.emoji-item:hover {
+  background: #f0f0f0;
 }
 </style> 

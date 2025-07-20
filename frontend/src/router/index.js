@@ -6,7 +6,7 @@ import Home from '@/views/Home.vue'
 import { useAuth } from '@/composables/useAuth'
 import Profile from '@/views/Profile.vue'
 import Chat from '@/views/Chat.vue'
-
+ 
 const routes = [
   { path:'/',name:'home',component:Home},
   { path: '/signin', name: 'Signin', component: Signin },
@@ -33,6 +33,10 @@ router.beforeEach(async (to, from, next) => {
   const auth = useAuth()
   const isPublicRoute = publicRoutes.includes(to.path)
   
+  //  if(!hasToken){
+  //   auth.clearAuthState()
+  //   return next('/signin')
+  //  }
   // If going to public route and already authenticated, redirect to home
   if (isPublicRoute && auth.isAuthenticated.value) {
     return next('/')
@@ -55,7 +59,7 @@ router.beforeEach(async (to, from, next) => {
       auth.clearAuthState()
       return next('/signin')
     }
-  } 
+} 
   
   next()
 })
