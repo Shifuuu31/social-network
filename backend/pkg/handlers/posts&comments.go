@@ -83,13 +83,16 @@ func (app *Root) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	currentUserId := app.DL.GetRequesterID(w, r)
-
+	wanaseeprofile:=0
 	if filter.Type != "user" {
 		filter.Id = currentUserId
+	} else {
+		wanaseeprofile = currentUserId
+		fmt.Println("wanaseeprofile: momo", wanaseeprofile)
 	}
 
 	// Set the filter ID to the current user's ID
- 
+
 	// filter.Type = "followers"
 	// Validate filter using tools function
 	fmt.Println("filter:", filter)
@@ -101,7 +104,7 @@ func (app *Root) GetFeedPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	posts, err := app.DL.Posts.GetPosts(filter)
+	posts, err := app.DL.Posts.GetPosts(filter, wanaseeprofile)
 	// fmt.Println("waaaaaaaaaaaaaaaaaaaaaaaazi", posts)
 	// fmt.Println("GetFeedPosts filter:", filter, "Posts:", posts)
 

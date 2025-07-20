@@ -112,16 +112,12 @@ func (pfl *PostFilter) Validate() error {
 	return nil
 }
 
-func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
+func (pm *PostModel) GetPosts(filter *PostFilter, wanaseeprofile int) (posts []Post, err error) {
 	var query string
 	var rows *sql.Rows
 
-	fmt.Println("filter.Type: momo", filter.Type)
-	fmt.Println("filter.Id: momo", filter.Id)
-
 	if filter.Type == "user" {
-		// Only fetch posts by this user
-		query = `
+		query := `
 			SELECT 
 				posts.id, 
 				posts.user_id, 
@@ -140,11 +136,25 @@ func (pm *PostModel) GetPosts(filter *PostFilter) (posts []Post, err error) {
 				FROM comments
 				GROUP BY post_id
 			) comment_counts ON posts.id = comment_counts.post_id
-			WHERE posts.user_id = ?
+			LEFT JOIN follow_request 
+				ON follow_request.from_user_id = ? 
+				AND follow_request.to_user_id = posts.user_id 
+				AND follow_request.status = 'accepted'
+			LEFT JOIN close_friends
+				ON close_friends.user_id = posts.user_id
+				AND close_friends.friend_id = ?
+			WHERE 
+				posts.user_id = ?
+				AND (
+					posts.privacy = 'public'
+					OR (posts.privacy = 'followers' AND follow_request.from_user_id IS NOT NULL)
+					OR (posts.privacy = 'private' AND close_friends.friend_id IS NOT NULL)
+				)
 			ORDER BY posts.created_at DESC
 			LIMIT ? OFFSET ?
 		`
-		rows, err = pm.DB.Query(query, filter.Id, filter.NPost, filter.Start)
+		// NOTE: You must distinguish between the profile being visited vs current user
+		rows, err = pm.DB.Query(query, wanaseeprofile, wanaseeprofile, filter.Id, filter.NPost, filter.Start)
 	} else {
 		// UNIFIED QUERY: Handle all privacy types in one query
 		query = `
