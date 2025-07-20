@@ -23,6 +23,7 @@
 </template>
 
 <script setup>
+import NotificationHeader from './NotificationHeader.vue'
 // Header component logic
 </script>
 
@@ -106,6 +107,21 @@
 .nav-link-primary:hover {
   background: linear-gradient(135deg, #7c3aed, #9333ea);
   transform: translateY(-1px);
+}
+
+.nav-link-unseen {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444 !important;
+}
+
+.nav-link-unseen:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fff !important;
+}
+
+.nav-icon {
+  font-size: 1rem;
+  margin-right: 4px;
 }
 
 @media (max-width: 768px) {

@@ -189,3 +189,25 @@ func (nm *NotificationModel) MarkAllAsRead(userID int) error {
 	}
 	return nil
 }
+
+// GetUserUnseenNotifications retrieves only unseen notifications for a user with pagination
+func (nm *NotificationModel) GetUserUnseenNotifications(userID, limit, offset int) ([]*Notification, error) {
+	query := `SELECT id, user_id, type, message, seen, created_at FROM notifications 
+			  WHERE user_id = ? AND seen = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?`
+
+	rows, err := nm.DB.Query(query, userID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("get user unseen notifications: %w", err)
+	}
+	defer rows.Close()
+
+	var notifications []*Notification
+	for rows.Next() {
+		n := &Notification{}
+		if err := rows.Scan(&n.ID, &n.UserID, &n.Type, &n.Message, &n.Seen, &n.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan notification: %w", err)
+		}
+		notifications = append(notifications, n)
+	}
+	return notifications, nil
+}

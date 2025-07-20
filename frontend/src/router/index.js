@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Groups from '../views/Groups.vue'
 import GroupView from '../views/GroupView.vue'
 import CreateGroup from '../views/CreateGroup.vue'
+import NotificationsView from '../views/NotificationsView.vue'
+import UnseenNotifications from '../components/UnseenNotifications.vue'
 // import Chat from '../components/chat/ChatWindow.vue'
 
 const routes = [
@@ -30,6 +32,16 @@ const routes = [
     name: 'GroupView',
     component: GroupView,
     props: true
+  },
+  {
+    path: '/notifications',
+    name: 'Notifications',
+    component: NotificationsView
+  },
+  {
+    path: '/notifications/unseen',
+    name: 'UnseenNotifications',
+    component: UnseenNotifications
   }
 ]
 

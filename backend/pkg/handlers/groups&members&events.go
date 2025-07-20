@@ -304,6 +304,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	// Check if requester is creator
 	// requesterID := 1 //TODO handel
 	// requesterID := rt.DL.GetRequesterID(w, r)
+	fmt.Println(member.user)
 
 	err := rt.DL.Members.IsUserGroupMember(member) // TODO:all members can send invites
 

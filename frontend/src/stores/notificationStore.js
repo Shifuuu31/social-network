@@ -93,6 +93,40 @@ export const useNotificationStore = defineStore('notification', () => {
     }
   }
 
+  // Fetch only unseen notifications
+  const fetchUnseenNotifications = async (page = 1, limit = 20) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/notifications?page=${page}&limit=${limit}&unseen_only=true`, {
+        credentials: 'include'
+      })
+      if (!res.ok) throw new Error('Fetch failed')
+      const data = await res.json()
+      
+      if (page === 1) {
+        // Replace notifications for first page
+        notifications.value = data.notifications || []
+      } else {
+        // Append for subsequent pages
+        notifications.value.push(...(data.notifications || []))
+      }
+      
+      return {
+        notifications: data.notifications || [],
+        total: data.total || 0,
+        page: data.page || 1,
+        hasMore: (data.notifications || []).length === limit
+      }
+    } catch (error) {
+      console.error('Failed to fetch unseen notifications:', error)
+      return {
+        notifications: [],
+        total: 0,
+        page: 1,
+        hasMore: false
+      }
+    }
+  }
+
   // Helper: Create a follow request notification
   const createFollowRequest = (fromUser, recipientId) => {
     addNotification({
@@ -193,6 +227,7 @@ export const useNotificationStore = defineStore('notification', () => {
     markMultipleAsRead,
     fetchNotifications,
     fetchUnreadCount,
+    fetchUnseenNotifications,
     createFollowRequest,
     createGroupInvitation,
     createGroupJoinRequest,

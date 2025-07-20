@@ -143,6 +143,8 @@ func (rt *Root) GetNotifications(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	page := 1
 	limit := 20
+	unseenOnly := false
+
 	if p := r.URL.Query().Get("page"); p != "" {
 		if parsedPage, err := strconv.Atoi(p); err == nil && parsedPage > 0 {
 			page = parsedPage
@@ -153,10 +155,20 @@ func (rt *Root) GetNotifications(w http.ResponseWriter, r *http.Request) {
 			limit = parsedLimit
 		}
 	}
+	if r.URL.Query().Get("unseen_only") == "true" {
+		unseenOnly = true
+	}
 
 	offset := (page - 1) * limit
 
-	notifications, err := rt.DL.Notifications.GetUserNotifications(requesterID, limit, offset)
+	var notifications []*models.Notification
+	var err error
+
+	if unseenOnly {
+		notifications, err = rt.DL.Notifications.GetUserUnseenNotifications(requesterID, limit, offset)
+	} else {
+		notifications, err = rt.DL.Notifications.GetUserNotifications(requesterID, limit, offset)
+	}
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
