@@ -8,8 +8,8 @@ import (
 type Notification struct {
 	ID        int    `json:"id"`
 	UserID    int    `json:"user_id"`
-	Type      string `json:"type"` 
-	Message   string `json:"message"` 
+	Type      string `json:"type"`
+	Message   string `json:"message"`
 	Seen      bool   `json:"seen"`
 	CreatedAt int    `json:"created_at"`
 }
@@ -29,11 +29,30 @@ func (nm *NotificationModel) Upsert(notification *Notification) error {
 			message = excluded.message,
 			seen = excluded.seen,
 			created_at = excluded.created_at
+		RETURNING id, user_id, type, message, seen, created_at
 	`
 
-	if _, err := nm.DB.Exec(query, notification.ID, notification.UserID, notification.Type, notification.Message, notification.Seen, notification.CreatedAt); err != nil {
-		return fmt.Errorf("upsert notification: %w", err)
+	row := nm.DB.QueryRow(query,
+		notification.ID,
+		notification.UserID,
+		notification.Type,
+		notification.Message,
+		notification.Seen,
+		notification.CreatedAt,
+	)
+
+	// Scan returned values back into the notification struct
+	if err := row.Scan(
+		&notification.ID,
+		&notification.UserID,
+		&notification.Type,
+		&notification.Message,
+		&notification.Seen,
+		&notification.CreatedAt,
+	); err != nil {
+		return fmt.Errorf("upsert scan: %w", err)
 	}
+
 	return nil
 }
 

@@ -13,6 +13,7 @@ type Message struct {
 	Content    string    `json:"content"`
 	Type       string    `json:"type"` // 'private',  'group', 'join_group
 	CreatedAt  time.Time `json:"created_at"`
+	Notif *Notification `json:"notification,omitempty"`
 }
 
 type MessageModel struct {
@@ -31,3 +32,4 @@ func (m *MessageModel) Insert(msg *Message) error {
 	return m.DB.QueryRow(query, msg.SenderID, msg.ReceiverID, msg.GroupID, msg.Content, msg.Type).
 		Scan(&msg.ID, &msg.CreatedAt)
 }
+
