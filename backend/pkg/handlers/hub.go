@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"social-network/pkg/models"
 	"social-network/pkg/tools"
@@ -11,39 +13,41 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// **WEBSOCKET HUB - MANAGES ALL CLIENT CONNECTIONS AND GROUPS**
 type WSHub struct {
-	Upgrader  websocket.Upgrader
-	Clients   map[int][]*websocket.Conn         // userID -> connection
-	Groups    map[int]map[int][]*websocket.Conn // groupID -> userID -> connection
-	Broadcast chan any                          // broadcast channel for messages
-	Mutex     sync.RWMutex                      // protects Clients and Groups
+	Upgrader websocket.Upgrader
+	Clients  map[int][]*websocket.Conn         // userID -> connection
+	Groups   map[int]map[int][]*websocket.Conn // groupID -> userID -> connection
+	Mutex    sync.RWMutex                      // protects Clients and Groups
 }
 
+// **WEBSOCKET RESPONSE STRUCTURE - USED FOR SUCCESS/ERROR RESPONSES**
 type WSResponse struct {
 	Status  string `json:"status"`  // "success" or "error"
 	Message string `json:"message"` // additional text
 }
 
+// **CREATES NEW WEBSOCKET HUB INSTANCE**
 func NewHub() *WSHub {
 	return &WSHub{
 		Upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool { return true }, // allow all origins
 		},
-		Clients:   make(map[int][]*websocket.Conn),
-		Groups:    make(map[int]map[int][]*websocket.Conn),
-		Broadcast: make(chan any),
+		Clients: make(map[int][]*websocket.Conn),
+		Groups:  make(map[int]map[int][]*websocket.Conn),
 	}
 }
 
+// **SETS UP WEBSOCKET ROUTES**
 func (rt *Root) NewWSHandler() *http.ServeMux {
 	wsMux := http.NewServeMux()
 	wsMux.HandleFunc("/connect", rt.Connect) // route for websocket connection
 	return wsMux
 }
 
+// **HANDLES INITIAL WEBSOCKET CONNECTION UPGRADE**
 func (rt *Root) Connect(w http.ResponseWriter, r *http.Request) {
 	requesterID := rt.DL.GetRequesterID(w, r)
-
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "New websocket connection attempt",
@@ -53,6 +57,7 @@ func (rt *Root) Connect(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
+	// **UPGRADE HTTP CONNECTION TO WEBSOCKET**
 	conn, err := rt.Hub.Upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -67,71 +72,42 @@ func (rt *Root) Connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// **ADD CLIENT TO HUB AND START HANDLING**
 	rt.Hub.AddClient(requesterID, conn)
-
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:    "INFO",
 		Message:  "WebSocket client added",
 		Metadata: map[string]any{"user_id": requesterID},
 	})
 
-	go rt.Send(requesterID, conn)
+	go rt.HandleClient(requesterID, conn)
 }
 
-// AddClient adds a new client connection
-func (hub *WSHub) AddClient(userID int, conn *websocket.Conn) {
-	hub.Mutex.RLock()
-
-	hub.Clients[userID] = append(hub.Clients[userID], conn)
-	log.Printf("Added client userID=%d", userID)
-
-	if len(hub.Clients[userID]) == 1 {
-		// TODO send user online
-	}
-	hub.Mutex.RUnlock()
-}
-
-func (hub *WSHub) RemoveClientConn(userID int, conn *websocket.Conn) {
-	hub.Mutex.RLock()
-
-	conns := hub.Clients[userID]
-	for i, c := range conns {
-		if c == conn {
-			conn.Close()
-			// Remove the connection from the slice
-			hub.Clients[userID] = append(conns[:i], conns[i+1:]...)
-			break
-		}
-	}
-
-	// Clean up empty slice
-	if len(hub.Clients[userID]) == 0 {
-		delete(hub.Clients, userID)
-		log.Printf("All clients disconnected for userID=%d", userID)
-	}
-	hub.Mutex.RUnlock()
-}
-
-// JoinGroup adds a client to a group
-func (hub *WSHub) JoinGroup(userID, groupID int) {
-	hub.Mutex.Lock()
-	defer hub.Mutex.Unlock()
-
-	if hub.Groups[groupID] == nil {
-		hub.Groups[groupID] = make(map[int][]*websocket.Conn)
-	}
-	if conns, ok := hub.Clients[userID]; ok {
-		hub.Groups[groupID][userID] = conns
-		log.Printf("User %d joined group %d", userID, groupID)
-	}
-}
-
-func (rt *Root) Send(userID int, conn *websocket.Conn) {
+// **MAIN CLIENT HANDLER - PROCESSES INCOMING NOTIFICATIONS**
+func (rt *Root) HandleClient(userID int, conn *websocket.Conn) {
 	defer rt.Hub.RemoveClientConn(userID, conn)
 
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
+	})
+	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				conn.Close()
+				return
+			}
+		}
+	}()
+
 	for {
-		var msg *models.Message
-		err := conn.ReadJSON(&msg)
+		// **READ NOTIFICATION FROM CLIENT (NOTIFICATION-FIRST ARCHITECTURE)**
+		var notif *models.Notification
+		err := conn.ReadJSON(&notif)
 		if err != nil {
 			rt.DL.Logger.Log(models.LogEntry{
 				Level:   "INFO",
@@ -141,127 +117,233 @@ func (rt *Root) Send(userID int, conn *websocket.Conn) {
 					"error":   err.Error(),
 				},
 			})
-			conn.WriteJSON(WSResponse{
-				Status:  "error",
-				Message: "failed to send msg",
-			})
+			// **SEND ERROR RESPONSE ON READ FAILURE**
+			WriteWSError(conn, "failed to read notification")
 			return
 		}
 
-		msg.SenderID = userID
-
-		if err := rt.DL.Messages.Insert(msg); err != nil {
-			rt.DL.Logger.Log(models.LogEntry{
-				Level:   "ERROR",
-				Message: "Failed to insert message",
-				Metadata: map[string]any{
-					"user_id": userID,
-					"error":   err.Error(),
-					"message": msg,
-				},
-			})
-			conn.WriteJSON(WSResponse{
-				Status:  "error",
-				Message: "failed to send msg",
-			})
-			return
-		}
-
-		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "INFO",
-			Message: "Message inserted",
-			Metadata: map[string]any{
-				"user_id": userID,
-				"message": msg,
-			},
-		})
-
-		switch msg.Type {
-		case "private":
-			rt.DL.Logger.Log(models.LogEntry{
-				Level:   "INFO",
-				Message: "Sending private message",
-				Metadata: map[string]any{
-					"from": msg.SenderID,
-					"to":   msg.ReceiverID,
-				},
-			})
-			if err := rt.Hub.SendToUser(msg.ReceiverID, msg); err != nil {
-				conn.WriteJSON(WSResponse{
-					Status:  "error",
-					Message: "failed to send msg",
-				})
+		// **ROUTE NOTIFICATION BY TYPE**
+		switch notif.Type {
+		case "message":
+			if err := rt.handleMessageNotification(userID, notif); err != nil {
+				// **ERROR HANDLING - SEND WSResponse ON FAILURE**
+				WriteWSError(conn, "failed to process message")
 				return
 			}
-
-		case "group":
-			rt.DL.Logger.Log(models.LogEntry{
-				Level:   "INFO",
-				Message: "Broadcasting group message",
-				Metadata: map[string]any{
-					"group_id": msg.GroupID,
-					"from":     msg.SenderID,
-				},
-			})
-			if err := rt.Hub.BroadcastToGroupMembers(msg.GroupID, msg.SenderID, msg); err != nil {
-				conn.WriteJSON(WSResponse{
-					Status:  "error",
-					Message: "failed to send msg",
-				})
-				return
-			}
-
 		case "join_group":
-			rt.DL.Logger.Log(models.LogEntry{
-				Level:   "INFO",
-				Message: "User joining group",
-				Metadata: map[string]any{
-					"user_id":  userID,
-					"group_id": msg.GroupID,
-				},
-			})
-			rt.Hub.JoinGroup(userID, msg.GroupID)
+			if err := rt.handleJoinGroupNotification(userID, notif); err != nil {
+				// **ERROR HANDLING - SEND WSResponse ON FAILURE**
 
+				WriteWSError(conn, "failed to join group")
+
+				return
+			}
 		default:
 			rt.DL.Logger.Log(models.LogEntry{
 				Level:   "ERROR",
-				Message: "Invalid message type",
+				Message: "Invalid notification type",
 				Metadata: map[string]any{
-					"user_id":  userID,
-					"group_id": msg.GroupID,
+					"user_id": userID,
+					"type":    notif.Type,
 				},
 			})
-			conn.WriteJSON(WSResponse{
-				Status:  "error",
-				Message: "invalid message type",
-			})
-			return
+			// **ERROR HANDLING - INVALID TYPE**
+			WriteWSError(conn, "invalid notification type")
+			continue
 		}
 
-		conn.WriteJSON(WSResponse{
-			Status:  "success",
-			Message: "msg sent",
-		})
+		// **SUCCESS RESPONSE - NOTIFICATION PROCESSED**
+		WriteWSSuccess(conn, "notification processed")
 	}
 }
 
-// BroadcastToAll sends the given data to all WebSocket connections in the slice.
-// It removes any closed connections from the slice if needed (you can customize that).
-func (hub *WSHub) SendToUser(userID int, data any) error {
-	hub.Mutex.RLock()
-	conns := hub.Clients[userID]
-	hub.Mutex.RUnlock()
+// **ADDS NEW CLIENT CONNECTION TO HUB**
+func (hub *WSHub) AddClient(userID int, conn *websocket.Conn) {
+	hub.Mutex.Lock()
+	defer hub.Mutex.Unlock()
 
-	for _, conn := range conns {
-		if err := conn.WriteJSON(data); err != nil {
-			log.Printf("SendToUser: Failed to send to user %d: %v", userID, err)
-			// Optionally close and remove the conn here
+	hub.Clients[userID] = append(hub.Clients[userID], conn)
+	log.Printf("Added client userID=%d", userID)
+
+	// **HANDLE FIRST CONNECTION - USER COMES ONLINE**
+	if len(hub.Clients[userID]) == 1 {
+		// TODO send user online notification
+	}
+}
+
+// **REMOVES CLIENT CONNECTION FROM HUB**
+func (hub *WSHub) RemoveClientConn(userID int, conn *websocket.Conn) {
+	hub.Mutex.Lock()
+	defer hub.Mutex.Unlock()
+
+	conns := hub.Clients[userID]
+	for i, c := range conns {
+		if c == conn {
+			conn.Close()
+			// **REMOVE CONNECTION FROM SLICE**
+			hub.Clients[userID] = append(conns[:i], conns[i+1:]...)
+			break
 		}
 	}
+
+	// **CLEAN UP EMPTY SLICE - USER GOES OFFLINE**
+	if len(hub.Clients[userID]) == 0 {
+		delete(hub.Clients, userID)
+		log.Printf("All clients disconnected for userID=%d", userID)
+	}
+}
+
+// **ADDS USER TO GROUP FOR GROUP MESSAGING**
+func (hub *WSHub) JoinGroup(userID, groupID int) {
+	hub.Mutex.Lock()
+	defer hub.Mutex.Unlock()
+
+	// **INITIALIZE GROUP IF NOT EXISTS**
+	if hub.Groups[groupID] == nil {
+		hub.Groups[groupID] = make(map[int][]*websocket.Conn)
+	}
+	// **ADD USER'S CONNECTIONS TO GROUP**
+	if conns, ok := hub.Clients[userID]; ok {
+		hub.Groups[groupID][userID] = conns
+		log.Printf("User %d joined group %d", userID, groupID)
+	}
+}
+
+// **HANDLES MESSAGE-TYPE NOTIFICATIONS - PROCESSES AND STORES MESSAGES**
+func (rt *Root) handleMessageNotification(userID int, notif *models.Notification) error {
+	// **VALIDATE MESSAGE EXISTS IN NOTIFICATION**
+	if notif.Message == nil {
+		return fmt.Errorf("message is required for message notification")
+	}
+
+	// **SET MESSAGE METADATA**
+	notif.Message.SenderID = userID
+	notif.Message.CreatedAt = time.Now()
+
+	// **INSERT MESSAGE INTO DATABASE FIRST**
+	if err := rt.DL.Messages.Insert(notif.Message); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to insert message",
+			Metadata: map[string]any{
+				"user_id": userID,
+				"error":   err.Error(),
+				"message": notif.Message,
+			},
+		})
+		return err
+	}
+
+	// **UPDATE NOTIFICATION WITH MESSAGE ID AND TIMESTAMP**
+	notif.MessageID = notif.Message.ID
+	notif.CreatedAt = int(time.Now().Unix())
+
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "INFO",
+		Message: "Message inserted",
+		Metadata: map[string]any{
+			"user_id":    userID,
+			"message_id": notif.Message.ID,
+		},
+	})
+
+	// **ROUTE NOTIFICATION BASED ON MESSAGE TYPE**
+	switch notif.Message.Type {
+	case "private":
+		return rt.sendPrivateNotification(notif)
+	case "group":
+		return rt.sendGroupNotification(notif)
+	default:
+		return fmt.Errorf("invalid message type: %s", notif.Message.Type)
+	}
+}
+
+// **HANDLES JOIN GROUP NOTIFICATIONS**
+func (rt *Root) handleJoinGroupNotification(userID int, notif *models.Notification) error {
+	// **VALIDATE GROUP ID EXISTS**
+	if notif.Message == nil || notif.Message.GroupID == 0 {
+		return fmt.Errorf("group_id is required for join_group notification")
+	}
+
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "INFO",
+		Message: "User joining group",
+		Metadata: map[string]any{
+			"user_id":  userID,
+			"group_id": notif.Message.GroupID,
+		},
+	})
+
+	// **ADD USER TO GROUP IN HUB**
+	rt.Hub.JoinGroup(userID, notif.Message.GroupID)
 	return nil
 }
 
-func (rt *Root) NotifyUser(userID int, notif *models.Notification) {
+// **SENDS PRIVATE MESSAGE NOTIFICATION TO SPECIFIC USER**
+func (rt *Root) sendPrivateNotification(notif *models.Notification) error {
+	// **VALIDATE RECEIVER ID EXISTS**
+	if notif.Message == nil || notif.Message.ReceiverID == 0 {
+		return fmt.Errorf("receiver_id is required for private message")
+	}
+
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "INFO",
+		Message: "Sending private notification",
+		Metadata: map[string]any{
+			"from": notif.Message.SenderID,
+			"to":   notif.Message.ReceiverID,
+		},
+	})
+
+	// **CREATE NOTIFICATION FOR RECEIVER**
+	receiverNotif := &models.Notification{
+		UserID:     notif.Message.ReceiverID,
+		Type:       "message_received",
+		SubMessage: "You have a new message",
+		MessageID:  notif.Message.ID,
+		Message:    notif.Message,
+		Seen:       false,
+		CreatedAt:  int(time.Now().Unix()),
+	}
+
+	return rt.SendNotificationToUser(notif.Message.ReceiverID, receiverNotif)
+}
+
+// **SENDS GROUP MESSAGE NOTIFICATION TO ALL GROUP MEMBERS**
+func (rt *Root) sendGroupNotification(notif *models.Notification) error {
+	// **VALIDATE GROUP ID EXISTS**
+	if notif.Message == nil || notif.Message.GroupID == 0 {
+		return fmt.Errorf("group_id is required for group message")
+	}
+
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "INFO",
+		Message: "Broadcasting group notification",
+		Metadata: map[string]any{
+			"group_id": notif.Message.GroupID,
+			"from":     notif.Message.SenderID,
+		},
+	})
+
+	// **CREATE NOTIFICATION FOR GROUP MEMBERS**
+	groupNotif := &models.Notification{
+		Type:       "group_message_received",
+		SubMessage: "New message in group",
+		MessageID:  notif.Message.ID,
+		Message:    notif.Message,
+		Seen:       false,
+		CreatedAt:  int(time.Now().Unix()),
+	}
+
+	return rt.BroadcastNotificationToGroup(notif.Message.GroupID, notif.Message.SenderID, groupNotif)
+}
+
+// SendNotificationToUser sends a notification to a specific user
+func (rt *Root) SendNotificationToUser(userID int, notif *models.Notification) error {
+	// Set the notification's user ID
+	notif.UserID = userID
+
+	// Save notification to database
 	if err := rt.DL.Notifications.Upsert(notif); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -271,92 +353,92 @@ func (rt *Root) NotifyUser(userID int, notif *models.Notification) {
 				"error":   err.Error(),
 			},
 		})
-		return
+		return err
 	}
 
-	rt.Hub.Mutex.RLock()
-	conns := rt.Hub.Clients[userID]
-	rt.Hub.Mutex.RUnlock()
-
-	msg := models.Message{
-		Type:  "notify",
-		Notif: notif,
-	}
+	// Send to WebSocket connections
+	rt.Hub.Mutex.Lock()
+	conns := removeDeadConns(rt.Hub.Clients[userID])
+	rt.Hub.Clients[userID] = conns
+	rt.Hub.Mutex.Unlock()
 
 	for _, conn := range conns {
-		if err := conn.WriteJSON(msg); err != nil {
-			log.Printf("SendNotificationToUser error: userID=%d, err=%v", userID, err)
-			conn.Close()
+		if err := conn.WriteJSON(notif); err != nil {
+			log.Printf("SendNotificationToUser: Failed to send to user %d: %v", userID, err)
+			// Optionally close and remove the conn here
 		}
 	}
+
+	return nil
 }
 
-func (hub *WSHub) BroadcastToGroupMembers(groupID, senderID int, data any) error {
-	hub.Mutex.RLock()
-	defer hub.Mutex.RUnlock()
+// BroadcastNotificationToGroup sends notification to all group members except sender
+func (rt *Root) BroadcastNotificationToGroup(groupID, senderID int, notif *models.Notification) error {
+	rt.Hub.Mutex.RLock()
+	groupConns, ok := rt.Hub.Groups[groupID]
+	rt.Hub.Mutex.RUnlock()
 
-	groupConns, ok := hub.Groups[groupID]
 	if !ok {
-		log.Printf("BroadcastToGroup: group %d not found", groupID)
+		log.Printf("BroadcastNotificationToGroup: group %d not found", groupID)
 		return nil
 	}
 
 	for userID, conns := range groupConns {
+		conns := removeDeadConns(conns)
+		rt.Hub.Mutex.Lock()
+		rt.Hub.Groups[groupID][userID] = conns
+		rt.Hub.Mutex.Unlock()
+
 		if userID == senderID {
+			continue // Skip sender
+		}
+
+		// Set the notification's user ID for each recipient
+		userNotif := *notif // Copy the notification
+		userNotif.UserID = userID
+
+		// Save notification to database for each user
+		if err := rt.DL.Notifications.Upsert(&userNotif); err != nil {
+			rt.DL.Logger.Log(models.LogEntry{
+				Level:   "ERROR",
+				Message: "Failed to save group notification",
+				Metadata: map[string]any{
+					"user_id":  userID,
+					"group_id": groupID,
+					"error":    err.Error(),
+				},
+			})
 			continue
 		}
+
+		// Send to WebSocket connections
 		for _, conn := range conns {
-			if err := conn.WriteJSON(data); err != nil {
-				log.Printf("BroadcastToGroup: failed to send to user %d in group %d: %v", userID, groupID, err)
+			if err := conn.WriteJSON(&userNotif); err != nil {
+				log.Printf("BroadcastNotificationToGroup: failed to send to user %d in group %d: %v", userID, groupID, err)
 			}
 		}
 	}
 
 	return nil
-}
-
-func (rt *Root) NotifyGroupMembers(groupID int, notif *models.Notification) {
-	if err := rt.DL.Notifications.Upsert(notif); err != nil {
-		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "ERROR",
-			Message: "Failed to save notification",
-			Metadata: map[string]any{
-				"user_id": groupID,
-				"error":   err.Error(),
-			},
-		})
-		return
-	}
-
-	rt.Hub.Mutex.RLock()
-	groupUsers := rt.Hub.Groups[groupID]
-	rt.Hub.Mutex.RUnlock()
-
-	msg := models.Message{
-		Type:  "notify",
-		Notif: notif,
-	}
-
-	for userID, conns := range groupUsers {
-		for _, conn := range conns {
-			if err := conn.WriteJSON(msg); err != nil {
-				log.Printf("SendNotificationToGroup error: userID=%d, err=%v", userID, err)
-				conn.Close()
-			}
-		}
-	}
 }
 
 func removeDeadConns(conns []*websocket.Conn) []*websocket.Conn {
 	var alive []*websocket.Conn
 	for _, c := range conns {
-		if c != nil {
-			if err := c.WriteMessage(websocket.PingMessage, nil); err == nil {
-				alive = append(alive, c)
-			} else {
-				c.Close()
-			}
+		c.SetWriteDeadline(time.Now().Add(1 * time.Second))
+		if err := c.WriteControl(websocket.PingMessage, nil, time.Now().Add(1*time.Second)); err == nil {
+			alive = append(alive, c)
+		} else {
+			c.Close()
 		}
 	}
 	return alive
+}
+
+func WriteWSSuccess(conn *websocket.Conn, msg string) {
+	conn.WriteJSON(WSResponse{Status: "success", Message: msg})
+}
+
+func WriteWSError(conn *websocket.Conn, msg string) {
+	conn.WriteJSON(WSResponse{Status: "error", Message: msg})
 }

@@ -6,57 +6,59 @@ import (
 )
 
 type Notification struct {
-	ID        int    `json:"id"`
-	UserID    int    `json:"user_id"`
-	Type      string `json:"type"`
-	Message   string `json:"message"`
-	Seen      bool   `json:"seen"`
-	CreatedAt int    `json:"created_at"`
+	ID         int      `json:"id"`
+	UserID     int      `json:"user_id"`
+	Type       string   `json:"type"`
+	SubMessage string   `json:"sub_message"`
+	MessageID  int      `json:"message_id"`
+	Message    *Message `json:"message,omitempty"`
+	Seen       bool     `json:"seen"`
+	CreatedAt  int      `json:"created_at"`
 }
 
 type NotificationModel struct {
 	DB *sql.DB
 }
 
-// Upsert inserts or replaces a notification
-func (nm *NotificationModel) Upsert(notification *Notification) error {
+func (nm *NotificationModel) Upsert(notif *Notification) error {
 	query := `
-		INSERT INTO notifications (id, user_id, type, message, seen, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET
-			user_id = excluded.user_id,
-			type = excluded.type,
-			message = excluded.message,
-			seen = excluded.seen,
-			created_at = excluded.created_at
-		RETURNING id, user_id, type, message, seen, created_at
+	INSERT INTO notifications (id, user_id, type, sub_message, message_id, seen, created_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?)
+	ON CONFLICT(id) DO UPDATE SET
+		user_id = excluded.user_id,
+		type = excluded.type,
+		sub_message = excluded.sub_message,
+		message_id = excluded.message_id,
+		seen = excluded.seen,
+		created_at = excluded.created_at
+	RETURNING id, user_id, type, sub_message, message_id, seen, created_at
 	`
-
 	row := nm.DB.QueryRow(query,
-		notification.ID,
-		notification.UserID,
-		notification.Type,
-		notification.Message,
-		notification.Seen,
-		notification.CreatedAt,
+		notif.ID,
+		notif.UserID,
+		notif.Type,
+		notif.SubMessage,
+		notif.MessageID,
+		notif.Seen,
+		notif.CreatedAt,
 	)
 
-	// Scan returned values back into the notification struct
-	if err := row.Scan(
-		&notification.ID,
-		&notification.UserID,
-		&notification.Type,
-		&notification.Message,
-		&notification.Seen,
-		&notification.CreatedAt,
-	); err != nil {
+	if err := row.Scan(&notif.ID, &notif.UserID, &notif.Type, &notif.SubMessage, &notif.MessageID, &notif.Seen, &notif.CreatedAt); err != nil {
 		return fmt.Errorf("upsert scan: %w", err)
+	}
+
+	if notif.MessageID > 0 {
+		msg := &Message{}
+		err := nm.DB.QueryRow(`SELECT id, sender_id, receiver_id, group_id, content, type, created_at FROM messages WHERE id = ?`, notif.MessageID).
+			Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.GroupID, &msg.Content, &msg.Type, &msg.CreatedAt)
+		if err == nil {
+			notif.Message = msg
+		}
 	}
 
 	return nil
 }
 
-// Delete deletes a specific notification
 func (nm *NotificationModel) Delete(notificationID int) error {
 	if _, err := nm.DB.Exec(`DELETE FROM notifications WHERE id = ?`, notificationID); err != nil {
 		return fmt.Errorf("delete notification: %w", err)
@@ -64,10 +66,6 @@ func (nm *NotificationModel) Delete(notificationID int) error {
 	return nil
 }
 
-// TODO
-// func (nm *Notifica.
-
-// MarkAllAsSeen marks all user notifications as seen
 func (nm *NotificationModel) MarkAllAsSeen(userID int) error {
 	if _, err := nm.DB.Exec(`UPDATE notifications SET seen = 1 WHERE user_id = ? AND seen = 0`, userID); err != nil {
 		return fmt.Errorf("mark all as seen: %w", err)
@@ -75,7 +73,6 @@ func (nm *NotificationModel) MarkAllAsSeen(userID int) error {
 	return nil
 }
 
-// CountUnseen returns the number of unseen notifications for a user
 func (nm *NotificationModel) CountUnseen(userID int) (count int, err error) {
 	if err = nm.DB.QueryRow(`SELECT COUNT(*) FROM notifications WHERE user_id = ? AND seen = 0`, userID).Scan(&count); err != nil {
 		return 0, fmt.Errorf("count unseen: %w", err)
@@ -87,12 +84,11 @@ type NotificationPayload struct {
 	UserID     string `json:"user_id"`
 	Start      int    `json:"star"`
 	NumOfItems int    `json:"n_items"`
-	Type       string `json:"type"` // all, seen, unseen
+	Type       string `json:"type"`
 }
 
-// GetByUser retrieves notifications for a user with optional filters
 func (nm *NotificationModel) GetByUser(payload *NotificationPayload) ([]*Notification, error) {
-	query := `SELECT id, user_id, type, message, seen, created_at FROM notifications WHERE user_id = ?`
+	query := `SELECT id, user_id, type, sub_message, message_id, seen, created_at FROM notifications WHERE user_id = ?`
 	args := []any{payload.UserID}
 
 	switch payload.Type {
@@ -113,11 +109,11 @@ func (nm *NotificationModel) GetByUser(payload *NotificationPayload) ([]*Notific
 
 	var notifications []*Notification
 	for rows.Next() {
-		n := &Notification{}
-		if err := rows.Scan(&n.ID, &n.UserID, &n.Type, &n.Message, &n.Seen, &n.CreatedAt); err != nil {
+		notif := &Notification{}
+		if err := rows.Scan(&notif.ID, &notif.UserID, &notif.Type, &notif.SubMessage, &notif.MessageID, &notif.Seen, &notif.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan notification: %w", err)
 		}
-		notifications = append(notifications, n)
+		notifications = append(notifications, notif)
 	}
 	return notifications, nil
 }
