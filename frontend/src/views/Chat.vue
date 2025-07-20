@@ -24,15 +24,30 @@ function selectConversation(userId) {
 </script>
 
 <style scoped>
+#app,
+main{
+  overflow: hidden;
+}
+
+.header {
+display: block;
+  position: none;
+}
+
+
 .chat-page {
-  height: 100vh;
+  width: 100%;
+  height: 90vh;
+
   background: #f8f9fa;
 }
 
 .chat-container {
   display: flex;
-  height: 100%;
-  max-width: 1200px;
+  flex-direction: row;
+  width: 100%;
+   height: 100%;
+    overflow: auto;
   margin: 0 auto;
   background: white;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);

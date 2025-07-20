@@ -41,7 +41,10 @@
         <span class="badge green">2</span>
       </router-link>
       <!-- Profile Icon -->
- 
+
+      <router-link  @click="logout()" to="/signin" class="icon-container" aria-label="Signout">
+        <span >X</span>
+      </router-link>
 
     </div>
   </header>
@@ -51,6 +54,11 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useAuth } from '@/composables/useAuth'
+
+
+const {logout} = useAuth()
+
 const dropdownOpen = ref(false)
 const router = useRouter()
 
@@ -58,10 +66,10 @@ function toggleDropdown() {
   dropdownOpen.value = !dropdownOpen.value
 }
 
-function logout() {
-  // localStorage.removeItem('token')
-  router.push('/login')
-}
+// function logout() {
+//   // localStorage.removeItem('token')
+//   router.push('/login')
+// }
 
 function goToProfile() {
   router.push('/profile')
@@ -75,7 +83,7 @@ function goToProfile() {
   border-radius: 0;
   margin: 0;
   max-width: 100vw;
-  /* width: 95%; */
+  height: 60px;
   padding: 14px 48px;
   display: flex;
   align-items: center;

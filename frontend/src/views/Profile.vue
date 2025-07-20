@@ -268,6 +268,7 @@ const closeFriendsLoading = ref(false)
 const closeFriendsError = ref('')
 
 async function loadCloseFriends() {
+  if (!isOwner) return
   closeFriendsLoading.value = true
   closeFriendsError.value = ''
   try {
@@ -322,7 +323,7 @@ onMounted(async () => {
   if (activeTab.value === 'posts' && canViewPrivateProfile.value) {
     fetchUserPosts()
   }
-  if (activeTab.value === 'closeFriends') {
+  if (activeTab.value === 'closeFriends' && isOwner) {
     await loadCloseFriends()
   }
 })

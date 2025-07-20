@@ -35,7 +35,7 @@ async function fetchCurrentUser() {
 async function logout() {
   try {
     await fetch('/api/auth/signout', {
-      method: 'POST',
+      method: 'DELETE',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' }
     })

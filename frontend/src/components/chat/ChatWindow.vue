@@ -375,11 +375,15 @@ export default {
 }
 
 .chat-container {
-  flex: 1;
   display: flex;
+  width: 100%;    
   flex-direction: column;
+   height: 100%;
+    overflow: auto;
+  margin: 0 auto;
+  background: white;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
 }
-
 .chat-header {
   padding: 1rem;
   border-bottom: 1px solid #e1e5e9;
@@ -420,7 +424,7 @@ export default {
 }
 
 .messages-container {
-  flex: 1;
+  max-height: 70vh;
   overflow-y: auto;
   padding: 1rem;
   background: #f8f9fa;
