@@ -27,7 +27,7 @@ func (m *Message) Validate() error {
 	if strings.TrimSpace(m.Content) == "" {
 		return errors.New("message content cannot be empty")
 	}
-
+	
 	if len(m.Content) > 1000 {
 		return errors.New("message content too long (max 1000 characters)")
 	}
@@ -110,7 +110,7 @@ func (m *MessageModel) GetMessagesByConversation(userID1, userID2 int, limit int
 	var messages []*Message
 	for rows.Next() {
 		msg := &Message{}
-		err := rows.Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.GroupID,
+		err := rows.Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.GroupID, 
 			&msg.Content, &msg.Type, &msg.CreatedAt)
 		if err != nil {
 			return nil, err
@@ -144,7 +144,7 @@ func (m *MessageModel) GetMessagesByGroup(groupID int, limit int) ([]*Message, e
 	var messages []*Message
 	for rows.Next() {
 		msg := &Message{}
-		err := rows.Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.GroupID,
+		err := rows.Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.GroupID, 
 			&msg.Content, &msg.Type, &msg.CreatedAt)
 		if err != nil {
 			return nil, err

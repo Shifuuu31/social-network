@@ -72,7 +72,7 @@ func (dl *DataLayer) GetRequesterID(w http.ResponseWriter, r *http.Request) (req
 		})
 		return userID
 	}
-
+	
 	// FOR PRODUCTION: User is not authenticated
 	dl.Logger.Log(models.LogEntry{
 		Level:   "ERROR",
@@ -317,14 +317,14 @@ func (dl *DataLayer) TimeoutMiddleware(duration time.Duration) func(http.Handler
 				"timeout": duration.String(),
 			},
 		})
-
+		
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Skip timeout for WebSocket connections
 			if r.URL.Path == "/connect" || r.Header.Get("Upgrade") == "websocket" {
 				next.ServeHTTP(w, r)
 				return
 			}
-
+			
 			// Apply timeout for regular HTTP requests
 			http.TimeoutHandler(next, duration, "Request timed out").ServeHTTP(w, r)
 		})

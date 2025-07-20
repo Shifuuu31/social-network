@@ -18,10 +18,10 @@ type NotificationResponse struct {
 
 // WebSocket notification structure for real-time updates
 type WSNotification struct {
-	Type         string               `json:"type"`   // "notification"
-	Action       string               `json:"action"` // "new", "update", "delete"
-	Notification *models.Notification `json:"notification"`
-	UnreadCount  int                  `json:"unread_count"`
+	Type         string                `json:"type"`         // "notification"
+	Action       string                `json:"action"`       // "new", "update", "delete"
+	Notification *models.Notification  `json:"notification"`
+	UnreadCount  int                   `json:"unread_count"`
 }
 
 func (rt *Root) NewNotificationsHandler() (notificationsMux *http.ServeMux) {
@@ -156,7 +156,7 @@ func (rt *Root) MarkNotificationSeen(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
 		NotificationID int `json:"notification_id"`
 	}
-
+	
 	if err := tools.DecodeJSON(r, &payload); err != nil {
 		tools.RespondError(w, "Invalid request format", http.StatusBadRequest)
 		return
