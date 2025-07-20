@@ -42,9 +42,11 @@
       </router-link>
       <!-- Profile Icon -->
 
-      <router-link  @click="logout()" to="/signin" class="icon-container" aria-label="Signout">
-        <span >X</span>
-      </router-link>
+      <button @click="handleLogout" class="icon-container" aria-label="Signout" :disabled="loading">
+        <span v-if="!loading">X</span>
+        <span v-else>...</span>
+      </button>
+ 
 
     </div>
   </header>
@@ -55,12 +57,23 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuth } from '@/composables/useAuth'
+const router = useRouter() 
 
+ // Get auth functions and state
+const { logout, loading } = useAuth()
 
-const {logout} = useAuth()
+async function handleLogout() {
+  try {
+    await logout()
+    await router.push('/signin')
+  } catch (error) {
+    console.error('Logout failed:', error)
+    // Force navigation even if logout fails
+    await router.push('/signin')
+  }
+}
 
 const dropdownOpen = ref(false)
-const router = useRouter()
 
 function toggleDropdown() {
   dropdownOpen.value = !dropdownOpen.value

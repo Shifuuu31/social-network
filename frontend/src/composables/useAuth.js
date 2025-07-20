@@ -1,6 +1,5 @@
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'    
-  
+import { useRouter } from 'vue-router' 
 const user = ref(null)
 const isAuthenticated = computed(() => !!user.value)
 const isLoading = ref(false)
@@ -42,10 +41,16 @@ async function logout() {
   } catch (e) {
     console.warn("Logout failed:", e)
   }
+  clearAuthState()
 
+}
+
+function clearAuthState() {
   user.value = null
   error.value = null
+  isLoading.value = false
 }
+
 
 export function useAuth() {
   return {
@@ -54,6 +59,9 @@ export function useAuth() {
     isLoading,
     error,
     fetchCurrentUser,
-    logout
+    logout,
+    clearAuthState,
   }
 }
+
+

@@ -1,7 +1,5 @@
 // router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
-// import PostDetailsView from '@/views/postDetailsView.vue'
-// import PostsView from '@/views/postsView.vue'
 import Signin from '@/views/signin.vue'
 import Signup from '@/views/signup.vue'
 import Home from '@/views/Home.vue'
@@ -9,24 +7,7 @@ import { useAuth } from '@/composables/useAuth'
 import Profile from '@/views/Profile.vue'
 import Chat from '@/views/Chat.vue'
 
-
-// Import other views as needed
-// import 
 const routes = [
-
-  //  {
-  //   path: '/posts',
-  //   name: 'posts',
-  //   component: PostsView
-  // },
-  // {
-  //   path: '/post/:id',
-  //   name: 'PostDetail',
-  //   component: PostDetailsView,
-  //   props: true
-  // },
-    
-
   { path:'/',name:'home',component:Home},
   { path: '/signin', name: 'Signin', component: Signin },
   { path: '/signup', name: 'Signup', component: Signup },                                                                                              
@@ -37,8 +18,6 @@ const routes = [
     name: 'DiscoverFriend',
     component: () => import('@/views/DiscoverFriend.vue')
   }
-
-  // Add other routes as needed
 ]
 
 const router = createRouter({
@@ -46,26 +25,39 @@ const router = createRouter({
   routes
 })
 
-const publicr = ['/signin', '/signup']
-// Add guard
-router.beforeEach(async (to, from, next) => {  
-  const auth = useAuth()
-  const pp = publicr.includes(to.path)
-  if (pp && auth.isAuthenticated) {
-    return next('/')
+const publicRoutes = ['/signin', '/signup']
 
+// Add guard with better error handling
+router.beforeEach(async (to, from, next) => {  
+  const hasToken = document.cookie.includes('session_token');
+  const auth = useAuth()
+  const isPublicRoute = publicRoutes.includes(to.path)
+  
+  // If going to public route and already authenticated, redirect to home
+  if (isPublicRoute && auth.isAuthenticated.value) {
+    return next('/')
   }        
-  // Run check only if route requires auth 
-  if (!pp){                                                                                        
-    const success = auth.isAuthenticated.value || await auth.fetchCurrentUser()
-    if (!success) {
-      await auth.logout()
+  
+  // If going to protected route, check authentication
+  if (!isPublicRoute && hasToken) {
+    try {
+      // Check if already authenticated or try to fetch current user
+      const isAuth = auth.isAuthenticated.value || await auth.fetchCurrentUser()
+      
+      if (!isAuth) {
+        // Clear auth state and redirect to signin
+        auth.clearAuthState()
+        return next('/signin')
+      }
+    } catch (error) {
+      console.warn('Auth check failed:', error)
+      // Clear auth state and redirect to signin
+      auth.clearAuthState()
       return next('/signin')
     }
   } 
+  
   next()
 })
-                                                         
-
 
 export default router
