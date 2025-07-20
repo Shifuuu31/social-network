@@ -118,43 +118,43 @@ func (pm *PostModel) GetPosts(filter *PostFilter, wanaseeprofile int) (posts []P
 
 	if filter.Type == "user" {
 		query := `
-			SELECT 
-				posts.id, 
-				posts.user_id, 
-				users.nickname, 
-				posts.group_id,
-				posts.content,
-				posts.image_url,
-				posts.privacy, 
-				posts.created_at,
-				COALESCE(comment_counts.reply_count, 0) as replies,
-				users.avatar_url
-			FROM posts
-			JOIN users ON posts.user_id = users.id
-			LEFT JOIN (
-				SELECT post_id, COUNT(*) as reply_count
-				FROM comments
-				GROUP BY post_id
-			) comment_counts ON posts.id = comment_counts.post_id
-			LEFT JOIN follow_request 
-				ON follow_request.from_user_id = ? 
-				AND follow_request.to_user_id = posts.user_id 
-				AND follow_request.status = 'accepted'
-			LEFT JOIN close_friends
-				ON close_friends.user_id = posts.user_id
-				AND close_friends.friend_id = ?
-			WHERE 
-				posts.user_id = ?
-				AND (
-					posts.privacy = 'public'
-					OR (posts.privacy = 'followers' AND follow_request.from_user_id IS NOT NULL)
-					OR (posts.privacy = 'private' AND close_friends.friend_id IS NOT NULL)
-				)
-			ORDER BY posts.created_at DESC
-			LIMIT ? OFFSET ?
-		`
-		// NOTE: You must distinguish between the profile being visited vs current user
-		rows, err = pm.DB.Query(query, wanaseeprofile, wanaseeprofile, filter.Id, filter.NPost, filter.Start)
+        SELECT 
+            posts.id, 
+            posts.user_id, 
+            users.nickname, 
+            posts.group_id,
+            posts.content,
+            posts.image_url,
+            posts.privacy, 
+            posts.created_at,
+            COALESCE(comment_counts.reply_count, 0) as replies,
+            users.avatar_url
+        FROM posts
+        JOIN users ON posts.user_id = users.id
+        LEFT JOIN (
+            SELECT post_id, COUNT(*) as reply_count
+            FROM comments
+            GROUP BY post_id
+        ) comment_counts ON posts.id = comment_counts.post_id
+        LEFT JOIN follow_request 
+            ON follow_request.from_user_id = ? 
+            AND follow_request.to_user_id = posts.user_id 
+            AND follow_request.status = 'accepted'
+        LEFT JOIN close_friends
+            ON close_friends.user_id = posts.user_id
+            AND close_friends.friend_id = ?
+        WHERE
+            posts.user_id = ?
+            AND (
+                ? = posts.user_id
+                OR posts.privacy = 'public'
+                OR (posts.privacy = 'followers' AND follow_request.from_user_id IS NOT NULL)
+                OR (posts.privacy = 'private' AND close_friends.friend_id IS NOT NULL)
+            )
+        ORDER BY posts.created_at DESC
+        LIMIT ? OFFSET ?
+    `
+		rows, err = pm.DB.Query(query, wanaseeprofile, wanaseeprofile, filter.Id, wanaseeprofile, filter.NPost, filter.Start)
 	} else {
 		// UNIFIED QUERY: Handle all privacy types in one query
 		query = `
@@ -212,7 +212,6 @@ func (pm *PostModel) GetPosts(filter *PostFilter, wanaseeprofile int) (posts []P
 			&post.Replies,
 			&post.AvatarURL,
 		)
-
 		if err != nil {
 			fmt.Printf("ERROR: Failed to scan row %d: %v\n", postCount, err)
 			return nil, err
@@ -229,7 +228,6 @@ func (pm *PostModel) GetPosts(filter *PostFilter, wanaseeprofile int) (posts []P
 
 	if len(posts) > 0 {
 		fmt.Printf("DEBUG: First post avatar_url: %v\n", posts[0].AvatarURL)
-
 	}
 	return posts, nil
 }
