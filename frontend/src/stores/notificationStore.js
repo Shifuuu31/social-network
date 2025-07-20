@@ -244,6 +244,72 @@ export const useNotificationStore = defineStore('notifications', () => {
     }
   }
 
+  // Handle notification actions (accept/decline)
+  const handleNotificationAction = async (notification, action) => {
+    try {
+      // Extract necessary data from notification for different types
+      const payload = {
+        notification_id: notification.id,
+        action: action
+      }
+
+      // Parse additional data from notification message or metadata
+      if (notification.type === 'group_invite') {
+        // Extract group ID from notification message
+        const groupIdMatch = notification.message.match(/group.*?(\d+)/) || 
+                           notification.message.match(/(?:to|for) (?:the )?(?:group )?.*?(\d+)/)
+        if (groupIdMatch) {
+          payload.group_id = parseInt(groupIdMatch[1])
+        }
+      } else if (notification.type === 'follow_request') {
+        // Extract user ID from notification message
+        const userIdMatch = notification.message.match(/user.*?(\d+)/) || 
+                          notification.message.match(/from.*?(\d+)/)
+        if (userIdMatch) {
+          payload.user_id = parseInt(userIdMatch[1])
+        }
+      } else if (notification.type === 'group_request' || notification.type === 'group_join_request') {
+        // Extract both group ID and user ID for group join requests
+        const groupIdMatch = notification.message.match(/group.*?(\d+)/)
+        const userIdMatch = notification.message.match(/user.*?(\d+)/) || 
+                          notification.message.match(/from.*?(\d+)/)
+        if (groupIdMatch) {
+          payload.group_id = parseInt(groupIdMatch[1])
+        }
+        if (userIdMatch) {
+          payload.user_id = parseInt(userIdMatch[1])
+        }
+      }
+
+      const response = await fetch(`${API_BASE}/notifications/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      // Update notification as seen and refresh notifications list
+      const notificationIndex = notifications.value.findIndex(n => n.id === notification.id)
+      if (notificationIndex !== -1) {
+        notifications.value[notificationIndex].seen = true
+      }
+
+      // Refresh notifications to get updated state
+      await fetchNotifications({ start: 0, limit: 20 })
+
+      return data
+    } catch (err) {
+      console.error('Error handling notification action:', err)
+      throw err
+    }
+  }
+
   // Delete notification
   const deleteNotification = async (notificationId) => {
     try {
@@ -274,6 +340,7 @@ export const useNotificationStore = defineStore('notifications', () => {
       'follow_request': '👤',
       'group_invite': '👥',
       'group_request': '📨',
+      'group_join_request': '📨',
       'event_created': '📅',
       'follow_accepted': '✅',
       'group_accepted': '🎉',
@@ -288,6 +355,7 @@ export const useNotificationStore = defineStore('notifications', () => {
       'follow_request': '#3b82f6',
       'group_invite': '#8b5cf6',
       'group_request': '#f59e0b',
+      'group_join_request': '#f59e0b',
       'event_created': '#10b981',
       'follow_accepted': '#22c55e',
       'group_accepted': '#8b5cf6',
@@ -352,6 +420,7 @@ export const useNotificationStore = defineStore('notifications', () => {
     fetchUnreadCount,
     markAsSeen,
     markAllAsSeen,
+    handleNotificationAction,
     deleteNotification,
     clearError,
 

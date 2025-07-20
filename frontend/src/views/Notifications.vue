@@ -94,13 +94,13 @@
                 >
                   ✓
                 </button>
-                <button 
+                <!-- <button 
                   @click="deleteNotification(notification.id)"
                   class="action-btn delete"
                   title="Delete notification"
                 >
                   🗑️
-                </button>
+                </button> -->
               </div>
             </div>
 
@@ -128,6 +128,15 @@
                 </template>
                 
                 <template v-else-if="notification.type === 'group_request'">
+                  <button @click="handleGroupRequestAction(notification, 'accept')" class="btn btn-primary btn-sm">
+                    Accept Request
+                  </button>
+                  <button @click="handleGroupRequestAction(notification, 'decline')" class="btn btn-secondary btn-sm">
+                    Decline Request
+                  </button>
+                </template>
+                
+                <template v-else-if="notification.type === 'group_join_request'">
                   <button @click="handleGroupRequestAction(notification, 'accept')" class="btn btn-primary btn-sm">
                     Accept Request
                   </button>
@@ -243,15 +252,15 @@ const markAllAsRead = async () => {
   }
 }
 
-const deleteNotification = async (notificationId) => {
-  if (confirm('Are you sure you want to delete this notification?')) {
-    try {
-      await notificationStore.deleteNotification(notificationId)
-    } catch (error) {
-      console.error('Failed to delete notification:', error)
-    }
-  }
-}
+// const deleteNotification = async (notificationId) => {
+//   if (confirm('Are you sure you want to delete this notification?')) {
+//     try {
+//       await notificationStore.deleteNotification(notificationId)
+//     } catch (error) {
+//       console.error('Failed to delete notification:', error)
+//     }
+//   }
+// }
 
 // Notification type helpers
 const getNotificationTypeLabel = (type) => {
@@ -259,6 +268,7 @@ const getNotificationTypeLabel = (type) => {
     'follow_request': 'Follow Request',
     'group_invite': 'Group Invitation',
     'group_request': 'Group Join Request',
+    'group_join_request': 'Group Join Request',
     'event_created': 'Event Created',
     'follow_accepted': 'Follow Accepted',
     'group_accepted': 'Group Accepted'
@@ -267,33 +277,60 @@ const getNotificationTypeLabel = (type) => {
 }
 
 const hasActionButtons = (notification) => {
-  const actionTypes = ['group_invite', 'follow_request', 'group_request', 'event_created']
+  const actionTypes = ['group_invite', 'follow_request', 'group_request', 'group_join_request', 'event_created']
   return actionTypes.includes(notification.type) && !notification.seen
 }
 
 // Action handlers
 const handleGroupInviteAction = async (notification, action) => {
-  // Mark as read first
-  await markAsRead(notification.id)
-  
-  // Navigate to groups page where user can handle the invite
-  router.push('/groups')
+  try {
+    // Call the notification action API
+    await notificationStore.handleNotificationAction(notification, action)
+    
+    // Show success message
+    console.log(`Successfully ${action}ed group invitation`)
+    
+    // Optionally show a toast notification or alert
+    alert(`Successfully ${action}ed group invitation!`)
+    
+  } catch (error) {
+    console.error(`Failed to ${action} group invitation:`, error)
+    alert(`Failed to ${action} group invitation: ${error.message}`)
+  }
 }
 
 const handleFollowRequestAction = async (notification, action) => {
-  // Mark as read first
-  await markAsRead(notification.id)
-  
-  // In a real app, you'd handle the follow request here
-  console.log(`Handle follow request: ${action}`)
+  try {
+    // Call the notification action API
+    await notificationStore.handleNotificationAction(notification, action)
+    
+    // Show success message
+    console.log(`Successfully ${action}ed follow request`)
+    
+    // Optionally show a toast notification or alert
+    alert(`Successfully ${action}ed follow request!`)
+    
+  } catch (error) {
+    console.error(`Failed to ${action} follow request:`, error)
+    alert(`Failed to ${action} follow request: ${error.message}`)
+  }
 }
 
 const handleGroupRequestAction = async (notification, action) => {
-  // Mark as read first
-  await markAsRead(notification.id)
-  
-  // Navigate to groups page where group creator can handle requests
-  router.push('/groups')
+  try {
+    // Call the notification action API
+    await notificationStore.handleNotificationAction(notification, action)
+    
+    // Show success message
+    console.log(`Successfully ${action}ed group join request`)
+    
+    // Optionally show a toast notification or alert
+    alert(`Successfully ${action}ed group join request!`)
+    
+  } catch (error) {
+    console.error(`Failed to ${action} group join request:`, error)
+    alert(`Failed to ${action} group join request: ${error.message}`)
+  }
 }
 
 const viewEvent = async (notification) => {

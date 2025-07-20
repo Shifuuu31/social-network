@@ -14,19 +14,18 @@ import (
 func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 	groupsMux = http.NewServeMux()
 
-groupsMux.HandleFunc("POST /group/new", rt.NewGroup) 
-groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups)
+	groupsMux.HandleFunc("POST /group/new", rt.NewGroup)
+	groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups)
+	groupsMux.HandleFunc("POST /group/request", rt.RequestToJoinGroup)
 
-groupsMux.Handle("GET /group/{id}", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroup)))
-groupsMux.Handle("POST /group/events", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroupEvents)))
-groupsMux.Handle("POST /group/invite",  rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.InviteToJoinGroup)))
-groupsMux.Handle("POST /group/request",  rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.RequestToJoinGroup)))
-groupsMux.Handle("POST /group/accept-decline",  rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.AcceptDeclineGroup))) // TODO: ws
-groupsMux.Handle("POST /group/event/new", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.NewEvent)))
-groupsMux.Handle("POST /group/event/vote", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.EventVote)))
-groupsMux.Handle("GET /group/{id}/available-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetAvailableUsers)))
-groupsMux.Handle("GET /group/{id}/search-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.SearchAvailableUsers)))
-
+	groupsMux.Handle("GET /group/{id}", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroup)))
+	groupsMux.Handle("POST /group/events", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroupEvents)))
+	groupsMux.Handle("POST /group/invite", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.InviteToJoinGroup)))
+	groupsMux.Handle("POST /group/accept-decline", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.AcceptDeclineGroup))) // TODO: ws
+	groupsMux.Handle("POST /group/event/new", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.NewEvent)))
+	groupsMux.Handle("POST /group/event/vote", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.EventVote)))
+	groupsMux.Handle("GET /group/{id}/available-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetAvailableUsers)))
+	groupsMux.Handle("GET /group/{id}/search-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.SearchAvailableUsers)))
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
@@ -72,9 +71,9 @@ func (rt *Root) GetGroup(w http.ResponseWriter, r *http.Request) {
 	// 	return
 
 	// }
-	
+
 	err = rt.DL.Groups.GetGroupByID(group)
-	
+
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",

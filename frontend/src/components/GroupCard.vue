@@ -2,77 +2,36 @@
   <div class="group-card">
     <div class="group-image">
       <img :src="groupImage" :alt="group.name" @error="handleImageError" />
-      
     </div>
-    
+
     <div class="group-content">
       <h3 class="group-name">{{ group.name }}</h3>
       <p class="group-description">{{ group.description }}</p>
-      
+
       <div class="group-stats">
         <span class="member-count">
           <span class="icon">👥</span>
-          {{ group.memberCount }} {{ group.memberCount === 1 ? 'membre' : 'membres' }}
+          {{ group.memberCount }} {{ group.memberCount === 1 ? 'member' : 'members' }}
         </span>
         <span class="created-date">
           <span class="icon">📅</span>
           {{ formatDate(group.createdAt) }}
         </span>
       </div>
-      
+
       <div class="group-actions">
         <button 
           class="btn btn-secondary btn-view"
           @click="viewGroup"
         >
           <span class="icon">👁</span>
-          Voir
-        </button>
-        
-        <!-- Not a member -->
-        <button 
-          v-if="!group.isMember"
-          class="btn btn-primary btn-join"
-          @click="handleJoin"
-          :disabled="isJoining"
-        >
-          <span class="icon">+</span>
-          {{ isJoining ? 'Rejoindre...' : 'Rejoindre' }}
-        </button>
-        
-        <!-- Requested to join -->
-        <button 
-          v-else-if="group.isMember === 'requested'"
-          class="btn btn-grey btn-requested"
-          disabled
-        >
-          <span class="icon">⏳</span>
-          Demande envoyée
-        </button>
-        
-        <!-- Invited to join -->
-        <button 
-          v-else-if="group.isMember === 'invited'"
-          class="btn btn-grey btn-invited"
-          @click="handleAcceptInvite"
-          :disabled="isJoining"
-        >
-          <span class="icon">📨</span>
-          {{ isJoining ? 'Accepter...' : 'Accepter l\'invitation' }}
-        </button>
-        
-        <!-- Full member -->
-        <button 
-          v-else-if="group.isMember === 'member'"
-          class="btn btn-success btn-joined desactivated"
-        >
-          <span class="icon">✓</span>
-          Membre
+          View
         </button>
       </div>
     </div>
   </div>
 </template>
+
 
 <script setup>
 import { ref, computed } from 'vue'
