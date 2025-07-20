@@ -92,8 +92,8 @@ func (gmm *GroupMemberModel) IsUserGroupMember(payload *GroupMember) error {
 		WHERE group_id = ? AND user_id = ?
 	`
 	var count int
-	
-	if err := gmm.DB.QueryRow(query, payload.GroupID, payload.UserID).Scan(&count);err != nil || count <= 0 {
+
+	if err := gmm.DB.QueryRow(query, payload.GroupID, payload.UserID).Scan(&count); err != nil || count <= 0 {
 		return fmt.Errorf("check user in group: %w", err)
 	}
 	return nil

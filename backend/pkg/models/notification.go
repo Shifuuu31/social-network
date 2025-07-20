@@ -127,3 +127,23 @@ func (nm *NotificationModel) GetByUser(payload *NotificationPayload) ([]*Notific
 	}
 	return notifications, nil
 }
+
+// GetByID retrieves a notification by its ID
+func (nm *NotificationModel) GetByID(notification *Notification) error {
+	query := `SELECT id, user_id, type, message, seen, created_at FROM notifications WHERE id = ?`
+
+	err := nm.DB.QueryRow(query, notification.ID).Scan(
+		&notification.ID,
+		&notification.UserID,
+		&notification.Type,
+		&notification.Message,
+		&notification.Seen,
+		&notification.CreatedAt,
+	)
+
+	if err != nil {
+		return fmt.Errorf("get notification by id: %w", err)
+	}
+
+	return nil
+}

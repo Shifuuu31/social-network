@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"social-network/pkg/models"
 	"social-network/pkg/tools"
@@ -18,10 +17,10 @@ type NotificationResponse struct {
 
 // WebSocket notification structure for real-time updates
 type WSNotification struct {
-	Type         string                `json:"type"`         // "notification"
-	Action       string                `json:"action"`       // "new", "update", "delete"
-	Notification *models.Notification  `json:"notification"`
-	UnreadCount  int                   `json:"unread_count"`
+	Type         string               `json:"type"`   // "notification"
+	Action       string               `json:"action"` // "new", "update"
+	Notification *models.Notification `json:"notification"`
+	UnreadCount  int                  `json:"unread_count"`
 }
 
 func (rt *Root) NewNotificationsHandler() (notificationsMux *http.ServeMux) {
@@ -31,13 +30,14 @@ func (rt *Root) NewNotificationsHandler() (notificationsMux *http.ServeMux) {
 	notificationsMux.HandleFunc("POST /mark-seen", rt.MarkNotificationSeen)
 	notificationsMux.HandleFunc("POST /mark-all-seen", rt.MarkAllNotificationsSeen)
 	notificationsMux.HandleFunc("GET /unread-count", rt.GetUnreadCount)
-	notificationsMux.HandleFunc("DELETE /{id}", rt.DeleteNotification)
+	notificationsMux.HandleFunc("POST /action", rt.AcceptDeclineFromNotification)
+	// notificationsMux.HandleFunc("DELETE /{id}", rt.DeleteNotification)
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "Notification routes registered",
 		Metadata: map[string]any{
-			"routes": "/fetch, /mark-seen, /mark-all-seen, /unread-count, /{id}",
+			"routes": "/fetch, /mark-seen, /mark-all-seen, /unread-count, /action, /{id}",
 		},
 	})
 
@@ -156,7 +156,7 @@ func (rt *Root) MarkNotificationSeen(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
 		NotificationID int `json:"notification_id"`
 	}
-	
+
 	if err := tools.DecodeJSON(r, &payload); err != nil {
 		tools.RespondError(w, "Invalid request format", http.StatusBadRequest)
 		return
@@ -254,54 +254,55 @@ func (rt *Root) GetUnreadCount(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteNotification deletes a specific notification
-func (rt *Root) DeleteNotification(w http.ResponseWriter, r *http.Request) {
-	requesterID := rt.DL.GetRequesterID(w, r)
-	if requesterID <= 0 {
-		tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+// func (rt *Root) DeleteNotification(w http.ResponseWriter, r *http.Request) {
+// 	requesterID := rt.DL.GetRequesterID(w, r)
+// 	fmt.Println("Requester ID:", requesterID)
+// 	if requesterID <= 0 {
+// 		tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
+// 		return
+// 	}
 
-	notificationIDStr := r.PathValue("id")
-	notificationID, err := strconv.Atoi(notificationIDStr)
-	if err != nil {
-		tools.RespondError(w, "Invalid notification ID", http.StatusBadRequest)
-		return
-	}
+// 	notificationIDStr := r.PathValue("id")
+// 	notificationID, err := strconv.Atoi(notificationIDStr)
+// 	if err != nil {
+// 		tools.RespondError(w, "Invalid notification ID", http.StatusBadRequest)
+// 		return
+// 	}
 
-	if err := rt.DL.Notifications.Delete(notificationID); err != nil {
-		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "ERROR",
-			Message: "Failed to delete notification",
-			Metadata: map[string]any{
-				"user_id":         requesterID,
-				"notification_id": notificationID,
-				"error":           err.Error(),
-			},
-		})
-		tools.RespondError(w, "Failed to delete notification", http.StatusInternalServerError)
-		return
-	}
+// 	if err := rt.DL.Notifications.Delete(notificationID); err != nil {
+// 		rt.DL.Logger.Log(models.LogEntry{
+// 			Level:   "ERROR",
+// 			Message: "Failed to delete notification",
+// 			Metadata: map[string]any{
+// 				"user_id":         requesterID,
+// 				"notification_id": notificationID,
+// 				"error":           err.Error(),
+// 			},
+// 		})
+// 		tools.RespondError(w, "Failed to delete notification", http.StatusInternalServerError)
+// 		return
+// 	}
 
-	// Get updated unread count
-	unreadCount, _ := rt.DL.Notifications.CountUnseen(requesterID)
+// 	// Get updated unread count
+// 	unreadCount, _ := rt.DL.Notifications.CountUnseen(requesterID)
 
-	// Send real-time update via WebSocket
-	rt.SendNotificationUpdate(requesterID, "delete", nil, unreadCount)
+// 	// Send real-time update via WebSocket
+// 	rt.SendNotificationUpdate(requesterID, "delete", nil, unreadCount)
 
-	tools.EncodeJSON(w, http.StatusOK, map[string]any{
-		"success":      true,
-		"unread_count": unreadCount,
-	})
+// 	tools.EncodeJSON(w, http.StatusOK, map[string]any{
+// 		"success":      true,
+// 		"unread_count": unreadCount,
+// 	})
 
-	rt.DL.Logger.Log(models.LogEntry{
-		Level:   "INFO",
-		Message: "Notification deleted successfully",
-		Metadata: map[string]any{
-			"user_id":         requesterID,
-			"notification_id": notificationID,
-		},
-	})
-}
+// 	rt.DL.Logger.Log(models.LogEntry{
+// 		Level:   "INFO",
+// 		Message: "Notification deleted successfully",
+// 		Metadata: map[string]any{
+// 			"user_id":         requesterID,
+// 			"notification_id": notificationID,
+// 		},
+// 	})
+// }
 
 // SendNotificationUpdate sends real-time notification updates via WebSocket
 func (rt *Root) SendNotificationUpdate(userID int, action string, notification *models.Notification, unreadCount int) {

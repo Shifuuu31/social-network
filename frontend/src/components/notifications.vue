@@ -78,13 +78,13 @@
               >
                 ✓
               </button>
-              <button 
+              <!-- <button 
                 @click.stop="deleteNotification(notification.id)"
                 class="delete-btn"
                 title="Delete notification"
               >
                 ✕
-              </button>
+              </button> -->
             </div>
           </div>
 

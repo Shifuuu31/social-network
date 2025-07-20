@@ -41,7 +41,8 @@ var skipPaths = []string{
 	"/notifications/mark-seen",
 	"/notifications/mark-all-seen",
 	"/notifications/unread-count",
-	// Group endpoints for testing notifications (correct paths)
+	"/notifications/action",
+	// Group endpoints for testing notifications (full paths before router prefix stripping)
 	"/groups/group/browse",
 	"/groups/group/new",
 	"/groups/group/invite",
@@ -72,7 +73,7 @@ func (dl *DataLayer) GetRequesterID(w http.ResponseWriter, r *http.Request) (req
 		})
 		return userID
 	}
-	
+
 	// FOR PRODUCTION: User is not authenticated
 	dl.Logger.Log(models.LogEntry{
 		Level:   "ERROR",
@@ -244,6 +245,7 @@ func (dl *DataLayer) GroupAccessMiddleware(next http.Handler) http.Handler {
 			GroupID: groupID,
 			UserID:  userID,
 		}); err != nil {
+			fmt.Println("User ID from context:", userID, ok)
 			dl.Logger.Log(models.LogEntry{
 				Level:   "WARN",
 				Message: "User not in group",
@@ -317,14 +319,14 @@ func (dl *DataLayer) TimeoutMiddleware(duration time.Duration) func(http.Handler
 				"timeout": duration.String(),
 			},
 		})
-		
+
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Skip timeout for WebSocket connections
 			if r.URL.Path == "/connect" || r.Header.Get("Upgrade") == "websocket" {
 				next.ServeHTTP(w, r)
 				return
 			}
-			
+
 			// Apply timeout for regular HTTP requests
 			http.TimeoutHandler(next, duration, "Request timed out").ServeHTTP(w, r)
 		})

@@ -10,11 +10,11 @@ const getCurrentUserId = () => {
     ?.split('=')[1]
   
   if (userIdCookie) {
-    return userIdCookie
+    return parseInt(userIdCookie, 10)
   }
 
   // Default user ID for demo/testing purposes
-  return '1'
+  return 1
 }
 
 export const useGroupsStore = defineStore('groups', () => {
@@ -47,7 +47,6 @@ export const useGroupsStore = defineStore('groups', () => {
       name: apiGroup.title,
       description: apiGroup.description,
       image: apiGroup.image_uuid.Valid ? `${API_BASE}/images/${apiGroup.image_uuid.String}` : '/default-group.jpg',
-      isPublic: true,
       memberCount: apiGroup.member_count || 0,
       isMember: apiGroup.is_member || '',
       createdAt: apiGroup.created_at,
@@ -94,7 +93,7 @@ export const useGroupsStore = defineStore('groups', () => {
     }
 
     const requestBody = JSON.stringify({
-      user_id: currentUserId.toString(),
+      user_id: currentUserId.toString(), // GroupsPayload expects string
       start: -1,
       n_items: 20,
       type: filter === 'user' ? 'user' : 'all',
@@ -119,11 +118,6 @@ export const useGroupsStore = defineStore('groups', () => {
         
         throw new Error("No data received from API")
       }
-      if (!data) {
-        console.log("Warning: No data received from API");
-        
-        throw new Error("No data received from API")
-      }
       if (Array.isArray(data)) {
         groupsData = data
       } else if (data.groups && Array.isArray(data.groups)) {
@@ -133,14 +127,11 @@ export const useGroupsStore = defineStore('groups', () => {
       } else {
         groupsData = []
       }
-      console.log(groupsData)
-      console.log(groupsData)
 
       const transformedGroups = groupsData.map(transformGroupData)
       groups.value = transformedGroups
 
     } catch (err) {
-      error.value = err.message
       error.value = err.message
       groups.value = []
     } finally {
