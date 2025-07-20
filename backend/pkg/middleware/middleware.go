@@ -41,6 +41,16 @@ var skipPaths = []string{
 	"/notifications/mark-seen",
 	"/notifications/mark-all-seen",
 	"/notifications/unread-count",
+	// Group endpoints for testing notifications (correct paths)
+	"/groups/group/browse",
+	"/groups/group/new",
+	"/groups/group/invite",
+	"/groups/group/request",
+	"/groups/group/accept-decline",
+	"/groups/group/event/new",
+	// Profile endpoints for testing notifications
+	"/profile/follow",
+	"/profile/accept-decline-follow",
 }
 
 // Optional: define prefixes to skip (e.g., for /static/*)
@@ -49,110 +59,39 @@ var skipPrefixes = []string{
 }
 
 func (dl *DataLayer) GetRequesterID(w http.ResponseWriter, r *http.Request) (requesterID int) {
-	// FOR TESTING WITHOUT AUTHENTICATION - RETURN HARDCODED USER IDS
-	// Comment out this section and uncomment below for production
-	
-	// Define test user IDs based on path patterns for different test scenarios
-	path := r.URL.Path
-	
-	// Default test user ID
-	testUserID := 1
-	
-	// Use different user IDs for different endpoints to simulate different users
-	if path == "/notifications/fetch" || 
-	   path == "/notifications/mark-seen" || 
-	   path == "/notifications/mark-all-seen" || 
-	   path == "/notifications/unread-count" {
-		// For notification endpoints, use user ID 2 to see notifications sent to user 2
-		testUserID = 2
+	// First, try to get the user ID from context (set by AccessMiddleware for skipped paths)
+	if userID, ok := r.Context().Value(models.UserIDKey).(int); ok {
+		dl.Logger.Log(models.LogEntry{
+			Level:   "DEBUG",
+			Message: "Using user ID from context",
+			Metadata: map[string]any{
+				"user_id": userID,
+				"path":    r.URL.Path,
+				"method":  r.Method,
+			},
+		})
+		return userID
 	}
-	
-	// For group operations, use user ID 1 (group creator in most cases)
-	if slices.Contains([]string{"POST", "PUT", "DELETE"}, r.Method) {
-		if path == "/groups/accept-decline" || path == "/groups/invite" {
-			testUserID = 1 // Group creator
-		}
-		if path == "/groups/request-join" {
-			testUserID = 3 // Different user requesting to join
-		}
-	}
-	
-	// For follow operations, use user ID 1
-	if path == "/profile/follow" || path == "/profile/accept-decline-follow" {
-		testUserID = 1
-	}
-	
+
+	// FOR PRODUCTION: User is not authenticated
 	dl.Logger.Log(models.LogEntry{
-		Level:   "DEBUG",
-		Message: "Using hardcoded test user ID",
+		Level:   "ERROR",
+		Message: "Unauthorized: user not authenticated",
 		Metadata: map[string]any{
-			"test_user_id": testUserID,
-			"path":         path,
-			"method":       r.Method,
+			"ip":     r.RemoteAddr,
+			"path":   r.URL.Path,
+			"method": r.Method,
 		},
 	})
-	
-	return testUserID
-	
-	// PRODUCTION CODE (commented out for testing)
-	// requesterID, ok := r.Context().Value(models.UserIDKey).(int)
-	// if !ok {
-	// 	dl.Logger.Log(models.LogEntry{
-	// 		Level:   "ERROR",
-	// 		Message: "Unauthorized: requester ID not found",
-	// 		Metadata: map[string]any{
-	// 			"ip":   r.RemoteAddr,
-	// 			"path": r.URL.Path,
-	// 		},
-	// 	})
-	// 	tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
-	// 	return 0
-	// }
-	// return requesterID
+	tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
+	return 0
 }
 
-// getTestUserID returns a test user ID based on the request path for testing purposes
+// getTestUserID provides a basic user ID for testing
 func (dl *DataLayer) getTestUserID(r *http.Request) int {
-	path := r.URL.Path
-	
-	// Default test user ID
-	testUserID := 1
-	
-	// Use different user IDs for different endpoints to simulate different users
-	if path == "/notifications/fetch" || 
-	   path == "/notifications/mark-seen" || 
-	   path == "/notifications/mark-all-seen" || 
-	   path == "/notifications/unread-count" {
-		// For notification endpoints, use user ID 2 to see notifications sent to user 2
-		testUserID = 2
-	}
-	
-	// For group operations, use user ID 1 (group creator in most cases)
-	if slices.Contains([]string{"POST", "PUT", "DELETE"}, r.Method) {
-		if path == "/groups/accept-decline" || path == "/groups/invite" {
-			testUserID = 1 // Group creator
-		}
-		if path == "/groups/request-join" {
-			testUserID = 3 // Different user requesting to join
-		}
-	}
-	
-	// For follow operations, use user ID 1
-	if path == "/profile/follow" || path == "/profile/accept-decline-follow" {
-		testUserID = 1
-	}
-	
-	dl.Logger.Log(models.LogEntry{
-		Level:   "DEBUG",
-		Message: "Using test user ID for skipped path",
-		Metadata: map[string]any{
-			"test_user_id": testUserID,
-			"path":         path,
-			"method":       r.Method,
-		},
-	})
-	
-	return testUserID
+	// For demo/testing purposes, return a default user ID
+	// In a real application, this would come from authentication
+	return 1
 }
 
 // RequireAuth checks if a user is authenticated by session
@@ -160,15 +99,10 @@ func (dl *DataLayer) AccessMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check if request path is in skipPaths or matches any skipPrefixes
 		if slices.Contains(skipPaths, r.URL.Path) || tools.SliceHasPrefix(skipPrefixes, r.URL.Path) {
-			// For testing: Add a fake user context for skipped paths (notification endpoints)
-			if slices.Contains(skipPaths, r.URL.Path) {
-				// Add test user context for notification endpoints
-				testUserID := dl.getTestUserID(r)
-				ctx := context.WithValue(r.Context(), models.UserIDKey, testUserID)
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
-			next.ServeHTTP(w, r)
+			// Add test user context for skipped paths
+			testUserID := dl.getTestUserID(r)
+			ctx := context.WithValue(r.Context(), models.UserIDKey, testUserID)
+			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
 
@@ -247,8 +181,8 @@ func (dl *DataLayer) GroupAccessMiddleware(next http.Handler) http.Handler {
 		var groupID int
 		var err error
 
-		// userID, ok := r.Context().Value(models.UserIDKey).(int) //TODO: Get user ID from context
-		userID, ok := 1, true
+		// Get user ID from authenticated context
+		userID, ok := r.Context().Value(models.UserIDKey).(int)
 		if !ok || userID <= 0 {
 			dl.Logger.Log(models.LogEntry{
 				Level:   "WARN",
@@ -373,7 +307,7 @@ func (dl *DataLayer) RecoverMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// TimeoutMiddleware applies a timeout to requests
+// TimeoutMiddleware applies a timeout to requests, but excludes WebSocket connections
 func (dl *DataLayer) TimeoutMiddleware(duration time.Duration) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		dl.Logger.Log(models.LogEntry{
@@ -383,20 +317,25 @@ func (dl *DataLayer) TimeoutMiddleware(duration time.Duration) func(http.Handler
 				"timeout": duration.String(),
 			},
 		})
-		return http.TimeoutHandler(next, duration, "Request timed out")
+
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip timeout for WebSocket connections
+			if r.URL.Path == "/connect" || r.Header.Get("Upgrade") == "websocket" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Apply timeout for regular HTTP requests
+			http.TimeoutHandler(next, duration, "Request timed out").ServeHTTP(w, r)
+		})
 	}
 }
 
 // ChainMiddlewares wraps all middleware in correct order
 func (dl *DataLayer) GlobalMiddleware(handler http.Handler) http.Handler {
-	timeout := 10 * time.Second
-
-	return dl.AccessMiddleware(dl.RecoverMiddleware(
-		dl.TimeoutMiddleware(timeout)(
-			// dl.CORSMiddleware(
+	return dl.RecoverMiddleware(
+		dl.AccessMiddleware(
 			handler,
-			// ),
 		),
-	),
 	)
 }

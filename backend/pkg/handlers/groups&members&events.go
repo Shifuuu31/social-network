@@ -14,19 +14,18 @@ import (
 func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 	groupsMux = http.NewServeMux()
 
-groupsMux.HandleFunc("POST /group/new", rt.NewGroup) 
-groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups)
+	groupsMux.HandleFunc("POST /group/new", rt.NewGroup)
+	groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups)
 
-groupsMux.Handle("GET /group/{id}", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroup)))
-groupsMux.Handle("POST /group/events", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroupEvents)))
-groupsMux.Handle("POST /group/invite",  rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.InviteToJoinGroup)))
-groupsMux.Handle("POST /group/request",  rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.RequestToJoinGroup)))
-groupsMux.Handle("POST /group/accept-decline",  rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.AcceptDeclineGroup))) // TODO: ws
-groupsMux.Handle("POST /group/event/new", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.NewEvent)))
-groupsMux.Handle("POST /group/event/vote", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.EventVote)))
-groupsMux.Handle("GET /group/{id}/available-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetAvailableUsers)))
-groupsMux.Handle("GET /group/{id}/search-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.SearchAvailableUsers)))
-
+	groupsMux.Handle("GET /group/{id}", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroup)))
+	groupsMux.Handle("POST /group/events", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroupEvents)))
+	groupsMux.Handle("POST /group/invite", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.InviteToJoinGroup)))
+	groupsMux.Handle("POST /group/request", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.RequestToJoinGroup)))
+	groupsMux.Handle("POST /group/accept-decline", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.AcceptDeclineGroup))) // TODO: ws
+	groupsMux.Handle("POST /group/event/new", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.NewEvent)))
+	groupsMux.Handle("POST /group/event/vote", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.EventVote)))
+	groupsMux.Handle("GET /group/{id}/available-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetAvailableUsers)))
+	groupsMux.Handle("GET /group/{id}/search-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.SearchAvailableUsers)))
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
@@ -58,8 +57,7 @@ func (rt *Root) GetGroup(w http.ResponseWriter, r *http.Request) {
 	group := &models.Group{
 		ID: groupID,
 	}
-	requesterID := 1 // TODO: Get from auth when available
-	// requesterID := rt.DL.GetRequesterID(w, r) // TODO enable this when we have auth
+	requesterID := rt.DL.GetRequesterID(w, r)
 	// if requesterID <= 0 {
 	// 	rt.DL.Logger.Log(models.LogEntry{
 	// 		Level:   "ERROR",
@@ -73,9 +71,9 @@ func (rt *Root) GetGroup(w http.ResponseWriter, r *http.Request) {
 	// 	return
 
 	// }
-	
+
 	err = rt.DL.Groups.GetGroupByID(group)
-	
+
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -280,8 +278,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	// TODO validate payload
 
 	// Check if requester is creator
-	requesterID := 1 //TODO handel
-	// requesterID := rt.DL.GetRequesterID(w, r)
+	requesterID := rt.DL.GetRequesterID(w, r)
 
 	err := rt.DL.Groups.IsUserCreator(member.GroupID, requesterID)
 
@@ -1017,7 +1014,7 @@ func (rt *Root) GetAvailableUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if requester is authorized (member or creator)
-	requesterID := 1 // TODO: Get from auth when available
+	requesterID := rt.DL.GetRequesterID(w, r)
 
 	err = rt.DL.Groups.IsUserCreator(groupID, requesterID)
 
@@ -1108,7 +1105,7 @@ func (rt *Root) SearchAvailableUsers(w http.ResponseWriter, r *http.Request) {
 	// }
 
 	// Check if requester is authorized (member or creator)
-	requesterID := 1 // TODO: Get from auth when available
+	requesterID := rt.DL.GetRequesterID(w, r)
 
 	err = rt.DL.Groups.IsUserCreator(groupID, requesterID)
 

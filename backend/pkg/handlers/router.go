@@ -24,15 +24,13 @@ func (rt *Root) Router() http.Handler {
 
 	mainMux := http.NewServeMux()
 
-	// Mount sub-muxes under prefixes
+	mainMux.Handle("/connect", wsHanler)
 	mainMux.Handle("/posts/", http.StripPrefix("/posts", postsHandler))
-	mainMux.Handle("/connect", wsHanler) // Direct WebSocket connection
 	mainMux.Handle("/auth/", http.StripPrefix("/auth", authMux))
 	mainMux.Handle("/users/", http.StripPrefix("/users", usersHandler))
 	mainMux.Handle("/groups/", http.StripPrefix("/groups", groupsHandler))
 	mainMux.Handle("/get/", http.StripPrefix("/get", filesHandler))
 	mainMux.Handle("/notifications/", http.StripPrefix("/notifications", notificationsHandler))
 
-	// Apply global middleware
 	return rt.DL.GlobalMiddleware(mainMux)
 }

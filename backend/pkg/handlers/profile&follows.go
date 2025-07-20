@@ -24,8 +24,7 @@ func (rt *Root) NewUsersHandler() (usersMux *http.ServeMux) {
 	return usersMux
 }
 func (rt *Root) Users(w http.ResponseWriter, r *http.Request) {
-	// requesterID := rt.DL.GetRequesterID(w, r)
-	requesterID := 1
+	requesterID := rt.DL.GetRequesterID(w, r)
 
 	users, err := rt.DL.Users.GetAllUsers()
 	if err != nil {

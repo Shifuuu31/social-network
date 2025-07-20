@@ -42,7 +42,12 @@ func (rt *Root) NewWSHandler() *http.ServeMux {
 }
 
 func (rt *Root) Connect(w http.ResponseWriter, r *http.Request) {
-	requesterID := rt.DL.GetRequesterID(w, r) // identify user
+	// Get authenticated user ID from middleware
+	requesterID := rt.DL.GetRequesterID(w, r)
+	if requesterID == 0 {
+		// User is not authenticated - error already sent by GetRequesterID
+		return
+	}
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",

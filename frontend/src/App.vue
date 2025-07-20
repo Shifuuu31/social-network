@@ -14,7 +14,7 @@ import { useNotificationStore } from './stores/notificationStore'
 
 const notificationStore = useNotificationStore()
 
-onMounted(() => {
+onMounted(async () => {
   // Initialize notification system when app starts
   notificationStore.connectWebSocket()
   notificationStore.requestNotificationPermission()

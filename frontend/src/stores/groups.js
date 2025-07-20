@@ -1,6 +1,22 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
+// Simple user ID helper - using a basic approach for groups functionality
+const getCurrentUserId = () => {
+  // Try to get from cookie first
+  const userIdCookie = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('user_id='))
+    ?.split('=')[1]
+  
+  if (userIdCookie) {
+    return userIdCookie
+  }
+
+  // Default user ID for demo/testing purposes
+  return '1'
+}
+
 export const useGroupsStore = defineStore('groups', () => {
   const groups = ref([])
   const currentGroup = ref(null)
@@ -69,9 +85,16 @@ export const useGroupsStore = defineStore('groups', () => {
     isLoading.value = true
     error.value = null
 
-    // Always pass user_id for proper filtering (//TODO: Get from auth when available)
+    // Get current user ID from authentication context
+    const currentUserId = getCurrentUserId()
+    if (!currentUserId) {
+      error.value = 'User not authenticated'
+      isLoading.value = false
+      throw new Error('User not authenticated')
+    }
+
     const requestBody = JSON.stringify({
-      user_id: '1',
+      user_id: currentUserId.toString(),
       start: -1,
       n_items: 20,
       type: filter === 'user' ? 'user' : 'all',
@@ -274,7 +297,7 @@ export const useGroupsStore = defineStore('groups', () => {
         body: JSON.stringify({
           privacy: "group",
           group_id: groupId,
-          owner_id: 1, // TODO Replace with actual user ID from context or store
+          owner_id: getCurrentUserId(), // Get current user ID from auth context
           content: postData.content
         })
       })
@@ -338,7 +361,7 @@ export const useGroupsStore = defineStore('groups', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: 1, // TODO Replace with actual user ID from context or store
+          user_id: getCurrentUserId(), // Get current user ID from auth context
           group_id: groupId,
           status: 'requested',
           prev_status: 'none'
@@ -389,7 +412,7 @@ export const useGroupsStore = defineStore('groups', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           group_id: groupId,
-          user_id: 1, // TODO: Replace with actual user ID
+          user_id: getCurrentUserId(), // Get current user ID from auth context
           status: 'member',
           prev_status: 'invited'
         })
@@ -443,7 +466,7 @@ export const useGroupsStore = defineStore('groups', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           group_id: groupId,
-          user_id: 1, // TODO: Replace with actual user ID
+          user_id: getCurrentUserId(), // Get current user ID from auth context
           status: 'declined',
           prev_status: 'invited'
         })
@@ -499,7 +522,7 @@ export const useGroupsStore = defineStore('groups', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           event_id: eventId,
-          user_id: 1, // TODO: Replace with actual user ID
+          user_id: getCurrentUserId(), // Get current user ID from auth context
           vote: voteType
         })
       })

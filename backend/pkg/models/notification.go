@@ -11,7 +11,7 @@ type Notification struct {
 	Type      string `json:"type"`
 	Message   string `json:"message"`
 	Seen      bool   `json:"seen"`
-	CreatedAt int    `json:"created_at"`
+	CreatedAt string `json:"created_at"`
 }
 
 type NotificationModel struct {
@@ -90,9 +90,9 @@ func (nm *NotificationModel) CountUnseen(userID int) (count int, err error) {
 }
 
 type NotificationPayload struct {
-	UserID     string `json:"user_id"`
-	Start      int    `json:"star"`
-	NumOfItems int    `json:"n_items"`
+	UserID     int    `json:"user_id"`
+	Start      int    `json:"start"`
+	NumOfItems int    `json:"num_of_items"`
 	Type       string `json:"type"` // all, seen, unseen
 }
 
