@@ -172,6 +172,23 @@ WSLoop:
 				},
 			})
 			rt.Hub.JoinGroup(requesterID, msg.GroupID) // add user to group
+
+		case "notification_subscribe":
+			// Handle notification subscription - user wants to receive real-time notifications
+			rt.DL.Logger.Log(models.LogEntry{
+				Level:   "INFO",
+				Message: "User subscribed to notifications",
+				Metadata: map[string]any{
+					"user_id": requesterID,
+				},
+			})
+			// Client is already in the Clients map, so they'll receive notifications
+			conn.WriteJSON(WSResponse{
+				Status:  "success",
+				Message: "subscribed to notifications",
+			})
+			continue WSLoop // don't break, continue listening
+
 		default:
 
 			rt.DL.Logger.Log(models.LogEntry{

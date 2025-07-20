@@ -58,7 +58,7 @@ func (rt *Root) GetGroup(w http.ResponseWriter, r *http.Request) {
 	group := &models.Group{
 		ID: groupID,
 	}
-	requesterID := 17 // TODO: Get from auth when available
+	requesterID := 1 // TODO: Get from auth when available
 	// requesterID := rt.DL.GetRequesterID(w, r) // TODO enable this when we have auth
 	// if requesterID <= 0 {
 	// 	rt.DL.Logger.Log(models.LogEntry{
@@ -340,10 +340,11 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 		Seen:    false,
 	}
 
-	if err := rt.DL.Notifications.Insert(notification); err != nil {
+	// Use the new notification system to create and send notification
+	if err := rt.CreateAndSendNotification(notification); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
-			Message: "Failed to create notification for group invite",
+			Message: "Failed to create and send notification for group invite",
 			Metadata: map[string]any{
 				"user_id":  member.UserID,
 				"group_id": member.GroupID,
@@ -354,7 +355,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	} else {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "INFO",
-			Message: "Notification created for group invite",
+			Message: "Notification created and sent for group invite",
 			Metadata: map[string]any{
 				"user_id":         member.UserID,
 				"group_id":        member.GroupID,
@@ -460,10 +461,11 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 		Seen:    false,
 	}
 
-	if err := rt.DL.Notifications.Insert(notification); err != nil {
+	// Use the new notification system to create and send notification
+	if err := rt.CreateAndSendNotification(notification); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
-			Message: "Failed to create notification for group join request",
+			Message: "Failed to create and send notification for group join request",
 			Metadata: map[string]any{
 				"creator_id":   groupInfo.CreatorID,
 				"group_id":     member.GroupID,
@@ -475,7 +477,7 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	} else {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "INFO",
-			Message: "Notification created for group join request",
+			Message: "Notification created and sent for group join request",
 			Metadata: map[string]any{
 				"creator_id":      groupInfo.CreatorID,
 				"group_id":        member.GroupID,
@@ -802,10 +804,11 @@ func (rt *Root) NewEvent(w http.ResponseWriter, r *http.Request) {
 					Seen:    false,
 				}
 
-				if err := rt.DL.Notifications.Insert(notification); err != nil {
+				// Use the enhanced notification system
+				if err := rt.CreateAndSendNotification(notification); err != nil {
 					rt.DL.Logger.Log(models.LogEntry{
 						Level:   "ERROR",
-						Message: "Failed to create event notification for group member",
+						Message: "Failed to create and send event notification for group member",
 						Metadata: map[string]any{
 							"user_id":  member.UserID,
 							"group_id": event.GroupId,

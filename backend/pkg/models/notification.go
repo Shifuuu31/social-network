@@ -65,8 +65,13 @@ func (nm *NotificationModel) Delete(notificationID int) error {
 	return nil
 }
 
-// TODO
-// func (nm *Notifica.
+// MarkAsSeen marks a specific notification as seen for a user
+func (nm *NotificationModel) MarkAsSeen(notificationID, userID int) error {
+	if _, err := nm.DB.Exec(`UPDATE notifications SET seen = 1 WHERE id = ? AND user_id = ?`, notificationID, userID); err != nil {
+		return fmt.Errorf("mark notification as seen: %w", err)
+	}
+	return nil
+}
 
 // MarkAllAsSeen marks all user notifications as seen
 func (nm *NotificationModel) MarkAllAsSeen(userID int) error {

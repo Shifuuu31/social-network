@@ -8,7 +8,23 @@
 </template>
 
 <script setup>
+import { onMounted, onUnmounted } from 'vue'
 import Header from './components/Header.vue'
+import { useNotificationStore } from './stores/notificationStore'
+
+const notificationStore = useNotificationStore()
+
+onMounted(() => {
+  // Initialize notification system when app starts
+  notificationStore.connectWebSocket()
+  notificationStore.requestNotificationPermission()
+  notificationStore.fetchUnreadCount()
+})
+
+onUnmounted(() => {
+  // Clean up WebSocket connection when app is destroyed
+  notificationStore.disconnect()
+})
 </script>
 
 <style scoped>

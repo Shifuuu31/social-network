@@ -14,13 +14,16 @@
         <router-link to="/groups/create" class="nav-link nav-link-primary">
           Créer un groupe
         </router-link>
+        
+        <!-- Notification Bell -->
+        <NotificationDropdown />
       </nav>
     </div>
   </header>
 </template>
 
 <script setup>
-// Header component logic
+import NotificationDropdown from './notifications.vue'
 </script>
 
 <style scoped>
