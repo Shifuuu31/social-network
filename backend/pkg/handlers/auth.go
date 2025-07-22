@@ -71,7 +71,9 @@ func (rt *Root) SignUp(w http.ResponseWriter, r *http.Request) {
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Password hashed successfully"})
 
 	// generate a unique uuid
+
 	user.ImgUUID = uuid.NewString()
+
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "img uuid generated successfully"})
 
 	// insert user into db

@@ -8,7 +8,7 @@ const signin = await fetch(`${baseUrl}/signin`, {
     body: JSON.stringify({ email, password })
   });
   const cookie = signin.headers.get("set-cookie")?.split(";")[0];
-console.log(cookie);
+// console.log(cookie);
 
 fetch(`${baseUrl}/info`, {
   method: 'POST',
@@ -20,10 +20,10 @@ fetch(`${baseUrl}/info`, {
 })
 .then(async res => {
   const text = await res.text();
-  console.log(res.status, text);
+  // console.log(res.status, text);
   try {
     const json = JSON.parse(text);
-    console.log('Parsed JSON:', json);
+    // console.log('Parsed JSON:', json);
   } catch (e) {
     console.error('Invalid JSON response:', e.message);
   }

@@ -14,6 +14,7 @@ type Event struct {
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	VotesCount  int       `json:"vote_count"`
+	UserVote    string    `json:"user_vote"` // User's vote status: "going", "not_going", or ""
 	EventTime   time.Time `json:"event_time"`
 	CreatedAt   time.Time `json:"created_at"`
 }
@@ -77,6 +78,7 @@ func (em *EventModel) GetEventByID(event *Event) error {
 		}
 		return fmt.Errorf("get event by id: %w", err)
 	}
+	// Note: UserVote is not set here as it requires a specific user context
 	return nil
 }
 
@@ -112,26 +114,33 @@ func (em *EventModel) DeleteEvent(eventID int) error {
 }
 
 type EventsPayload struct {
-	GroupID    string `json:"group_id"`
-	Start      int    `json:"star"`
-	NumOfItems int    `json:"n_items"`
+	GroupID    int `json:"group_id"`
+	UserID     int `json:"user_id"` // Add user ID for vote status
+	Start      int `json:"start"`
+	NumOfItems int `json:"n_items"`
 }
 
 // GetEventsByGroup returns paginated events for a group.
 func (em *EventModel) GetEventsByGroup(payload *EventsPayload) ([]*Event, error) {
+	var maxid int
 	if payload.Start == -1 {
-		if err := em.DB.QueryRow(`SELECT MAX(id) FROM events WHERE group_id = ?`, payload.GroupID).Scan(&payload.Start); err != nil {
-			return nil, fmt.Errorf("get max event id: %w", err)
+		err := em.DB.QueryRow(`SELECT IFNULL(MAX(id), 0) FROM events WHERE group_id = ?`, payload.GroupID).Scan(&maxid)
+		if err != nil {
+			fmt.Printf("ERROR: Failed to get max ID for group %d: %v\n", payload.GroupID, err)
+			return nil, err
 		}
+
+		payload.Start = maxid
 	}
+	fmt.Println("Fetching events for group:", payload.GroupID, "starting from ID:", payload.Start, "limit:", payload.NumOfItems)
 
 	query := `
 		SELECT e.id, e.group_id, e.title, e.description, e.event_time, e.created_at,
 		       COUNT(ev.id) AS vote_count
 		FROM events e
-		LEFT JOIN event_votes ev ON e.id = ev.event_id
+		LEFT JOIN event_votes ev ON e.id = ev.event_id AND ev.vote = 'going'
 		WHERE e.group_id = ? AND e.id <= ?
-		GROUP BY e.id false,
+		GROUP BY e.id
 		ORDER BY e.id DESC
 		LIMIT ?
 	`
@@ -147,6 +156,19 @@ func (em *EventModel) GetEventsByGroup(payload *EventsPayload) ([]*Event, error)
 		if err := rows.Scan(&e.ID, &e.GroupId, &e.Title, &e.Description, &e.EventTime, &e.CreatedAt, &e.VotesCount); err != nil {
 			return nil, fmt.Errorf("scan event: %w", err)
 		}
+
+		// Check user's vote status for this event
+		if payload.UserID > 0 {
+			var userVote string
+			err = em.DB.QueryRow(`SELECT vote FROM event_votes WHERE event_id = ? AND user_id = ?`, e.ID, payload.UserID).Scan(&userVote)
+			if err != nil {
+				// User hasn't voted - this is not an error
+				e.UserVote = ""
+			} else {
+				e.UserVote = userVote
+			}
+		}
+
 		events = append(events, &e)
 	}
 	return events, nil

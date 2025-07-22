@@ -14,8 +14,8 @@ type GroupMember struct {
 	Status    string    `json:"status"` // "invited", "requested", "member", "declined"
 	CreatedAt time.Time `json:"created_at"`
 }
-// TODO
 func (gm *GroupMember) Validate() error {
+	// TODO validate Group member
 	return nil
 }
 
@@ -23,21 +23,19 @@ type GroupMemberModel struct {
 	DB *sql.DB
 }
 
-// UpsertMember insert member or update mehis status.
 func (gmm *GroupMemberModel) Upsert(member *GroupMember) error {
 	query := `
-		INSERT INTO group_members (group_id, user_id, status)
-		VALUES (?, ?, ?)
+		INSERT INTO group_members (group_id, user_id, prev_status, status)
+		VALUES (?, ?, ?, ?)
 		ON CONFLICT(group_id, user_id) DO UPDATE SET status=excluded.status
 	`
-	
-	if _, err := gmm.DB.Exec(query, member.GroupID, member.UserID, member.Status);err != nil {
+
+	if _, err := gmm.DB.Exec(query, member.GroupID, member.UserID, member.PrevStatus, member.Status); err != nil {
 		return fmt.Errorf("upsert group member: %w", err)
 	}
 	return nil
 }
 
-// DeleteMember removes a member from a group.
 func (gmm *GroupMemberModel) Delete(member *GroupMember) error {
 	query := `
 		DELETE FROM group_members
@@ -54,7 +52,6 @@ func (gmm *GroupMemberModel) Delete(member *GroupMember) error {
 	return nil
 }
 
-// GetMember retrieves a specific group member.
 func (gmm *GroupMemberModel) GetMember(member *GroupMember) error {
 	query := `
 		SELECT id, status, created_at
@@ -65,7 +62,6 @@ func (gmm *GroupMemberModel) GetMember(member *GroupMember) error {
 	return row.Scan(&member.ID, &member.Status, &member.CreatedAt)
 }
 
-// GetGroupMembers returns all members of a group.
 func (gmm *GroupMemberModel) GetGroupMembers(groupID int) ([]*GroupMember, error) {
 	query := `
 		SELECT id, group_id, user_id, status, created_at
@@ -89,16 +85,15 @@ func (gmm *GroupMemberModel) GetGroupMembers(groupID int) ([]*GroupMember, error
 	return members, nil
 }
 
-// IsUserInGroup checks if a user is in a specific group.
-func (gmm *GroupMemberModel) IsUserGroupMember(groupID, userID int) error {
+func (gmm *GroupMemberModel) IsUserGroupMember(payload *GroupMember) error {
 	query := `
 		SELECT COUNT(*)
 		FROM group_members
 		WHERE group_id = ? AND user_id = ?
 	`
 	var count int
-	
-	if err := gmm.DB.QueryRow(query, groupID, userID).Scan(&count);err != nil || count <= 0 {
+
+	if err := gmm.DB.QueryRow(query, payload.GroupID, payload.UserID).Scan(&count); err != nil || count <= 0 {
 		return fmt.Errorf("check user in group: %w", err)
 	}
 	return nil

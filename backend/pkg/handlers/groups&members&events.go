@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"social-network/pkg/models"
 	"social-network/pkg/tools"
@@ -13,23 +15,102 @@ func (rt *Root) NewGroupsHandler() (groupsMux *http.ServeMux) {
 	groupsMux = http.NewServeMux()
 
 	groupsMux.HandleFunc("POST /group/new", rt.NewGroup)
-	groupsMux.HandleFunc("POST /group/invite", rt.InviteToJoinGroup)
+	groupsMux.HandleFunc("POST /group/browse", rt.BrowseGroups)
 	groupsMux.HandleFunc("POST /group/request", rt.RequestToJoinGroup)
+
+	groupsMux.Handle("GET /group/{id}", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroup)))
+	groupsMux.Handle("POST /group/events", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetGroupEvents)))
+	groupsMux.Handle("POST /group/invite", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.InviteToJoinGroup)))
 	groupsMux.HandleFunc("POST /group/accept-decline-request", rt.AcceptDeclineRequestToJoin)
 	groupsMux.HandleFunc("POST /group/accept-decline-invitation", rt.AcceptDeclineInvitation)
-	groupsMux.HandleFunc("POST /browse", rt.BrowseGroups)
-	groupsMux.HandleFunc("POST /group/event", rt.NewEvent)
-	groupsMux.HandleFunc("POST /group/event/vote", rt.EventVote)
+	groupsMux.Handle("POST /group/event/new", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.NewEvent)))
+	groupsMux.Handle("POST /group/event/vote", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.EventVote)))
+	groupsMux.Handle("GET /group/{id}/available-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.GetAvailableUsers)))
+	groupsMux.Handle("GET /group/{id}/search-users", rt.DL.GroupAccessMiddleware(http.HandlerFunc(rt.SearchAvailableUsers)))
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "Group routes registered",
 		Metadata: map[string]any{
-			"path": "/group/new, /group/invite, /group/request, /group/accept-decline, /group/browse, /group/event, /group/event/vote",
+			"path": "/group/new, /group/{id}, /group/events, /group/invite, /group/request, /group/accept-decline, /group/browse, /group/event, /group/event/vote, /group/{id}/available-users, /group/{id}/search-users",
 		},
 	})
 
 	return groupsMux
+}
+
+// GetGroup retrieves a group by its ID
+func (rt *Root) GetGroup(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("GetGroup called")
+	groupID, err := strconv.Atoi(r.PathValue("id"))
+	if groupID <= 0 || err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Group ID not provided in request",
+			Metadata: map[string]any{
+				"ip":   r.RemoteAddr,
+				"path": r.URL.Path,
+			},
+		})
+		tools.RespondError(w, "Group ID is required", http.StatusBadRequest)
+		return
+	}
+	group := &models.Group{
+		ID: groupID,
+	}
+	requesterID := rt.DL.GetRequesterID(w, r)
+	// if requesterID <= 0 {
+	// 	rt.DL.Logger.Log(models.LogEntry{
+	// 		Level:   "ERROR",
+	// 		Message: "Unauthorized: requester ID not found",
+	// 		Metadata: map[string]any{
+	// 			"ip":   r.RemoteAddr,
+	// 			"path": r.URL.Path,
+	// 		},
+	// 	})
+	// 	tools.RespondError(w, "Unauthorized", http.StatusUnauthorized)
+	// 	return
+
+	// }
+
+	err = rt.DL.Groups.GetGroupByID(group)
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to retrieve group from DB",
+			Metadata: map[string]any{
+				"group_id": groupID,
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"err":      err.Error(),
+			},
+		})
+		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	member := &models.GroupMember{
+		GroupID: groupID,
+		UserID:  requesterID,
+	}
+	err = rt.DL.Members.GetMember(member)
+	if err != nil {
+		group.IsMember = ""
+	} else {
+		group.IsMember = member.Status
+	}
+
+	if err := tools.EncodeJSON(w, http.StatusOK, group); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to send group response",
+			Metadata: map[string]any{
+				"group_id": groupID,
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"err":      err.Error(),
+			},
+		})
+	}
 }
 
 func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
@@ -67,11 +148,10 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group input validated"})
 
-	// generate a unique uuid
 	group.ImgUUID = uuid.NewString()
+
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "img uuid generated successfully"})
 
-	// insert user into db
 	if err := rt.DL.Groups.Insert(group); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -87,6 +167,65 @@ func (rt *Root) NewGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group inserted into DB"})
+
+	creator := &models.GroupMember{
+		GroupID:    group.ID,
+		UserID:     group.CreatorID,
+		Status:     "member",
+		PrevStatus: "none",
+	}
+	if err := rt.DL.Members.Upsert(creator); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to add creator as group member",
+			Metadata: map[string]any{
+				"group_id": group.ID,
+				"user_id":  group.CreatorID,
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"err":      err.Error(),
+			},
+		})
+	} else {
+		rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Creator added as group member"})
+	}
+
+	// Initialize group chat room in WebSocket hub
+	rt.Hub.InitializeGroupChat(group.ID)
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "DEBUG",
+		Message: "Group chat initialized in WebSocket hub",
+		Metadata: map[string]any{
+			"group_id": group.ID,
+		},
+	})
+
+	// If the creator has an active WebSocket connection, automatically join them to the group chat
+	if conn, hasConnection := rt.Hub.Clients[group.CreatorID]; hasConnection {
+		rt.Hub.JoinGroup(group.CreatorID, group.ID)
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "DEBUG",
+			Message: "Creator automatically joined group chat",
+			Metadata: map[string]any{
+				"group_id": group.ID,
+				"user_id":  group.CreatorID,
+			},
+		})
+
+		// Send a welcome message to the creator
+		if conn != nil {
+
+			welcomeMsg := &models.Notification{
+				Type: "group_chat_created",
+				Message: &models.Message{
+					GroupID: group.ID,
+					Content: "Group chat has been created! You can now start chatting with group members.",
+				},
+				CreatedAt: group.CreatedAt,
+			}
+			rt.SendNotificationToUser(group.CreatorID, welcomeMsg)
+		}
+	}
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
@@ -134,18 +273,15 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	// Check if requester is creator
 	requesterID := rt.DL.GetRequesterID(w, r)
 
-	err1 := rt.DL.Members.IsUserGroupMember(member.GroupID, requesterID)
-	err2 := rt.DL.Groups.IsUserCreator(member.GroupID, requesterID)
-
-	if err1 != nil && err2 != nil {
+	err := rt.DL.Groups.IsUserCreator(member.GroupID, requesterID)
+	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Forbidden: requester isn't the group creator",
 			Metadata: map[string]any{
 				"ip":     r.RemoteAddr,
 				"path":   r.URL.Path,
-				"error1": err1.Error(),
-				"error2": err2.Error(),
+				"error1": err.Error(),
 			},
 		})
 		tools.RespondError(w, "Forbidden", http.StatusForbidden)
@@ -170,6 +306,54 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member inserted with pending invite status"})
+
+	// Create notification for the invited user
+	// Get group information for the notification message
+	groupInfo := &models.Group{ID: member.GroupID}
+	if err := rt.DL.Groups.GetGroupByID(groupInfo); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "WARN",
+			Message: "Failed to get group info for notification, using generic message",
+			Metadata: map[string]any{
+				"group_id": member.GroupID,
+				"error":    err.Error(),
+			},
+		})
+		groupInfo.Title = "a group" // fallback
+	}
+
+	notification := &models.Notification{
+		UserID: member.UserID,
+		Type:   "group_invite",
+		Message: &models.Message{
+			Content: fmt.Sprintf("You've been invited to join the group '%s'.", groupInfo.Title),
+		},
+		Seen: false,
+	}
+
+	// Use the new notification system to create and send notification
+	if err := rt.CreateAndSendNotification(notification); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to create and send notification for group invite",
+			Metadata: map[string]any{
+				"user_id":  member.UserID,
+				"group_id": member.GroupID,
+				"error":    err.Error(),
+			},
+		})
+		// Don't fail the whole request if notification creation fails
+	} else {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "INFO",
+			Message: "Notification created and sent for group invite",
+			Metadata: map[string]any{
+				"user_id":         member.UserID,
+				"group_id":        member.GroupID,
+				"notification_id": notification.ID,
+			},
+		})
+	}
 
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
@@ -197,6 +381,7 @@ func (rt *Root) InviteToJoinGroup(w http.ResponseWriter, r *http.Request) {
 func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	var member *models.GroupMember
 	if err := tools.DecodeJSON(r, &member); err != nil {
+		fmt.Println(err)
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to decode group join request JSON",
@@ -210,9 +395,8 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Group join request JSON decoded"})
-
 	// TODO validate payload
-
+	fmt.Println("Request to join group:", member)
 	// Insert into group_members as "pending_request"
 	// member.Status = "requested"
 	member.UserID = rt.DL.GetRequesterID(w, r)
@@ -231,7 +415,74 @@ func (rt *Root) RequestToJoinGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Member inserted with pending join request status"})
 
-	// TODO Notify group creator
+	// Create notification for the group creator about the join request
+	// Get group information for the notification message
+	groupInfo := &models.Group{ID: member.GroupID}
+	if err := rt.DL.Groups.GetGroupByID(groupInfo); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "WARN",
+			Message: "Failed to get group info for notification, using generic message",
+			Metadata: map[string]any{
+				"group_id": member.GroupID,
+				"error":    err.Error(),
+			},
+		})
+		groupInfo.Title = "your group" // fallback
+		groupInfo.CreatorID = 1        // fallback to avoid breaking
+	}
+
+	// Get the user who requested to join for a more personalized message
+	requestUser := &models.User{ID: member.UserID}
+	userDisplayName := "Someone"
+	if err := rt.DL.Users.GetUserByID(requestUser); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "WARN",
+			Message: "Failed to get user info for notification, using generic message",
+			Metadata: map[string]any{
+				"user_id": member.UserID,
+				"error":   err.Error(),
+			},
+		})
+	} else {
+		userDisplayName = requestUser.FirstName + " " + requestUser.LastName
+	}
+
+	notification := &models.Notification{
+		UserID: groupInfo.CreatorID,
+		Type:   "group_join_request",
+		Message: &models.Message{
+			Content: fmt.Sprintf("%s requested to join your group '%s'.", userDisplayName, groupInfo.Title),
+		},
+		Seen: false,
+	}
+
+	// Use the new notification system to create and send notification
+	if err := rt.CreateAndSendNotification(notification); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to create and send notification for group join request",
+			Metadata: map[string]any{
+				"creator_id":   groupInfo.CreatorID,
+				"group_id":     member.GroupID,
+				"requester_id": member.UserID,
+				"error":        err.Error(),
+			},
+		})
+		// Don't fail the whole request if notification creation fails
+	} else {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "INFO",
+			Message: "Notification created and sent for group join request",
+			Metadata: map[string]any{
+				"creator_id":      groupInfo.CreatorID,
+				"group_id":        member.GroupID,
+				"requester_id":    member.UserID,
+				"notification_id": notification.ID,
+			},
+		})
+	}
+
+	tools.EncodeJSON(w, http.StatusCreated, member.Status)
 }
 
 // Notify group creator
@@ -330,12 +581,13 @@ func (rt *Root) BrowseGroups(w http.ResponseWriter, r *http.Request) {
 				"err":  err.Error(),
 			},
 		})
+
 		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Get groups JSON decoded"})
 
-	posts, err := rt.DL.Groups.GetGroups(rt.DL.GetRequesterID(w, r), payload)
+	groups, err := rt.DL.Groups.GetGroups(payload)
 	if err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -351,7 +603,7 @@ func (rt *Root) BrowseGroups(w http.ResponseWriter, r *http.Request) {
 	}
 	rt.DL.Logger.Log(models.LogEntry{Level: "DEBUG", Message: "Groups retrieved from DB"})
 
-	if err := tools.EncodeJSON(w, http.StatusOK, posts); err != nil {
+	if err := tools.EncodeJSON(w, http.StatusOK, groups); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
 			Message: "Failed to send groups response",
@@ -435,7 +687,80 @@ func (rt *Root) NewEvent(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
-	// TODO send notification to group members
+	// Send notifications to all group members about the new event
+	// Get group information for the notification message
+	groupInfo := &models.Group{ID: event.GroupId}
+	if err := rt.DL.Groups.GetGroupByID(groupInfo); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "WARN",
+			Message: "Failed to get group info for event notification, using generic message",
+			Metadata: map[string]any{
+				"group_id": event.GroupId,
+				"error":    err.Error(),
+			},
+		})
+		groupInfo.Title = "a group" // fallback
+	}
+
+	// Get all group members to notify them
+	groupMembers, err := rt.DL.Members.GetGroupMembers(event.GroupId)
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to get group members for event notification",
+			Metadata: map[string]any{
+				"group_id": event.GroupId,
+				"event_id": event.ID,
+				"error":    err.Error(),
+			},
+		})
+	} else {
+		// Create notifications for all group members (except the event creator)
+		eventCreatorID := 1 // TODO: Get from auth when available
+		notificationCount := 0
+
+		for _, member := range groupMembers {
+			// Skip the event creator and only notify actual members
+			if member.UserID != eventCreatorID && member.Status == "member" {
+				notification := &models.Notification{
+					UserID: member.UserID,
+					Type:   "group_event_created",
+
+					Message: &models.Message{
+						Content: fmt.Sprintf("A new event '%s' has been created in group '%s'.", event.Title, groupInfo.Title),
+					},
+					Seen: false,
+				}
+
+				// Use the enhanced notification system
+				if err := rt.CreateAndSendNotification(notification); err != nil {
+					rt.DL.Logger.Log(models.LogEntry{
+						Level:   "ERROR",
+						Message: "Failed to create and send event notification for group member",
+						Metadata: map[string]any{
+							"user_id":  member.UserID,
+							"group_id": event.GroupId,
+							"event_id": event.ID,
+							"error":    err.Error(),
+						},
+					})
+				} else {
+					notificationCount++
+				}
+			}
+		}
+
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "INFO",
+			Message: "Event notifications created for group members",
+			Metadata: map[string]any{
+				"group_id":           event.GroupId,
+				"event_id":           event.ID,
+				"notifications_sent": notificationCount,
+				"total_members":      len(groupMembers),
+			},
+		})
+	}
 
 	if err := tools.EncodeJSON(w, http.StatusCreated, event); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
@@ -523,6 +848,250 @@ func (rt *Root) EventVote(w http.ResponseWriter, r *http.Request) {
 				"ip":   r.RemoteAddr,
 				"path": r.URL.Path,
 				"err":  err.Error(),
+			},
+		})
+	}
+}
+
+// GetGroupEvents retrieves events for a specific group
+func (rt *Root) GetGroupEvents(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("GetGroupEvents called")
+	payload := &models.EventsPayload{}
+	if err := tools.DecodeJSON(r, &payload); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to decode events payload JSON",
+			Metadata: map[string]any{
+				"ip":   r.RemoteAddr,
+				"path": r.URL.Path,
+				"err":  err.Error(),
+			},
+		})
+		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if payload.GroupID <= 0 {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Group ID not provided in request",
+			Metadata: map[string]any{
+				"ip":   r.RemoteAddr,
+				"path": r.URL.Path,
+			},
+		})
+		tools.RespondError(w, "Group ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Set user ID for vote status (TODO: Get from auth when available)
+	payload.UserID = 1
+
+	events, err := rt.DL.Events.GetEventsByGroup(payload)
+	fmt.Println("Retrieved events:", events)
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to retrieve events from DB",
+			Metadata: map[string]any{
+				"group_id": payload.GroupID,
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"err":      err.Error(),
+			},
+		})
+		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "INFO",
+		Message: "Events retrieved successfully",
+		Metadata: map[string]any{
+			"group_id": payload.GroupID,
+			"count":    len(events),
+			"ip":       r.RemoteAddr,
+			"path":     r.URL.Path,
+		},
+	})
+
+	if err := tools.EncodeJSON(w, http.StatusOK, events); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to send events response",
+			Metadata: map[string]any{
+				"group_id": payload.GroupID,
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"err":      err.Error(),
+			},
+		})
+	}
+}
+
+// GetAvailableUsers retrieves users who have never been invited or been members of a specific group
+func (rt *Root) GetAvailableUsers(w http.ResponseWriter, r *http.Request) {
+	groupID, err := strconv.Atoi(r.PathValue("id"))
+	if groupID <= 0 || err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Group ID not provided in request",
+			Metadata: map[string]any{
+				"ip":   r.RemoteAddr,
+				"path": r.URL.Path,
+			},
+		})
+		tools.RespondError(w, "Group ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Check if requester is authorized (member or creator)
+	requesterID := rt.DL.GetRequesterID(w, r)
+
+	err = rt.DL.Groups.IsUserCreator(groupID, requesterID)
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Forbidden: requester isn't a group member or creator",
+			Metadata: map[string]any{
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"group_id": groupID,
+				"user_id":  requesterID,
+			},
+		})
+		tools.RespondError(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	users, err := rt.DL.Users.GetUsersNotInGroup(groupID)
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to retrieve available users",
+			Metadata: map[string]any{
+				"group_id": groupID,
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"err":      err.Error(),
+			},
+		})
+		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "INFO",
+		Message: "Available users retrieved successfully",
+		Metadata: map[string]any{
+			"group_id":   groupID,
+			"user_count": len(users),
+			"ip":         r.RemoteAddr,
+			"path":       r.URL.Path,
+		},
+	})
+
+	if err := tools.EncodeJSON(w, http.StatusOK, users); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to send available users response",
+			Metadata: map[string]any{
+				"group_id": groupID,
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"err":      err.Error(),
+			},
+		})
+	}
+}
+
+// SearchAvailableUsers searches for users who have never been invited or been members of a specific group
+func (rt *Root) SearchAvailableUsers(w http.ResponseWriter, r *http.Request) {
+	groupID, err := strconv.Atoi(r.PathValue("id"))
+	if groupID <= 0 || err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Group ID not provided in request",
+			Metadata: map[string]any{
+				"ip":   r.RemoteAddr,
+				"path": r.URL.Path,
+			},
+		})
+		tools.RespondError(w, "Group ID is required", http.StatusBadRequest)
+		return
+	}
+
+	searchQuery := r.URL.Query().Get("q")
+	// if searchQuery == "" {
+	// 	rt.DL.Logger.Log(models.LogEntry{
+	// 		Level:   "ERROR",
+	// 		Message: "Search query not provided",
+	// 		Metadata: map[string]any{
+	// 			"ip":   r.RemoteAddr,
+	// 			"path": r.URL.Path,
+	// 		},
+	// 	})
+	// 	tools.RespondError(w, "Search query is required", http.StatusBadRequest)
+	// 	return
+	// }
+
+	// Check if requester is authorized (member or creator)
+	requesterID := rt.DL.GetRequesterID(w, r)
+
+	err = rt.DL.Groups.IsUserCreator(groupID, requesterID)
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Forbidden: requester isn't a group member or creator",
+			Metadata: map[string]any{
+				"ip":       r.RemoteAddr,
+				"path":     r.URL.Path,
+				"group_id": groupID,
+				"user_id":  requesterID,
+			},
+		})
+		tools.RespondError(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	users, err := rt.DL.Users.SearchUsersNotInGroup(groupID, searchQuery)
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to search available users",
+			Metadata: map[string]any{
+				"group_id":     groupID,
+				"search_query": searchQuery,
+				"ip":           r.RemoteAddr,
+				"path":         r.URL.Path,
+				"err":          err.Error(),
+			},
+		})
+		tools.RespondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "INFO",
+		Message: "User search completed successfully",
+		Metadata: map[string]any{
+			"group_id":     groupID,
+			"search_query": searchQuery,
+			"user_count":   len(users),
+			"ip":           r.RemoteAddr,
+			"path":         r.URL.Path,
+		},
+	})
+
+	if err := tools.EncodeJSON(w, http.StatusOK, users); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to send search results response",
+			Metadata: map[string]any{
+				"group_id":     groupID,
+				"search_query": searchQuery,
+				"ip":           r.RemoteAddr,
+				"path":         r.URL.Path,
+				"err":          err.Error(),
 			},
 		})
 	}

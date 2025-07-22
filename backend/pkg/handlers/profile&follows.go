@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -12,6 +13,7 @@ func (rt *Root) NewUsersHandler() (usersMux *http.ServeMux) {
 	usersMux = http.NewServeMux()
 
 	usersMux.HandleFunc("POST /profile/info", rt.ProfileInfo)
+	usersMux.HandleFunc("GET /profile/users", rt.Users)
 	usersMux.HandleFunc("POST /profile/activity", rt.ProfileActivity)
 	usersMux.HandleFunc("POST /profile/followers", rt.ProfileFollowers)
 	usersMux.HandleFunc("POST /profile/following", rt.ProfileFollowing)
@@ -20,6 +22,51 @@ func (rt *Root) NewUsersHandler() (usersMux *http.ServeMux) {
 	usersMux.HandleFunc("POST /follow/accept-decline", rt.AcceptDeclineFollowRequest)
 
 	return usersMux
+}
+
+func (rt *Root) Users(w http.ResponseWriter, r *http.Request) {
+	requesterID := rt.DL.GetRequesterID(w, r)
+
+	users, err := rt.DL.Users.GetAllUsers()
+	if err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to fetch all users",
+			Metadata: map[string]any{
+				"requester_id": requesterID,
+				"ip":           r.RemoteAddr,
+				"path":         r.URL.Path,
+				"error":        err.Error(),
+			},
+		})
+		tools.RespondError(w, "Failed to fetch users", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tools.EncodeJSON(w, http.StatusOK, users); err != nil {
+		rt.DL.Logger.Log(models.LogEntry{
+			Level:   "ERROR",
+			Message: "Failed to send users response",
+			Metadata: map[string]any{
+				"requester_id": requesterID,
+				"ip":           r.RemoteAddr,
+				"path":         r.URL.Path,
+				"error":        err.Error(),
+			},
+		})
+		return
+	}
+
+	rt.DL.Logger.Log(models.LogEntry{
+		Level:   "INFO",
+		Message: "Users list sent successfully",
+		Metadata: map[string]any{
+			"requester_id": requesterID,
+			"user_count":   len(users),
+			"ip":           r.RemoteAddr,
+			"path":         r.URL.Path,
+		},
+	})
 }
 
 func (rt *Root) ProfileAccess(w http.ResponseWriter, r *http.Request, targetUser *models.User) bool {
@@ -460,7 +507,67 @@ func (rt *Root) FollowUnfollow(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 
-		// TODO Send follow Notif
+		// Create notification for follow request
+		// Get requester info for personalized message
+		requesterUser := &models.User{ID: requesterID}
+		requesterDisplayName := "Someone"
+		if err := rt.DL.Users.GetUserByID(requesterUser); err != nil {
+			rt.DL.Logger.Log(models.LogEntry{
+				Level:   "WARN",
+				Message: "Failed to get requester info for follow notification",
+				Metadata: map[string]any{
+					"requester_id": requesterID,
+					"error":        err.Error(),
+				},
+			})
+		} else {
+			requesterDisplayName = requesterUser.FirstName + " " + requesterUser.LastName
+		}
+
+		// Check if target user has private profile for notification
+		targetUser := &models.User{ID: payload.TargetId}
+		if err := rt.DL.Users.GetUserByID(targetUser); err != nil {
+			rt.DL.Logger.Log(models.LogEntry{
+				Level:   "WARN",
+				Message: "Failed to get target user info",
+				Metadata: map[string]any{
+					"target_id": payload.TargetId,
+					"error":     err.Error(),
+				},
+			})
+		} else if !targetUser.IsPublic {
+			// Only send notification for private profiles (public profiles auto-accept)
+			notification := &models.Notification{
+				UserID: payload.TargetId,
+				Type:   "follow_request",
+				Message: &models.Message{
+					Content: fmt.Sprintf("%s has requested to follow you.", requesterDisplayName),
+				},
+				Seen: false,
+			}
+
+			if err := rt.CreateAndSendNotification(notification); err != nil {
+				rt.DL.Logger.Log(models.LogEntry{
+					Level:   "ERROR",
+					Message: "Failed to create and send follow request notification",
+					Metadata: map[string]any{
+						"requester_id": requesterID,
+						"target_id":    payload.TargetId,
+						"error":        err.Error(),
+					},
+				})
+			} else {
+				rt.DL.Logger.Log(models.LogEntry{
+					Level:   "INFO",
+					Message: "Follow request notification sent",
+					Metadata: map[string]any{
+						"requester_id":    requesterID,
+						"target_id":       payload.TargetId,
+						"notification_id": notification.ID,
+					},
+				})
+			}
+		}
 	case "unfollow":
 		if err := rt.DL.Follows.Delete(followRequest); err != nil {
 			rt.DL.Logger.Log(models.LogEntry{

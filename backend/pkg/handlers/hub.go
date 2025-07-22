@@ -47,7 +47,13 @@ func (rt *Root) NewWSHandler() *http.ServeMux {
 
 // **HANDLES INITIAL WEBSOCKET CONNECTION UPGRADE**
 func (rt *Root) Connect(w http.ResponseWriter, r *http.Request) {
+	// Get authenticated user ID from middleware
 	requesterID := rt.DL.GetRequesterID(w, r)
+	if requesterID == 0 {
+		// User is not authenticated - error already sent by GetRequesterID
+		return
+	}
+
 	rt.DL.Logger.Log(models.LogEntry{
 		Level:   "INFO",
 		Message: "New websocket connection attempt",
@@ -103,7 +109,7 @@ func (rt *Root) HandleClient(userID int, conn *websocket.Conn) {
 			}
 		}
 	}()
-
+WSLoop:
 	for {
 		// **READ NOTIFICATION FROM CLIENT (NOTIFICATION-FIRST ARCHITECTURE)**
 		var notif *models.Notification
@@ -117,19 +123,80 @@ func (rt *Root) HandleClient(userID int, conn *websocket.Conn) {
 					"error":   err.Error(),
 				},
 			})
-			// **SEND ERROR RESPONSE ON READ FAILURE**
-			WriteWSError(conn, "failed to read notification")
-			return
+			conn.WriteJSON(WSResponse{
+				Status:  "error",
+				Message: "failed to send msg",
+			})
+			break WSLoop
 		}
 
-		// **ROUTE NOTIFICATION BY TYPE**
+		// Insert message into DB, log errors if any
+		if err := rt.DL.Messages.Insert(notif.Message); err != nil {
+			rt.DL.Logger.Log(models.LogEntry{
+				Level:   "ERROR",
+				Message: "Failed to insert message",
+				Metadata: map[string]any{
+					"user_id": userID,
+					"error":   err.Error(),
+					"message": notif,
+				},
+			})
+			conn.WriteJSON(WSResponse{
+				Status:  "error",
+				Message: "failed to send msg",
+			})
+			break WSLoop
+
+		} else {
+			rt.DL.Logger.Log(models.LogEntry{
+				Level:   "INFO",
+				Message: "Message inserted",
+				Metadata: map[string]any{
+					"user_id": userID,
+					"message": notif,
+				},
+			})
+		}
+
+		// Handle message by type
 		switch notif.Type {
-		case "message":
-			if err := rt.handleMessageNotification(userID, notif); err != nil {
-				// **ERROR HANDLING - SEND WSResponse ON FAILURE**
-				WriteWSError(conn, "failed to process message")
-				return
-			}
+		case "private":
+			rt.DL.Logger.Log(models.LogEntry{
+				Level:   "INFO",
+				Message: "Sending private message",
+				Metadata: map[string]any{
+					"from": notif.Message.SenderID,
+					"to":   notif.Message.ReceiverID,
+				},
+			})
+
+			if err := rt.SendNotificationToUser(notif.Message.ReceiverID, notif); err != nil {
+				conn.WriteJSON(WSResponse{
+					Status:  "error",
+					Message: "failed to send msg",
+				})
+				break WSLoop
+
+			} // send private msg
+
+		case "group":
+			rt.DL.Logger.Log(models.LogEntry{
+				Level:   "INFO",
+				Message: "Broadcasting group message",
+				Metadata: map[string]any{
+					"group_id": notif.Message.GroupID,
+					"from":     notif.Message.SenderID,
+				},
+			})
+			if err := rt.BroadcastNotificationToGroup(notif.Message.GroupID, notif.Message.SenderID, notif); err != nil {
+				conn.WriteJSON(WSResponse{
+					Status:  "error",
+					Message: "failed to send msg",
+				})
+				break WSLoop
+
+			} // send to group
+
 		case "join_group":
 			if err := rt.handleJoinGroupNotification(userID, notif); err != nil {
 				// **ERROR HANDLING - SEND WSResponse ON FAILURE**
@@ -209,52 +276,65 @@ func (hub *WSHub) JoinGroup(userID, groupID int) {
 	}
 }
 
+// InitializeGroupChat creates a new group chat room in the hub
+func (hub *WSHub) InitializeGroupChat(groupID int) {
+	hub.Mutex.Lock()
+	defer hub.Mutex.Unlock()
+
+	if hub.Groups[groupID] == nil {
+		hub.Groups[groupID] = make(map[int][]*websocket.Conn)
+		log.Printf("Initialized group chat for group %d", groupID)
+	} else {
+		log.Printf("Group chat for group %d already exists", groupID)
+	}
+}
+
 // **HANDLES MESSAGE-TYPE NOTIFICATIONS - PROCESSES AND STORES MESSAGES**
 func (rt *Root) handleMessageNotification(userID int, notif *models.Notification) error {
-	// **VALIDATE MESSAGE EXISTS IN NOTIFICATION**
-	if notif.Message == nil {
-		return fmt.Errorf("message is required for message notification")
-	}
-
-	// **SET MESSAGE METADATA**
-	notif.Message.SenderID = userID
-	notif.Message.CreatedAt = time.Now()
-
-	// **INSERT MESSAGE INTO DATABASE FIRST**
-	if err := rt.DL.Messages.Insert(notif.Message); err != nil {
-		rt.DL.Logger.Log(models.LogEntry{
-			Level:   "ERROR",
-			Message: "Failed to insert message",
-			Metadata: map[string]any{
-				"user_id": userID,
-				"error":   err.Error(),
-				"message": notif.Message,
-			},
-		})
-		return err
-	}
-
-	// **UPDATE NOTIFICATION WITH MESSAGE ID AND TIMESTAMP**
-	notif.MessageID = notif.Message.ID
-	notif.CreatedAt = int(time.Now().Unix())
-
-	rt.DL.Logger.Log(models.LogEntry{
-		Level:   "INFO",
-		Message: "Message inserted",
-		Metadata: map[string]any{
-			"user_id":    userID,
-			"message_id": notif.Message.ID,
-		},
-	})
-
 	// **ROUTE NOTIFICATION BASED ON MESSAGE TYPE**
-	switch notif.Message.Type {
-	case "private":
-		return rt.sendPrivateNotification(notif)
-	case "group":
-		return rt.sendGroupNotification(notif)
+	switch notif.Type {
+	case "message:private":
+		notif.Message.SenderID = userID
+		notif.Message.CreatedAt = time.Now()
+		notif.CreatedAt = time.Now()
+
+		// Insert message
+		if err := rt.DL.Messages.Insert(notif.Message); err != nil {
+			return err
+		}
+
+		// Notify receiver (store + WS)
+		receiverNotif := &models.Notification{
+			UserID:     notif.Message.ReceiverID,
+			Type:       "message_received",
+			SubMessage: "You have a new message",
+			Message:    notif.Message,
+			Seen:       false,
+			CreatedAt:  time.Now(),
+		}
+		return rt.SendNotificationToUser(notif.Message.ReceiverID, receiverNotif)
+
+	case "message:group":
+		notif.Message.SenderID = userID
+		notif.Message.CreatedAt = time.Now()
+		notif.CreatedAt = time.Now()
+
+		if err := rt.DL.Messages.Insert(notif.Message); err != nil {
+			return err
+		}
+
+		groupNotif := &models.Notification{
+			Type:       "group_message_received",
+			SubMessage: "New message in group",
+			Message:    notif.Message,
+			Seen:       false,
+			CreatedAt:  time.Now(),
+		}
+
+		return rt.BroadcastNotificationToGroup(notif.Message.GroupID, userID, groupNotif)
+
 	default:
-		return fmt.Errorf("invalid message type: %s", notif.Message.Type)
+		return fmt.Errorf("invalid message type: %s", notif.Type)
 	}
 }
 
@@ -279,71 +359,11 @@ func (rt *Root) handleJoinGroupNotification(userID int, notif *models.Notificati
 	return nil
 }
 
-// **SENDS PRIVATE MESSAGE NOTIFICATION TO SPECIFIC USER**
-func (rt *Root) sendPrivateNotification(notif *models.Notification) error {
-	// **VALIDATE RECEIVER ID EXISTS**
-	if notif.Message == nil || notif.Message.ReceiverID == 0 {
-		return fmt.Errorf("receiver_id is required for private message")
-	}
-
-	rt.DL.Logger.Log(models.LogEntry{
-		Level:   "INFO",
-		Message: "Sending private notification",
-		Metadata: map[string]any{
-			"from": notif.Message.SenderID,
-			"to":   notif.Message.ReceiverID,
-		},
-	})
-
-	// **CREATE NOTIFICATION FOR RECEIVER**
-	receiverNotif := &models.Notification{
-		UserID:     notif.Message.ReceiverID,
-		Type:       "message_received",
-		SubMessage: "You have a new message",
-		MessageID:  notif.Message.ID,
-		Message:    notif.Message,
-		Seen:       false,
-		CreatedAt:  int(time.Now().Unix()),
-	}
-
-	return rt.SendNotificationToUser(notif.Message.ReceiverID, receiverNotif)
-}
-
-// **SENDS GROUP MESSAGE NOTIFICATION TO ALL GROUP MEMBERS**
-func (rt *Root) sendGroupNotification(notif *models.Notification) error {
-	// **VALIDATE GROUP ID EXISTS**
-	if notif.Message == nil || notif.Message.GroupID == 0 {
-		return fmt.Errorf("group_id is required for group message")
-	}
-
-	rt.DL.Logger.Log(models.LogEntry{
-		Level:   "INFO",
-		Message: "Broadcasting group notification",
-		Metadata: map[string]any{
-			"group_id": notif.Message.GroupID,
-			"from":     notif.Message.SenderID,
-		},
-	})
-
-	// **CREATE NOTIFICATION FOR GROUP MEMBERS**
-	groupNotif := &models.Notification{
-		Type:       "group_message_received",
-		SubMessage: "New message in group",
-		MessageID:  notif.Message.ID,
-		Message:    notif.Message,
-		Seen:       false,
-		CreatedAt:  int(time.Now().Unix()),
-	}
-
-	return rt.BroadcastNotificationToGroup(notif.Message.GroupID, notif.Message.SenderID, groupNotif)
-}
 
 // SendNotificationToUser sends a notification to a specific user
 func (rt *Root) SendNotificationToUser(userID int, notif *models.Notification) error {
-	// Set the notification's user ID
 	notif.UserID = userID
 
-	// Save notification to database
 	if err := rt.DL.Notifications.Upsert(notif); err != nil {
 		rt.DL.Logger.Log(models.LogEntry{
 			Level:   "ERROR",
@@ -356,7 +376,6 @@ func (rt *Root) SendNotificationToUser(userID int, notif *models.Notification) e
 		return err
 	}
 
-	// Send to WebSocket connections
 	rt.Hub.Mutex.Lock()
 	conns := removeDeadConns(rt.Hub.Clients[userID])
 	rt.Hub.Clients[userID] = conns
@@ -365,12 +384,12 @@ func (rt *Root) SendNotificationToUser(userID int, notif *models.Notification) e
 	for _, conn := range conns {
 		if err := conn.WriteJSON(notif); err != nil {
 			log.Printf("SendNotificationToUser: Failed to send to user %d: %v", userID, err)
-			// Optionally close and remove the conn here
+			conn.Close()
 		}
 	}
-
 	return nil
 }
+
 
 // BroadcastNotificationToGroup sends notification to all group members except sender
 func (rt *Root) BroadcastNotificationToGroup(groupID, senderID int, notif *models.Notification) error {
@@ -384,43 +403,34 @@ func (rt *Root) BroadcastNotificationToGroup(groupID, senderID int, notif *model
 	}
 
 	for userID, conns := range groupConns {
-		conns := removeDeadConns(conns)
+		if userID == senderID {
+			continue
+		}
+
+		conns = removeDeadConns(conns)
 		rt.Hub.Mutex.Lock()
 		rt.Hub.Groups[groupID][userID] = conns
 		rt.Hub.Mutex.Unlock()
 
-		if userID == senderID {
-			continue // Skip sender
-		}
-
-		// Set the notification's user ID for each recipient
-		userNotif := *notif // Copy the notification
+		// Clone the notif for DB/userID
+		userNotif := *notif
 		userNotif.UserID = userID
 
-		// Save notification to database for each user
-		if err := rt.DL.Notifications.Upsert(&userNotif); err != nil {
+		if err := rt.SendNotificationToUser(userID, &userNotif); err != nil {
 			rt.DL.Logger.Log(models.LogEntry{
 				Level:   "ERROR",
-				Message: "Failed to save group notification",
+				Message: "Failed to send group notification",
 				Metadata: map[string]any{
 					"user_id":  userID,
 					"group_id": groupID,
 					"error":    err.Error(),
 				},
 			})
-			continue
-		}
-
-		// Send to WebSocket connections
-		for _, conn := range conns {
-			if err := conn.WriteJSON(&userNotif); err != nil {
-				log.Printf("BroadcastNotificationToGroup: failed to send to user %d in group %d: %v", userID, groupID, err)
-			}
 		}
 	}
-
 	return nil
 }
+
 
 func removeDeadConns(conns []*websocket.Conn) []*websocket.Conn {
 	var alive []*websocket.Conn
