@@ -1,0 +1,3 @@
+when clicked "follow" button, following column not gonna auto-rendered real-time.
+make (on /main) "my groups" clickable link's to related groups.
+When user dont have avatar image its cause err
